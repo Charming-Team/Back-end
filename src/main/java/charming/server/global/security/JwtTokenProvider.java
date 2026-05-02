@@ -12,6 +12,7 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.UUID;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import lombok.extern.slf4j.Slf4j;
@@ -93,6 +94,7 @@ public class JwtTokenProvider {
         payload.put("name", user.getName());
         payload.put("role", user.getRole().name());
         payload.put("type", tokenType);
+        payload.put("jti", UUID.randomUUID().toString());
         payload.put("iat", now.getEpochSecond());
         payload.put("exp", expiresAt.getEpochSecond());
 

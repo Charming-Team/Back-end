@@ -25,7 +25,7 @@ public class AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final RefreshTokenService refreshTokenService;
 
-    @Transactional
+    @Transactional(noRollbackFor = CustomException.class)
     public LoginResponse login(LoginRequest request) {
         User user = userRepository.findByEmail(request.email())
                 .orElseThrow(() -> {
