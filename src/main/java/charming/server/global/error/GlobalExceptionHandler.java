@@ -1,6 +1,7 @@
 package charming.server.global.error;
 
 import charming.server.global.common.BaseResponse;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -92,8 +93,12 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<BaseResponse<Void>> handleException(Exception exception) {
-        log.error("Unhandled exception", exception);
+    public ResponseEntity<BaseResponse<Void>> handleException(Exception exception, HttpServletRequest request) {
+        log.error(
+                "[GlobalExceptionHandler] 처리되지 않은 예외 발생 reason=unhandled_exception path={}",
+                request.getRequestURI(),
+                exception
+        );
         ErrorCode errorCode = ErrorCode.INTERNAL_SERVER_ERROR;
 
         return ResponseEntity
