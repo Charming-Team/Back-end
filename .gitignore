@@ -67,3 +67,6 @@ application.yml
 ### Test Reports ###
 target/
 reports/
+
+### Local agent notes ###
+agent.md
