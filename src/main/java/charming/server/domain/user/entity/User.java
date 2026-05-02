@@ -82,6 +82,10 @@ public class User extends BaseEntity {
     @Schema(description = "소속 부서", example = "생산관리팀")
     private String department;
 
+    @Column(length = 20)
+    @Schema(description = "연락처", example = "010-1234-5678")
+    private String phoneNumber;
+
 
     public void recordLoginSuccess(LocalDateTime loginAt) {
         this.loginFailCount = 0;
