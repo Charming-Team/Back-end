@@ -19,6 +19,21 @@ public class TokenService {
     private final JwtTokenProvider jwtTokenProvider;
     private final RefreshTokenService refreshTokenService;
 
+    /**
+     * 기능: Refresh Token을 검증하고 기존 토큰을 폐기한 뒤 새 Access Token과 Refresh Token을 발급한다.
+     *
+     * Input:
+     * - request / TokenRefreshRequest / 토큰 재발급 요청 값
+     * - request.refreshToken / String / 재발급에 사용할 Refresh Token
+     *
+     * Output:
+     * - response / TokenRefreshResponse / 토큰 재발급 응답 값
+     * - response.tokenType / String / 토큰 타입
+     * - response.accessToken / String / 새로 발급된 Access Token
+     * - response.refreshToken / String / 새로 발급된 Refresh Token
+     * - response.accessTokenExpiresIn / long / Access Token 만료 시간(ms)
+     * - response.refreshTokenExpiresIn / long / Refresh Token 만료 시간(ms)
+     */
     @Transactional
     public TokenRefreshResponse refreshToken(TokenRefreshRequest request) {
         jwtTokenProvider.getRefreshTokenClaims(request.refreshToken());
