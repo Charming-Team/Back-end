@@ -17,9 +17,12 @@ public enum ErrorCode {
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "401", "인증이 필요합니다."),
     INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "401-001", "유효하지 않은 토큰입니다."),
     EXPIRED_TOKEN(HttpStatus.UNAUTHORIZED, "401-002", "만료된 토큰입니다."),
+    INVALID_LOGIN_CREDENTIALS(HttpStatus.UNAUTHORIZED, "401-003", "아이디 또는 비밀번호가 올바르지 않습니다."),
 
     // 403 Forbidden
     FORBIDDEN(HttpStatus.FORBIDDEN, "403", "접근 권한이 없습니다."),
+    ADMIN_AUTH_REQUIRED(HttpStatus.FORBIDDEN, "403-001", "관리자만 로그인할 수 있습니다."),
+    INACTIVE_ACCOUNT(HttpStatus.FORBIDDEN, "403-002", "사용할 수 없는 계정입니다."),
 
     // 404 Not Found
     NOT_FOUND(HttpStatus.NOT_FOUND, "404", "요청한 리소스를 찾을 수 없습니다."),
