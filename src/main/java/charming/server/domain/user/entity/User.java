@@ -55,7 +55,7 @@ public class User extends BaseEntity {
     private String password;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(nullable = false, length = 30)
     @Schema(description = "사용자 권한", example = "OPERATOR")
     private Role role;
 
@@ -82,9 +82,6 @@ public class User extends BaseEntity {
     @Schema(description = "소속 부서", example = "생산관리팀")
     private String department;
 
-    @Column(length = 100)
-    @Schema(description = "직책", example = "작업자")
-    private String position;
 
     public void recordLoginSuccess(LocalDateTime loginAt) {
         this.loginFailCount = 0;
