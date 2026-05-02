@@ -12,6 +12,7 @@ public enum ErrorCode {
     BAD_REQUEST(HttpStatus.BAD_REQUEST, "400", "잘못된 요청입니다."),
     VALIDATION_ERROR(HttpStatus.BAD_REQUEST, "400-001", "요청 값 검증에 실패했습니다."),
     INVALID_REQUEST_BODY(HttpStatus.BAD_REQUEST, "400-002", "요청 본문을 읽을 수 없습니다."),
+    PASSWORD_CONFIRM_MISMATCH(HttpStatus.BAD_REQUEST, "400-003", "비밀번호와 비밀번호 확인이 일치하지 않습니다."),
 
     // 401 Unauthorized
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "401", "인증이 필요합니다."),
@@ -32,6 +33,7 @@ public enum ErrorCode {
 
     // 409 Conflict
     CONFLICT(HttpStatus.CONFLICT, "409", "이미 존재하는 리소스입니다."),
+    DUPLICATE_EMAIL(HttpStatus.CONFLICT, "409-001", "이미 사용 중인 이메일입니다."),
 
     // 500 Internal Server Error
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "500", "서버 내부 오류가 발생했습니다.");

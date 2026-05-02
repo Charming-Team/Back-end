@@ -36,10 +36,6 @@ public class User extends BaseEntity {
     @Schema(description = "사용자 이름", example = "김길동")
     private String name;
 
-    @Column(nullable = false, unique = true, length = 50)
-    @Schema(description = "로그인 아이디", example = "operator01")
-    private String username;
-
     @Email
     @Column(nullable = false, unique = true, length = 100)
     @Schema(description = "이메일", example = "operator01@example.com")
