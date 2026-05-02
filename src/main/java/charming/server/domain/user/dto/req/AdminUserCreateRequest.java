@@ -40,6 +40,11 @@ public record AdminUserCreateRequest(
         String department,
 
         @NotBlank
+        @Size(max = 100)
+        @Schema(description = "회사명", example = "Charming")
+        String companyName,
+
+        @NotBlank
         @Size(max = 20)
         @Schema(description = "연락처", example = "010-1234-5678")
         String phoneNumber

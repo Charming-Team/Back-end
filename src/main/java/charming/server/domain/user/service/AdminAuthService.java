@@ -40,17 +40,18 @@ public class AdminAuthService {
                 .password(passwordEncoder.encode(request.password()))
                 .role(request.role())
                 .department(request.department().trim())
+                .companyName(request.companyName().trim())
                 .phoneNumber(request.phoneNumber().trim())
                 .build();
 
         User savedUser = userRepository.save(user);
         log.info(
-                "[AdminAuthService] 사용자 생성 완료 userId={}, email={}, role={}, department={}",
+                "[AdminAuthService] 사용자 생성 완료 userId={}, email={}, role={}, department={}, companyName={}",
                 savedUser.getId(),
-                savedUser.getName(),
                 savedUser.getEmail(),
                 savedUser.getRole(),
-                savedUser.getPhoneNumber()
+                savedUser.getDepartment(),
+                savedUser.getCompanyName()
         );
         return new AdminUserCreateResponse(
                 savedUser.getId(),
@@ -58,6 +59,7 @@ public class AdminAuthService {
                 savedUser.getEmail(),
                 savedUser.getRole(),
                 savedUser.getDepartment(),
+                savedUser.getCompanyName(),
                 savedUser.getPhoneNumber()
         );
     }

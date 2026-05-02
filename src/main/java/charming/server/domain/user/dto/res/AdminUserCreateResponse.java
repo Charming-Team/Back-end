@@ -20,6 +20,9 @@ public record AdminUserCreateResponse(
         @Schema(description = "소속 부서", example = "생산관리팀")
         String department,
 
+        @Schema(description = "회사명", example = "Charming")
+        String companyName,
+
         @Schema(description = "연락처", example = "010-1234-5678")
         String phoneNumber
 ) {
