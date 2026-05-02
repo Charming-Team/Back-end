@@ -28,7 +28,6 @@ app:
   cors:
     allowed-origins: http://localhost:3000,http://localhost:5173
   jwt:
-    secret: ${JWT_SECRET:local-development-jwt-secret-key-change-before-production-2026}
     access-token-expiration-ms: 1800000
     refresh-token-expiration-ms: 86400000
 
@@ -48,6 +47,9 @@ spring:
     properties:
       hibernate:
         format_sql: true
+app:
+  jwt:
+    secret: ${JWT_SECRET:local-development-jwt-secret-key-change-before-production-2026}
 
 ---
 spring:
@@ -62,6 +64,9 @@ spring:
   jpa:
     hibernate:
       ddl-auto: create-drop
+app:
+  jwt:
+    secret: test-jwt-secret-key-for-h2-tests-only
 
 ---
 spring:
@@ -91,3 +96,5 @@ management:
 app:
   cors:
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS}
+  jwt:
+    secret: ${JWT_SECRET}
