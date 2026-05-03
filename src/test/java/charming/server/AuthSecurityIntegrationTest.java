@@ -339,8 +339,8 @@ class AuthSecurityIntegrationTest {
         }
 
         @Test
-        @DisplayName("비활성 계정의 기존 Access Token은 보호 API에서 403-002를 반환한다")
-        void inactiveUserAccessTokenFails() throws Exception {
+        @DisplayName("기존 Access Token은 계정 상태 변경 후에도 만료 전까지 클레임 기반으로 동작한다")
+        void existingAccessTokenUsesClaimsUntilItExpires() throws Exception {
             User admin = saveUser(Role.ADMIN, "admin@example.com", PASSWORD);
             String accessToken = loginAndGetAccessToken(admin);
             admin.suspend();
@@ -350,9 +350,9 @@ class AuthSecurityIntegrationTest {
                             .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(createUserJson("operator01@example.com", "operator1234!", "operator1234!", Role.OPERATOR)))
-                    .andExpect(status().isForbidden())
-                    .andExpect(jsonPath("$.success").value(false))
-                    .andExpect(jsonPath("$.code").value("403-002"));
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.success").value(true))
+                    .andExpect(jsonPath("$.code").value("COMMON200"));
         }
     }
 

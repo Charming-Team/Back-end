@@ -1,7 +1,6 @@
 package charming.server.global.security;
 
-import charming.server.domain.user.entity.User;
-import charming.server.domain.user.repository.UserRepository;
+import charming.server.domain.user.entity.Role;
 import charming.server.global.common.BaseResponse;
 import charming.server.global.error.CustomException;
 import charming.server.global.error.ErrorCode;
@@ -32,7 +31,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final String BEARER_PREFIX = "Bearer ";
 
     private final JwtTokenProvider jwtTokenProvider;
-    private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -51,24 +49,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String token = authorizationHeader.substring(BEARER_PREFIX.length());
             Map<String, Object> claims = jwtTokenProvider.getAccessTokenClaims(token);
             Long userId = jwtTokenProvider.getUserId(claims);
-            User user = userRepository.findById(userId)
-                    .orElseThrow(() -> new CustomException(ErrorCode.INVALID_TOKEN));
-            if (!user.isActive()) {
-                throw new CustomException(ErrorCode.INACTIVE_ACCOUNT);
-            }
+            String email = jwtTokenProvider.getSubject(claims);
+            Role role = jwtTokenProvider.getRole(claims);
 
-            AuthUser authUser = new AuthUser(user.getId(), user.getEmail(), user.getRole());
+            AuthUser authUser = new AuthUser(userId, email, role);
             UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                     authUser,
                     null,
-                    List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()))
+                    List.of(new SimpleGrantedAuthority("ROLE_" + role.name()))
             );
             SecurityContextHolder.getContext().setAuthentication(authentication);
             log.debug(
                     "[JwtAuthenticationFilter] 인증 성공 userId={}, email={}, role={}, path={}",
-                    user.getId(),
-                    user.getEmail(),
-                    user.getRole(),
+                    userId,
+                    email,
+                    role,
                     request.getRequestURI()
             );
             filterChain.doFilter(request, response);

@@ -1,6 +1,7 @@
 package charming.server.global.security;
 
 import charming.server.domain.user.entity.User;
+import charming.server.domain.user.entity.Role;
 import charming.server.global.error.CustomException;
 import charming.server.global.error.ErrorCode;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -70,6 +71,27 @@ public class JwtTokenProvider {
             return number.longValue();
         }
         throw new CustomException(ErrorCode.INVALID_TOKEN);
+    }
+
+    public String getSubject(Map<String, Object> claims) {
+        Object subject = claims.get("sub");
+        if (subject instanceof String value && !value.isBlank()) {
+            return value;
+        }
+        throw new CustomException(ErrorCode.INVALID_TOKEN);
+    }
+
+    public Role getRole(Map<String, Object> claims) {
+        Object role = claims.get("role");
+        if (!(role instanceof String value) || value.isBlank()) {
+            throw new CustomException(ErrorCode.INVALID_TOKEN);
+        }
+
+        try {
+            return Role.valueOf(value);
+        } catch (IllegalArgumentException exception) {
+            throw new CustomException(ErrorCode.INVALID_TOKEN);
+        }
     }
 
     public long getAccessTokenExpirationMillis() {
