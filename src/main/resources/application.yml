@@ -40,7 +40,7 @@ spring:
     url: jdbc:postgresql://localhost:5432/postgres
     driver-class-name: org.postgresql.Driver
     username: postgres
-    password: thsutleo12@
+    password: ${DB_PASSWORD}
   jpa:
     hibernate:
       ddl-auto: update
@@ -49,7 +49,7 @@ spring:
         format_sql: true
 app:
   jwt:
-    secret: ${JWT_SECRET:local-development-jwt-secret-key-change-before-production-2026}
+    secret: ${JWT_SECRET}
 
 ---
 spring:
