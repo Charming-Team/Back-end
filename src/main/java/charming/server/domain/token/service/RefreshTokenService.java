@@ -90,6 +90,26 @@ public class RefreshTokenService {
     }
 
     /**
+     * 기능: 보관 기간이 지난 만료 Refresh Token 이력을 삭제한다.
+     *
+     * Input:
+     * - cutoff / LocalDateTime / 이 시각보다 먼저 만료된 Refresh Token 삭제 기준
+     *
+     * Output:
+     * - deletedCount / int / 삭제된 Refresh Token 수
+     */
+    @Transactional
+    public int deleteExpiredBefore(LocalDateTime cutoff) {
+        int deletedCount = refreshTokenRepository.deleteExpiredBefore(cutoff);
+        log.info(
+                "[RefreshTokenService] 만료 Refresh Token 정리 cutoff={}, deletedCount={}",
+                cutoff,
+                deletedCount
+        );
+        return deletedCount;
+    }
+
+    /**
      * 기능: Refresh Token 원문을 SHA-256 해시 문자열로 변환한다.
      *
      * Input:
