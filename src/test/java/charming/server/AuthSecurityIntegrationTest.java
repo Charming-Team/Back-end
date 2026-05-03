@@ -161,6 +161,24 @@ class AuthSecurityIntegrationTest {
                     .andExpect(jsonPath("$.success").value(false))
                     .andExpect(jsonPath("$.code").value("400-001"));
         }
+
+        @Test
+        @DisplayName("로그인은 잘못된 Authorization 헤더가 있어도 JWT 필터에 막히지 않는다")
+        void loginIgnoresInvalidAuthorizationHeader() throws Exception {
+            User user = saveUser(Role.OPERATOR, "operator@example.com", PASSWORD);
+
+            mockMvc.perform(post("/api/auth/login")
+                            .header(HttpHeaders.AUTHORIZATION, bearer("invalid-token"))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(json(Map.of(
+                                    "email", user.getEmail(),
+                                    "password", PASSWORD
+                            ))))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.success").value(true))
+                    .andExpect(jsonPath("$.code").value("COMMON200"))
+                    .andExpect(jsonPath("$.data.email").value(user.getEmail()));
+        }
     }
 
     @Nested
@@ -320,6 +338,23 @@ class AuthSecurityIntegrationTest {
                     .andExpect(status().isUnauthorized())
                     .andExpect(jsonPath("$.success").value(false))
                     .andExpect(jsonPath("$.code").value("401-001"));
+        }
+
+        @Test
+        @DisplayName("Refresh Token 재발급은 잘못된 Authorization 헤더가 있어도 body의 Refresh Token으로 처리한다")
+        void refreshTokenIgnoresInvalidAuthorizationHeader() throws Exception {
+            User user = saveUser(Role.OPERATOR, "operator@example.com", PASSWORD);
+            String refreshToken = dataValue(login(user), "refreshToken");
+
+            mockMvc.perform(post("/api/token/refresh")
+                            .header(HttpHeaders.AUTHORIZATION, bearer("invalid-token"))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(json(Map.of("refreshToken", refreshToken))))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.success").value(true))
+                    .andExpect(jsonPath("$.code").value("COMMON200"))
+                    .andExpect(jsonPath("$.data.accessToken").isNotEmpty())
+                    .andExpect(jsonPath("$.data.refreshToken").isNotEmpty());
         }
 
         @Test

@@ -29,9 +29,42 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private static final String BEARER_PREFIX = "Bearer ";
+    private static final String[] PUBLIC_EXACT_PATHS = {
+            "/api/auth/login",
+            "/api/token/refresh",
+            "/swagger-ui.html",
+            "/actuator/health"
+    };
+    private static final String[] PUBLIC_PATH_PREFIXES = {
+            "/swagger-ui/",
+            "/v3/api-docs",
+            "/actuator/health/"
+    };
 
     private final JwtTokenProvider jwtTokenProvider;
     private final ObjectMapper objectMapper;
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        if ("OPTIONS".equals(request.getMethod())) {
+            return true;
+        }
+
+        String path = getPathWithoutContextPath(request);
+        for (String publicPath : PUBLIC_EXACT_PATHS) {
+            if (path.equals(publicPath)) {
+                return true;
+            }
+        }
+
+        for (String publicPathPrefix : PUBLIC_PATH_PREFIXES) {
+            if (path.startsWith(publicPathPrefix)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     @Override
     protected void doFilterInternal(
@@ -83,5 +116,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         objectMapper.writeValue(response.getWriter(), BaseResponse.fail(errorCode));
+    }
+
+    private String getPathWithoutContextPath(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        String contextPath = request.getContextPath();
+        if (contextPath != null && !contextPath.isBlank() && path.startsWith(contextPath)) {
+            return path.substring(contextPath.length());
+        }
+        return path;
     }
 }
