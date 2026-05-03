@@ -64,14 +64,24 @@ public class RefreshTokenService {
      */
     @Transactional
     public User validateAndRevoke(String token) {
-        RefreshToken refreshToken = refreshTokenRepository.findByTokenHashAndRevokedFalse(hashToken(token))
+        String tokenHash = hashToken(token);
+        RefreshToken refreshToken = refreshTokenRepository.findByTokenHash(tokenHash)
                 .orElseThrow(() -> {
-                    log.warn("[RefreshTokenService] Refresh Token 검증 실패 reason=not_found_or_revoked");
+                    log.warn("[RefreshTokenService] Refresh Token 검증 실패 reason=not_found");
                     return new CustomException(ErrorCode.INVALID_TOKEN);
                 });
 
-        if (refreshToken.isExpired(LocalDateTime.now())) {
-            refreshToken.revoke();
+        if (refreshToken.isRevoked()) {
+            log.warn(
+                    "[RefreshTokenService] Refresh Token 검증 실패 reason=already_revoked refreshTokenId={}, userId={}",
+                    refreshToken.getId(),
+                    refreshToken.getUser().getId()
+            );
+            throw new CustomException(ErrorCode.INVALID_TOKEN);
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        if (refreshToken.isExpired(now)) {
             log.warn(
                     "[RefreshTokenService] Refresh Token 검증 실패 reason=expired refreshTokenId={}, userId={}",
                     refreshToken.getId(),
@@ -80,7 +90,16 @@ public class RefreshTokenService {
             throw new CustomException(ErrorCode.EXPIRED_TOKEN);
         }
 
-        refreshToken.revoke();
+        int revokedCount = refreshTokenRepository.revokeIfActive(tokenHash, now);
+        if (revokedCount != 1) {
+            log.warn(
+                    "[RefreshTokenService] Refresh Token 검증 실패 reason=concurrent_reuse refreshTokenId={}, userId={}",
+                    refreshToken.getId(),
+                    refreshToken.getUser().getId()
+            );
+            throw new CustomException(ErrorCode.INVALID_TOKEN);
+        }
+
         log.debug(
                 "[RefreshTokenService] Refresh Token 폐기 refreshTokenId={}, userId={}",
                 refreshToken.getId(),
