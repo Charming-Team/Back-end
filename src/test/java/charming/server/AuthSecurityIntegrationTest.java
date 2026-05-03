@@ -86,7 +86,7 @@ class AuthSecurityIntegrationTest {
                     .andExpect(jsonPath("$.data.tokenType").value("Bearer"))
                     .andExpect(jsonPath("$.data.accessToken").isNotEmpty())
                     .andExpect(jsonPath("$.data.refreshToken").isNotEmpty())
-                    .andExpect(jsonPath("$.data.accessTokenExpiresIn").value(1_800_000))
+                    .andExpect(jsonPath("$.data.accessTokenExpiresIn").value(300_000))
                     .andExpect(jsonPath("$.data.refreshTokenExpiresIn").value(86_400_000))
                     .andReturn();
 

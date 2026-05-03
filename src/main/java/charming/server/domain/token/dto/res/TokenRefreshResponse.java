@@ -13,7 +13,7 @@ public record TokenRefreshResponse(
         @Schema(description = "Refresh Token")
         String refreshToken,
 
-        @Schema(description = "Access Token 만료 시간(ms)", example = "1800000")
+        @Schema(description = "Access Token 만료 시간(ms)", example = "300000")
         long accessTokenExpiresIn,
 
         @Schema(description = "Refresh Token 만료 시간(ms)", example = "86400000")
