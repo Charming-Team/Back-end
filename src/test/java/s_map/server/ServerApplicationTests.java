@@ -1,4 +1,4 @@
-package charming.server;
+package s_map.server;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;

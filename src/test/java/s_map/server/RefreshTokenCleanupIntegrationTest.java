@@ -1,24 +1,21 @@
-package charming.server;
+package s_map.server;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
-import charming.server.domain.token.entity.RefreshToken;
-import charming.server.domain.token.repository.RefreshTokenRepository;
-import charming.server.domain.token.service.RefreshTokenService;
-import charming.server.domain.user.entity.Role;
-import charming.server.domain.user.entity.User;
-import charming.server.domain.user.entity.UserStatus;
-import charming.server.domain.user.repository.UserRepository;
 import java.time.LocalDateTime;
 import java.util.List;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import s_map.server.domain.token.entity.RefreshToken;
+import s_map.server.domain.token.repository.RefreshTokenRepository;
+import s_map.server.domain.token.service.RefreshTokenService;
+import s_map.server.domain.user.entity.Role;
+import s_map.server.domain.user.entity.User;
+import s_map.server.domain.user.entity.UserStatus;
+import s_map.server.domain.user.repository.UserRepository;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -59,11 +56,11 @@ class RefreshTokenCleanupIntegrationTest {
                 .map(RefreshToken::getTokenHash)
                 .toList();
 
-        assertEquals(2, deletedCount);
-        assertFalse(remainingTokenHashes.contains("old-revoked-token"));
-        assertFalse(remainingTokenHashes.contains("old-active-token"));
-        assertTrue(remainingTokenHashes.contains("recent-expired-token"));
-        assertTrue(remainingTokenHashes.contains("future-token"));
+        Assertions.assertEquals(2, deletedCount);
+        Assertions.assertFalse(remainingTokenHashes.contains("old-revoked-token"));
+        Assertions.assertFalse(remainingTokenHashes.contains("old-active-token"));
+        Assertions.assertTrue(remainingTokenHashes.contains("recent-expired-token"));
+        Assertions.assertTrue(remainingTokenHashes.contains("future-token"));
     }
 
     private User saveUser() {
@@ -73,7 +70,7 @@ class RefreshTokenCleanupIntegrationTest {
                 .password("encoded-password")
                 .role(Role.OPERATOR)
                 .department("생산관리팀")
-                .companyName("Charming")
+                .companyName("s_map")
                 .phoneNumber("010-0000-0000")
                 .status(UserStatus.ACTIVE)
                 .build();

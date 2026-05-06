@@ -1,14 +1,14 @@
-package charming.server;
+package s_map.server;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import charming.server.domain.token.entity.RefreshToken;
-import charming.server.domain.token.repository.RefreshTokenRepository;
-import charming.server.domain.user.entity.Role;
-import charming.server.domain.user.entity.User;
-import charming.server.domain.user.entity.UserStatus;
-import charming.server.domain.user.repository.UserRepository;
+import s_map.server.domain.token.entity.RefreshToken;
+import s_map.server.domain.token.repository.RefreshTokenRepository;
+import s_map.server.domain.user.entity.Role;
+import s_map.server.domain.user.entity.User;
+import s_map.server.domain.user.entity.UserStatus;
+import s_map.server.domain.user.repository.UserRepository;
 import jakarta.persistence.EntityManager;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.BeforeEach;
@@ -65,7 +65,7 @@ class RefreshTokenRotationIntegrationTest {
                 .password("encoded-password")
                 .role(Role.OPERATOR)
                 .department("생산관리팀")
-                .companyName("Charming")
+                .companyName("s_map")
                 .phoneNumber("010-0000-0000")
                 .status(UserStatus.ACTIVE)
                 .build();
