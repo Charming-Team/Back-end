@@ -8,7 +8,6 @@ import s_map.server.domain.user.repository.UserRepository;
 import s_map.server.global.error.CustomException;
 import s_map.server.global.error.ErrorCode;
 import s_map.server.global.security.JwtTokenProvider;
-import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -64,17 +63,14 @@ public class AuthService {
         }
 
         if (!passwordEncoder.matches(request.password(), user.getPassword())) {
-            user.increaseLoginFailCount();
             log.warn(
-                    "[AuthService] 로그인 실패 reason=password_mismatch userId={}, email={}, loginFailCount={}",
+                    "[AuthService] 로그인 실패 reason=password_mismatch userId={}, email={}",
                     user.getId(),
-                    user.getEmail(),
-                    user.getLoginFailCount()
+                    user.getEmail()
             );
             throw new CustomException(ErrorCode.INVALID_LOGIN_CREDENTIALS);
         }
 
-        user.recordLoginSuccess(LocalDateTime.now());
         String accessToken = jwtTokenProvider.generateAccessToken(user);
         String refreshToken = jwtTokenProvider.generateRefreshToken(user);
         refreshTokenService.save(user, refreshToken, jwtTokenProvider.getRefreshTokenExpirationMillis());
