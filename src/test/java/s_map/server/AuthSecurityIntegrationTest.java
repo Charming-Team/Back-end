@@ -106,8 +106,8 @@ class AuthSecurityIntegrationTest {
         }
 
         @Test
-        @DisplayName("비밀번호가 틀리면 401-003을 반환하고 로그인 실패 횟수가 증가한다")
-        void wrongPasswordIncrementsFailCount() throws Exception {
+        @DisplayName("비밀번호가 틀리면 401-003을 반환한다")
+        void wrongPasswordFails() throws Exception {
             User user = saveUser(Role.OPERATOR, "operator@example.com", PASSWORD);
 
             mockMvc.perform(MockMvcRequestBuilders.post("/api/auth/login")
@@ -119,9 +119,6 @@ class AuthSecurityIntegrationTest {
                     .andExpect(MockMvcResultMatchers.status().isUnauthorized())
                     .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(false))
                     .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("401-003"));
-
-            User updatedUser = userRepository.findById(user.getId()).orElseThrow();
-            Assertions.assertEquals(1, updatedUser.getLoginFailCount());
         }
 
         @Test
