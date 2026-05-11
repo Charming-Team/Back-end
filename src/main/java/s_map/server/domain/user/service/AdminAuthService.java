@@ -6,12 +6,19 @@ import s_map.server.domain.user.entity.User;
 import s_map.server.domain.user.repository.UserRepository;
 import s_map.server.global.error.CustomException;
 import s_map.server.global.error.ErrorCode;
+import s_map.server.domain.user.dto.res.AdminUserResponse;
+import s_map.server.domain.user.entity.UserStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 
 @Slf4j
 @Service
@@ -86,5 +93,21 @@ public class AdminAuthService {
                 savedUser.getCompanyName(),
                 savedUser.getPhoneNumber()
         );
+    }
+
+    /**
+     * 기능: 관리자 화면에서 사용자 목록을 조회한다.
+     */
+    @Transactional(readOnly = true)
+    public Page<AdminUserResponse> getUsers(int page, int size) {
+        Pageable pageable = PageRequest.of(
+                page,
+                size,
+                Sort.by(Sort.Direction.DESC, "id")
+        );
+
+        Page<User> users = userRepository.findByStatusNot(UserStatus.WITHDRAWN, pageable);
+
+        return users.map(AdminUserResponse::from);
     }
 }
