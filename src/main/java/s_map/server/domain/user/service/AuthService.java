@@ -126,20 +126,21 @@ public class AuthService {
     }
 
     /**
-     * 기능: Refresh Token을 검증한 뒤 폐기하여 로그아웃 처리한다.
+     * 기능: 현재 로그인한 사용자의 Refresh Token인지 검증한 뒤 폐기하여 로그아웃 처리한다.
      *
      * Input:
      * - request / LogoutRequest / 로그아웃 요청 값
      * - request.refreshToken / String / 폐기할 Refresh Token 원문
+     * - email / String / 현재 로그인한 사용자 이메일
      *
      * Output:
      * - result / void / 반환값 없음, Refresh Token 폐기만 수행
      */
     @Transactional
-    public void logout(LogoutRequest request) {
-        refreshTokenService.validateAndRevoke(request.getRefreshToken());
+    public void logout(LogoutRequest request, String email) {
+        refreshTokenService.validateOwnerAndRevoke(request.getRefreshToken(), email);
 
-        log.info("[AuthService] 로그아웃 성공");
+        log.info("[AuthService] 로그아웃 성공 email={}", email);
     }
 
 }

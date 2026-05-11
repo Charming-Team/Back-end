@@ -43,8 +43,11 @@ public class AuthController {
 
     @Operation(summary = "로그아웃")
     @PostMapping("/logout")
-    public BaseResponse<Void> logout(@Valid @RequestBody LogoutRequest request) {
-        authService.logout(request);
+    public BaseResponse<Void> logout(
+            @Valid @RequestBody LogoutRequest request,
+            @AuthenticationPrincipal UserDetails userDetails
+    ) {
+        authService.logout(request, userDetails.getUsername());
         return BaseResponse.success(null);
     }
 }
