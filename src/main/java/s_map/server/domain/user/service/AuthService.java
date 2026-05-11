@@ -6,6 +6,7 @@ import s_map.server.domain.user.dto.res.LoginResponse;
 import s_map.server.domain.user.entity.User;
 import s_map.server.domain.user.repository.UserRepository;
 import s_map.server.domain.user.dto.res.AuthMeResponse;
+import s_map.server.domain.user.dto.req.LogoutRequest;
 
 import s_map.server.global.error.CustomException;
 import s_map.server.global.error.ErrorCode;
@@ -108,6 +109,16 @@ public class AuthService {
                 });
 
         return AuthMeResponse.from(user);
+    }
+
+    /**
+     * 기능: Refresh Token을 폐기하여 로그아웃 처리한다.
+     */
+    @Transactional
+    public void logout(LogoutRequest request) {
+        refreshTokenService.validateAndRevoke(request.getRefreshToken());
+
+        log.info("[AuthService] 로그아웃 성공");
     }
 
 }

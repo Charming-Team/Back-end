@@ -5,8 +5,7 @@ import s_map.server.domain.user.dto.res.LoginResponse;
 import s_map.server.domain.user.service.AuthService;
 import s_map.server.global.common.BaseResponse;
 import s_map.server.domain.user.dto.res.AuthMeResponse;
-import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.GetMapping;
+import s_map.server.domain.user.dto.req.LogoutRequest;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -16,6 +15,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.GetMapping;
 
 @Tag(name = "Auth", description = "인증 API")
 @RestController
@@ -35,5 +36,12 @@ public class AuthController {
     @GetMapping("/me")
     public BaseResponse<AuthMeResponse> getMyInfo(Authentication authentication) {
         return BaseResponse.success(authService.getMyInfo(authentication.getName()));
+    }
+
+    @Operation(summary = "로그아웃")
+    @PostMapping("/logout")
+    public BaseResponse<Void> logout(@Valid @RequestBody LogoutRequest request) {
+        authService.logout(request);
+        return BaseResponse.success(null);
     }
 }
