@@ -15,8 +15,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 
 @Tag(name = "Auth", description = "인증 API")
 @RestController
@@ -34,8 +35,10 @@ public class AuthController {
 
     @Operation(summary = "내 정보 조회")
     @GetMapping("/me")
-    public BaseResponse<AuthMeResponse> getMyInfo(Authentication authentication) {
-        return BaseResponse.success(authService.getMyInfo(authentication.getName()));
+    public BaseResponse<AuthMeResponse> getMyInfo(
+            @AuthenticationPrincipal UserDetails userDetails
+    ) {
+        return BaseResponse.success(authService.getMyInfo(userDetails.getUsername()));
     }
 
     @Operation(summary = "로그아웃")

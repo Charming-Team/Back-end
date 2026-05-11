@@ -96,7 +96,27 @@ public class AdminAuthService {
     }
 
     /**
-     * 기능: 관리자 화면에서 사용자 목록을 조회한다.
+     * 기능: 관리자 화면에서 사용자 목록을 페이지 단위로 조회한다.
+     * WITHDRAWN 상태의 사용자는 목록에서 제외한다.
+     *
+     * Input:
+     * - page / int / 조회할 페이지 번호
+     * - size / int / 한 페이지에 조회할 사용자 수
+     *
+     * Output:
+     * - response / Page<AdminUserResponse> / 사용자 목록 페이지 응답 값
+     * - response.content / List<AdminUserResponse> / 사용자 목록
+     * - response.content.id / Long / 사용자 ID
+     * - response.content.name / String / 사용자 이름
+     * - response.content.email / String / 사용자 이메일
+     * - response.content.role / String / 사용자 권한
+     * - response.content.status / String / 사용자 계정 상태
+     * - response.content.department / String / 사용자 소속 부서
+     * - response.content.companyName / String / 사용자 소속 회사명
+     * - response.content.phoneNumber / String / 사용자 연락처
+     * - response.pageable / Pageable / 페이지 요청 정보
+     * - response.totalElements / long / 전체 사용자 수
+     * - response.totalPages / int / 전체 페이지 수
      */
     @Transactional(readOnly = true)
     public Page<AdminUserResponse> getUsers(int page, int size) {
@@ -113,7 +133,13 @@ public class AdminAuthService {
 
     /**
      * 기능: 관리자 화면에서 사용자를 삭제 처리한다.
-     * 실제 DB 삭제가 아니라 계정 상태를 WITHDRAWN으로 변경한다.
+     * 실제 DB 삭제가 아니라 사용자 계정 상태를 WITHDRAWN으로 변경한다.
+     *
+     * Input:
+     * - userId / Long / 삭제 처리할 사용자 ID
+     *
+     * Output:
+     * - result / void / 반환값 없음, 사용자 상태 변경만 수행
      */
     @Transactional
     public void deleteUser(Long userId) {

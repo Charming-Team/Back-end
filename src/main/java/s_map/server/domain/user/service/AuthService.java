@@ -99,6 +99,20 @@ public class AuthService {
 
     /**
      * 기능: 현재 로그인한 사용자의 정보를 조회한다.
+     *
+     * Input:
+     * - email / String / 현재 인증된 사용자의 이메일
+     *
+     * Output:
+     * - response / AuthMeResponse / 현재 로그인 사용자 정보 응답 값
+     * - response.id / Long / 사용자 ID
+     * - response.name / String / 사용자 이름
+     * - response.email / String / 사용자 이메일
+     * - response.role / String / 사용자 권한
+     * - response.status / String / 사용자 계정 상태
+     * - response.department / String / 사용자 소속 부서
+     * - response.companyName / String / 사용자 소속 회사명
+     * - response.phoneNumber / String / 사용자 연락처
      */
     @Transactional(readOnly = true)
     public AuthMeResponse getMyInfo(String email) {
@@ -112,7 +126,14 @@ public class AuthService {
     }
 
     /**
-     * 기능: Refresh Token을 폐기하여 로그아웃 처리한다.
+     * 기능: Refresh Token을 검증한 뒤 폐기하여 로그아웃 처리한다.
+     *
+     * Input:
+     * - request / LogoutRequest / 로그아웃 요청 값
+     * - request.refreshToken / String / 폐기할 Refresh Token 원문
+     *
+     * Output:
+     * - result / void / 반환값 없음, Refresh Token 폐기만 수행
      */
     @Transactional
     public void logout(LogoutRequest request) {
