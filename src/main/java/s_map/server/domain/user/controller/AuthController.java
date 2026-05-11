@@ -4,6 +4,10 @@ import s_map.server.domain.user.dto.req.LoginRequest;
 import s_map.server.domain.user.dto.res.LoginResponse;
 import s_map.server.domain.user.service.AuthService;
 import s_map.server.global.common.BaseResponse;
+import s_map.server.domain.user.dto.res.AuthMeResponse;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.GetMapping;
+
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -25,5 +29,11 @@ public class AuthController {
     @PostMapping("/login")
     public BaseResponse<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
         return BaseResponse.success(authService.login(request));
+    }
+
+    @Operation(summary = "내 정보 조회")
+    @GetMapping("/me")
+    public BaseResponse<AuthMeResponse> getMyInfo(Authentication authentication) {
+        return BaseResponse.success(authService.getMyInfo(authentication.getName()));
     }
 }

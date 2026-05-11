@@ -5,6 +5,8 @@ import s_map.server.domain.user.dto.req.LoginRequest;
 import s_map.server.domain.user.dto.res.LoginResponse;
 import s_map.server.domain.user.entity.User;
 import s_map.server.domain.user.repository.UserRepository;
+import s_map.server.domain.user.dto.res.AuthMeResponse;
+
 import s_map.server.global.error.CustomException;
 import s_map.server.global.error.ErrorCode;
 import s_map.server.global.security.JwtTokenProvider;
@@ -92,6 +94,20 @@ public class AuthService {
                 jwtTokenProvider.getAccessTokenExpirationMillis(),
                 jwtTokenProvider.getRefreshTokenExpirationMillis()
         );
+    }
+
+    /**
+     * 기능: 현재 로그인한 사용자의 정보를 조회한다.
+     */
+    @Transactional(readOnly = true)
+    public AuthMeResponse getMyInfo(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> {
+                    log.warn("[AuthService] 내 정보 조회 실패 reason=not_found email={}", email);
+                    return new CustomException(ErrorCode.NOT_FOUND);
+                });
+
+        return AuthMeResponse.from(user);
     }
 
 }
