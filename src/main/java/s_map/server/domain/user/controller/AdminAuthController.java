@@ -17,6 +17,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 
 @Tag(name = "Admin", description = "관리자 API")
 @RestController
@@ -39,5 +41,12 @@ public class AdminAuthController {
             @RequestParam(defaultValue = "20") int size
     ) {
         return BaseResponse.success(adminAuthService.getUsers(page, size));
+    }
+
+    @Operation(summary = "사용자 삭제")
+    @DeleteMapping("/users/{userId}")
+    public BaseResponse<Void> deleteUser(@PathVariable Long userId) {
+        adminAuthService.deleteUser(userId);
+        return BaseResponse.success(null);
     }
 }

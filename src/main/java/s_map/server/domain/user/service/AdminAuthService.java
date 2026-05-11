@@ -110,4 +110,26 @@ public class AdminAuthService {
 
         return users.map(AdminUserResponse::from);
     }
+
+    /**
+     * 기능: 관리자 화면에서 사용자를 삭제 처리한다.
+     * 실제 DB 삭제가 아니라 계정 상태를 WITHDRAWN으로 변경한다.
+     */
+    @Transactional
+    public void deleteUser(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> {
+                    log.warn("[AdminAuthService] 사용자 삭제 실패 reason=user_not_found userId={}", userId);
+                    return new CustomException(ErrorCode.NOT_FOUND);
+                });
+
+        user.withdraw();
+
+        log.info(
+                "[AdminAuthService] 사용자 삭제 처리 완료 userId={}, email={}, status={}",
+                user.getId(),
+                user.getEmail(),
+                user.getStatus()
+        );
+    }
 }
