@@ -8,6 +8,7 @@ import s_map.server.domain.user.entity.UserStatus;
 import s_map.server.domain.user.repository.UserRepository;
 import s_map.server.global.error.CustomException;
 import s_map.server.global.error.ErrorCode;
+import s_map.server.domain.user.entity.Role;
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -142,28 +143,67 @@ public class AdminAuthService {
     /**
      * 기능: 관리자 화면에서 사용자를 삭제 처리한다.
      * 실제 DB 삭제가 아니라 사용자 계정 상태를 WITHDRAWN으로 변경한다.
+     * 자기 자신, 다른 ADMIN 계정, 이미 WITHDRAWN 상태인 사용자는 삭제할 수 없다.
      *
      * Input:
      * - userId / Long / 삭제 처리할 사용자 ID
+     * - currentAdminId / Long / 현재 로그인한 관리자 ID
      *
      * Output:
      * - result / void / 반환값 없음, 사용자 상태 변경만 수행
      */
     @Transactional
-    public void deleteUser(Long userId) {
-        User user = userRepository.findById(userId)
+    public void deleteUser(Long userId, Long currentAdminId) {
+        User currentAdmin = userRepository.findById(currentAdminId)
+                .orElseThrow(() -> {
+                    log.warn(
+                            "[AdminAuthService] 사용자 삭제 실패 reason=current_admin_not_found adminId={}",
+                            currentAdminId
+                    );
+                    return new CustomException(ErrorCode.NOT_FOUND);
+                });
+
+        User targetUser = userRepository.findById(userId)
                 .orElseThrow(() -> {
                     log.warn("[AdminAuthService] 사용자 삭제 실패 reason=user_not_found userId={}", userId);
                     return new CustomException(ErrorCode.NOT_FOUND);
                 });
 
-        user.withdraw();
+        if (currentAdmin.getId().equals(targetUser.getId())) {
+            log.warn(
+                    "[AdminAuthService] 사용자 삭제 실패 reason=self_delete_not_allowed userId={}, email={}",
+                    currentAdmin.getId(),
+                    currentAdmin.getEmail()
+            );
+            throw new CustomException(ErrorCode.FORBIDDEN);
+        }
+
+        if (targetUser.getRole() == Role.ADMIN) {
+            log.warn(
+                    "[AdminAuthService] 사용자 삭제 실패 reason=admin_delete_not_allowed targetUserId={}, targetEmail={}",
+                    targetUser.getId(),
+                    targetUser.getEmail()
+            );
+            throw new CustomException(ErrorCode.FORBIDDEN);
+        }
+
+        if (targetUser.getStatus() == UserStatus.WITHDRAWN) {
+            log.warn(
+                    "[AdminAuthService] 사용자 삭제 실패 reason=already_withdrawn targetUserId={}, targetEmail={}",
+                    targetUser.getId(),
+                    targetUser.getEmail()
+            );
+            throw new CustomException(ErrorCode.CONFLICT);
+        }
+
+        targetUser.withdraw();
 
         log.info(
-                "[AdminAuthService] 사용자 삭제 처리 완료 userId={}, email={}, status={}",
-                user.getId(),
-                user.getEmail(),
-                user.getStatus()
+                "[AdminAuthService] 사용자 삭제 처리 완료 adminId={}, targetUserId={}, targetEmail={}, status={}",
+                currentAdmin.getId(),
+                targetUser.getId(),
+                targetUser.getEmail(),
+                targetUser.getStatus()
         );
     }
 }

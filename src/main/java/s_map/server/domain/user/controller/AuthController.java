@@ -36,18 +36,18 @@ public class AuthController {
     @Operation(summary = "내 정보 조회")
     @GetMapping("/me")
     public BaseResponse<AuthMeResponse> getMyInfo(
-            @AuthenticationPrincipal UserDetails userDetails
+            @AuthenticationPrincipal String email
     ) {
-        return BaseResponse.success(authService.getMyInfo(userDetails.getUsername()));
+        return BaseResponse.success(authService.getMyInfo(email));
     }
 
     @Operation(summary = "로그아웃")
     @PostMapping("/logout")
     public BaseResponse<Void> logout(
             @Valid @RequestBody LogoutRequest request,
-            @AuthenticationPrincipal UserDetails userDetails
+            @AuthenticationPrincipal String email
     ) {
-        authService.logout(request, userDetails.getUsername());
+        authService.logout(request, email);
         return BaseResponse.success(null);
     }
 }
