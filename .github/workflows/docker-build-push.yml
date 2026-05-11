@@ -4,15 +4,16 @@ on:
   push:
     branches:
       - main
-      - develop
-      - "feat/**"
-      - "chore/**"
   workflow_dispatch:
     inputs:
       version:
         description: "Optional release version tag, for example v0.1.1"
         required: false
         type: string
+
+concurrency:
+  group: docker-build-push-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -23,6 +24,7 @@ env:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
@@ -33,6 +35,7 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+          cache: gradle
 
       - name: Run tests
         run: ./gradlew test --no-daemon
@@ -49,11 +52,6 @@ jobs:
           echo "$HARBOR_PASSWORD" | docker login "$HARBOR_REGISTRY" \
             -u "$HARBOR_USERNAME" \
             --password-stdin
-
-      - name: Verify Harbor pull access
-        run: |
-          docker pull --platform linux/amd64 \
-            ${{ secrets.HARBOR_REGISTRY }}/${{ secrets.HARBOR_PROJECT }}/${IMAGE_NAME}:v0.1.0
 
       - name: Prepare image metadata
         id: meta
