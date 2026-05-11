@@ -2,13 +2,20 @@ package s_map.server.domain.user.service;
 
 import s_map.server.domain.user.dto.req.AdminUserCreateRequest;
 import s_map.server.domain.user.dto.res.AdminUserCreateResponse;
+import s_map.server.domain.user.dto.res.AdminUserResponse;
 import s_map.server.domain.user.entity.User;
+import s_map.server.domain.user.entity.UserStatus;
 import s_map.server.domain.user.repository.UserRepository;
 import s_map.server.global.error.CustomException;
 import s_map.server.global.error.ErrorCode;
+import s_map.server.domain.user.entity.Role;
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +24,10 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class AdminAuthService {
+
+    private static final int DEFAULT_PAGE = 0;
+    private static final int DEFAULT_SIZE = 20;
+    private static final int MAX_SIZE = 100;
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -77,6 +88,7 @@ public class AdminAuthService {
                 savedUser.getDepartment(),
                 savedUser.getCompanyName()
         );
+
         return new AdminUserCreateResponse(
                 savedUser.getId(),
                 savedUser.getName(),
@@ -85,6 +97,113 @@ public class AdminAuthService {
                 savedUser.getDepartment(),
                 savedUser.getCompanyName(),
                 savedUser.getPhoneNumber()
+        );
+    }
+
+    /**
+     * 기능: 관리자 화면에서 사용자 목록을 페이지 단위로 조회한다.
+     * WITHDRAWN 상태의 사용자는 목록에서 제외한다.
+     * page와 size 값은 허용 범위 내로 보정한다.
+     *
+     * Input:
+     * - page / int / 조회할 페이지 번호
+     * - size / int / 한 페이지에 조회할 사용자 수
+     *
+     * Output:
+     * - response / Page<AdminUserResponse> / 사용자 목록 페이지 응답 값
+     * - response.content / List<AdminUserResponse> / 사용자 목록
+     * - response.content.id / Long / 사용자 ID
+     * - response.content.name / String / 사용자 이름
+     * - response.content.email / String / 사용자 이메일
+     * - response.content.role / String / 사용자 권한
+     * - response.content.status / String / 사용자 계정 상태
+     * - response.content.department / String / 사용자 소속 부서
+     * - response.content.companyName / String / 사용자 소속 회사명
+     * - response.content.phoneNumber / String / 사용자 연락처
+     * - response.pageable / Pageable / 페이지 요청 정보
+     * - response.totalElements / long / 전체 사용자 수
+     * - response.totalPages / int / 전체 페이지 수
+     */
+    @Transactional(readOnly = true)
+    public Page<AdminUserResponse> getUsers(int page, int size) {
+        int safePage = Math.max(page, DEFAULT_PAGE);
+        int safeSize = size <= 0 ? DEFAULT_SIZE : Math.min(size, MAX_SIZE);
+
+        Pageable pageable = PageRequest.of(
+                safePage,
+                safeSize,
+                Sort.by(Sort.Direction.DESC, "id")
+        );
+
+        Page<User> users = userRepository.findByStatusNot(UserStatus.WITHDRAWN, pageable);
+
+        return users.map(AdminUserResponse::from);
+    }
+
+    /**
+     * 기능: 관리자 화면에서 사용자를 삭제 처리한다.
+     * 실제 DB 삭제가 아니라 사용자 계정 상태를 WITHDRAWN으로 변경한다.
+     * 자기 자신, 다른 ADMIN 계정, 이미 WITHDRAWN 상태인 사용자는 삭제할 수 없다.
+     *
+     * Input:
+     * - userId / Long / 삭제 처리할 사용자 ID
+     * - currentAdminId / Long / 현재 로그인한 관리자 ID
+     *
+     * Output:
+     * - result / void / 반환값 없음, 사용자 상태 변경만 수행
+     */
+    @Transactional
+    public void deleteUser(Long userId, Long currentAdminId) {
+        User currentAdmin = userRepository.findById(currentAdminId)
+                .orElseThrow(() -> {
+                    log.warn(
+                            "[AdminAuthService] 사용자 삭제 실패 reason=current_admin_not_found adminId={}",
+                            currentAdminId
+                    );
+                    return new CustomException(ErrorCode.NOT_FOUND);
+                });
+
+        User targetUser = userRepository.findById(userId)
+                .orElseThrow(() -> {
+                    log.warn("[AdminAuthService] 사용자 삭제 실패 reason=user_not_found userId={}", userId);
+                    return new CustomException(ErrorCode.NOT_FOUND);
+                });
+
+        if (currentAdmin.getId().equals(targetUser.getId())) {
+            log.warn(
+                    "[AdminAuthService] 사용자 삭제 실패 reason=self_delete_not_allowed userId={}, email={}",
+                    currentAdmin.getId(),
+                    currentAdmin.getEmail()
+            );
+            throw new CustomException(ErrorCode.FORBIDDEN);
+        }
+
+        if (targetUser.getRole() == Role.ADMIN) {
+            log.warn(
+                    "[AdminAuthService] 사용자 삭제 실패 reason=admin_delete_not_allowed targetUserId={}, targetEmail={}",
+                    targetUser.getId(),
+                    targetUser.getEmail()
+            );
+            throw new CustomException(ErrorCode.FORBIDDEN);
+        }
+
+        if (targetUser.getStatus() == UserStatus.WITHDRAWN) {
+            log.warn(
+                    "[AdminAuthService] 사용자 삭제 실패 reason=already_withdrawn targetUserId={}, targetEmail={}",
+                    targetUser.getId(),
+                    targetUser.getEmail()
+            );
+            throw new CustomException(ErrorCode.CONFLICT);
+        }
+
+        targetUser.withdraw();
+
+        log.info(
+                "[AdminAuthService] 사용자 삭제 처리 완료 adminId={}, targetUserId={}, targetEmail={}, status={}",
+                currentAdmin.getId(),
+                targetUser.getId(),
+                targetUser.getEmail(),
+                targetUser.getStatus()
         );
     }
 }
