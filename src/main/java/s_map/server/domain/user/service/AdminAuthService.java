@@ -2,28 +2,31 @@ package s_map.server.domain.user.service;
 
 import s_map.server.domain.user.dto.req.AdminUserCreateRequest;
 import s_map.server.domain.user.dto.res.AdminUserCreateResponse;
+import s_map.server.domain.user.dto.res.AdminUserResponse;
 import s_map.server.domain.user.entity.User;
+import s_map.server.domain.user.entity.UserStatus;
 import s_map.server.domain.user.repository.UserRepository;
 import s_map.server.global.error.CustomException;
 import s_map.server.global.error.ErrorCode;
-import s_map.server.domain.user.dto.res.AdminUserResponse;
-import s_map.server.domain.user.entity.UserStatus;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class AdminAuthService {
+
+    private static final int DEFAULT_PAGE = 0;
+    private static final int DEFAULT_SIZE = 20;
+    private static final int MAX_SIZE = 100;
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -84,6 +87,7 @@ public class AdminAuthService {
                 savedUser.getDepartment(),
                 savedUser.getCompanyName()
         );
+
         return new AdminUserCreateResponse(
                 savedUser.getId(),
                 savedUser.getName(),
@@ -98,6 +102,7 @@ public class AdminAuthService {
     /**
      * 기능: 관리자 화면에서 사용자 목록을 페이지 단위로 조회한다.
      * WITHDRAWN 상태의 사용자는 목록에서 제외한다.
+     * page와 size 값은 허용 범위 내로 보정한다.
      *
      * Input:
      * - page / int / 조회할 페이지 번호
@@ -120,9 +125,12 @@ public class AdminAuthService {
      */
     @Transactional(readOnly = true)
     public Page<AdminUserResponse> getUsers(int page, int size) {
+        int safePage = Math.max(page, DEFAULT_PAGE);
+        int safeSize = size <= 0 ? DEFAULT_SIZE : Math.min(size, MAX_SIZE);
+
         Pageable pageable = PageRequest.of(
-                page,
-                size,
+                safePage,
+                safeSize,
                 Sort.by(Sort.Direction.DESC, "id")
         );
 
