@@ -30,6 +30,7 @@ public enum ErrorCode {
     MATERIAL_NOT_FOUND(HttpStatus.NOT_FOUND, "404-101", "자재 정보를 찾을 수 없습니다."),
     MATERIAL_INVENTORY_NOT_FOUND(HttpStatus.NOT_FOUND, "404-102", "자재 재고 정보를 찾을 수 없습니다."),
     PRODUCTION_PLAN_NOT_FOUND(HttpStatus.NOT_FOUND, "404-103", "생산계획 정보를 찾을 수 없습니다."),
+    BOM_NOT_FOUND(HttpStatus.NOT_FOUND, "404-104", "BOM 정보를 찾을 수 없습니다."),
 
     // 405 Method Not Allowed
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "405", "지원하지 않는 HTTP 메서드입니다."),
@@ -38,6 +39,7 @@ public enum ErrorCode {
     CONFLICT(HttpStatus.CONFLICT, "409", "이미 존재하는 리소스입니다."),
     DUPLICATE_EMAIL(HttpStatus.CONFLICT, "409-001", "이미 사용 중인 이메일입니다."),
     DUPLICATE_MATERIAL_CODE(HttpStatus.CONFLICT, "409-101", "이미 사용 중인 자재 코드입니다."),
+    DUPLICATE_BOM(HttpStatus.CONFLICT, "409-102", "이미 등록된 제품-자재 BOM 정보입니다."),
 
     // 500 Internal Server Error
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "500", "서버 내부 오류가 발생했습니다.");
