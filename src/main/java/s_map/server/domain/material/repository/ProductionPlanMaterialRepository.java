@@ -9,9 +9,9 @@ import java.util.Optional;
 
 public interface ProductionPlanMaterialRepository extends JpaRepository<ProductionPlanMaterial, Long> {
 
-    List<ProductionPlanMaterial> findByProductionPlanPlanId(Long planId);
-
     List<ProductionPlanMaterial> findByPlanId(Long planId);
+
+    List<ProductionPlanMaterial> findByMaterialMaterialId(Long materialId);
 
     Optional<ProductionPlanMaterial> findByPlanIdAndMaterialMaterialId(
             Long planId,
