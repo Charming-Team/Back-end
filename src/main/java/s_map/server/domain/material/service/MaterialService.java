@@ -11,8 +11,13 @@ import s_map.server.domain.material.entity.ProductionPlanMaterial;
 import s_map.server.domain.material.repository.MaterialInventoryRepository;
 import s_map.server.domain.material.repository.MaterialRepository;
 import s_map.server.domain.material.repository.ProductionPlanMaterialRepository;
+import s_map.server.domain.material.dto.req.MaterialInventoryUpdateRequest;
+import s_map.server.domain.material.entity.InventoryStatus;
+
 import s_map.server.global.error.CustomException;
 import s_map.server.global.error.ErrorCode;
+
+import java.math.BigDecimal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -221,5 +226,103 @@ public class MaterialService {
         if (materialRepository.existsByMaterialCode(materialCode)) {
             throw new CustomException(ErrorCode.DUPLICATE_MATERIAL_CODE);
         }
+    }
+
+    /**
+     * 기능: 특정 자재의 재고 현황을 등록하거나 수정한다.
+     *
+     * Input:
+     * - materialId / Long / 재고를 등록 또는 수정할 자재 고유 ID
+     * - request / MaterialInventoryUpdateRequest / 자재 재고 수정 요청 값
+     * - request.currentQuantity / BigDecimal / 현재 보유 중인 전체 재고량
+     * - request.reservedQuantity / BigDecimal / 생산계획에 이미 예약된 재고량
+     * - request.safetyStockQuantity / BigDecimal / 안전 재고 수량
+     * - request.expectedInboundAt / LocalDateTime / 입고 예정 일시
+     * - request.expectedInboundQuantity / BigDecimal / 입고 예정 수량
+     *
+     * Output:
+     * - result / MaterialDetailResponse / 수정된 자재 상세 정보 및 재고 현황
+     */
+    @Transactional
+    public MaterialDetailResponse updateMaterialInventory(
+            Long materialId,
+            MaterialInventoryUpdateRequest request
+    ) {
+        Material material = getMaterialEntity(materialId);
+
+        BigDecimal availableQuantity = request.currentQuantity()
+                .subtract(request.reservedQuantity());
+
+        InventoryStatus inventoryStatus = calculateInventoryStatus(
+                availableQuantity,
+                request.safetyStockQuantity(),
+                request.expectedInboundAt(),
+                request.expectedInboundQuantity()
+        );
+
+        MaterialInventory inventory = materialInventoryRepository
+                .findByMaterialMaterialId(materialId)
+                .map(existingInventory -> {
+                    existingInventory.updateInventory(
+                            request.currentQuantity(),
+                            availableQuantity,
+                            request.reservedQuantity(),
+                            request.safetyStockQuantity(),
+                            request.expectedInboundAt(),
+                            request.expectedInboundQuantity(),
+                            inventoryStatus
+                    );
+
+                    return existingInventory;
+                })
+                .orElseGet(() -> materialInventoryRepository.save(
+                        MaterialInventory.builder()
+                                .material(material)
+                                .currentQuantity(request.currentQuantity())
+                                .availableQuantity(availableQuantity)
+                                .reservedQuantity(request.reservedQuantity())
+                                .safetyStockQuantity(request.safetyStockQuantity())
+                                .expectedInboundAt(request.expectedInboundAt())
+                                .expectedInboundQuantity(request.expectedInboundQuantity())
+                                .inventoryStatus(inventoryStatus)
+                                .build()
+                ));
+
+        return MaterialDetailResponse.from(material, inventory);
+    }
+
+    /**
+     * 기능: 가용 재고, 안전 재고, 입고 예정 정보를 기준으로 재고 상태를 계산한다.
+     *
+     * Input:
+     * - availableQuantity / BigDecimal / 실제 생산에 사용 가능한 재고량
+     * - safetyStockQuantity / BigDecimal / 안전 재고 수량
+     * - expectedInboundAt / LocalDateTime / 입고 예정 일시
+     * - expectedInboundQuantity / BigDecimal / 입고 예정 수량
+     *
+     * Output:
+     * - result / InventoryStatus / 계산된 재고 상태
+     */
+    private InventoryStatus calculateInventoryStatus(
+            BigDecimal availableQuantity,
+            BigDecimal safetyStockQuantity,
+            java.time.LocalDateTime expectedInboundAt,
+            BigDecimal expectedInboundQuantity
+    ) {
+        if (availableQuantity.compareTo(BigDecimal.ZERO) <= 0) {
+            return InventoryStatus.SHORTAGE;
+        }
+
+        if (availableQuantity.compareTo(safetyStockQuantity) < 0) {
+            return InventoryStatus.LOW;
+        }
+
+        if (expectedInboundAt != null
+                && expectedInboundQuantity != null
+                && expectedInboundQuantity.compareTo(BigDecimal.ZERO) > 0) {
+            return InventoryStatus.INBOUND_WAITING;
+        }
+
+        return InventoryStatus.NORMAL;
     }
 }

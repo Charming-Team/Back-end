@@ -5,6 +5,7 @@ import s_map.server.domain.material.dto.req.MaterialUpdateRequest;
 import s_map.server.domain.material.dto.res.MaterialDetailResponse;
 import s_map.server.domain.material.dto.res.MaterialResponse;
 import s_map.server.domain.material.dto.res.MaterialUsageResponse;
+import s_map.server.domain.material.dto.req.MaterialInventoryUpdateRequest;
 import s_map.server.domain.material.service.MaterialService;
 import s_map.server.global.common.BaseResponse;
 
@@ -12,6 +13,8 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -67,5 +70,14 @@ public class MaterialController {
             @PathVariable Long materialId
     ) {
         return BaseResponse.success(materialService.getMaterialUsage(materialId));
+    }
+
+    @Operation(summary = "자재 재고 등록/수정")
+    @PutMapping("/{materialId}/inventory")
+    public BaseResponse<MaterialDetailResponse> updateMaterialInventory(
+            @PathVariable Long materialId,
+            @Valid @RequestBody MaterialInventoryUpdateRequest request
+    ) {
+        return BaseResponse.success(materialService.updateMaterialInventory(materialId, request));
     }
 }
