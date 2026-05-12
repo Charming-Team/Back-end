@@ -2,6 +2,7 @@ package s_map.server;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.HttpServletResponse;
 import java.util.Map;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -379,6 +380,46 @@ class AuthSecurityIntegrationTest {
                     .andExpect(MockMvcResultMatchers.status().isOk())
                     .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(true))
                     .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("COMMON200"));
+        }
+    }
+
+    @Nested
+    @DisplayName("공개 문서 경로")
+    class PublicDocumentation {
+
+        @ParameterizedTest
+        @org.junit.jupiter.params.provider.ValueSource(strings = {
+                "/swagger-ui/index.html",
+                "/swagger-ui.html",
+                "/api/swagger-ui/index.html",
+                "/api/swagger-ui.html"
+        })
+        @DisplayName("Swagger 경로는 잘못된 Authorization 헤더가 있어도 JWT 인증 실패로 막히지 않는다")
+        void swaggerPathsIgnoreInvalidAuthorizationHeader(String path) throws Exception {
+            MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get(path)
+                            .header(HttpHeaders.AUTHORIZATION, bearer("invalid-token")))
+                    .andReturn();
+
+            Assertions.assertNotEquals(HttpServletResponse.SC_UNAUTHORIZED, result.getResponse().getStatus());
+        }
+
+        @Test
+        @DisplayName("/api/v3/api-docs는 인증 없이 OpenAPI JSON을 반환한다")
+        void apiPrefixedApiDocsReturnOpenApiJson() throws Exception {
+            mockMvc.perform(MockMvcRequestBuilders.get("/api/v3/api-docs")
+                            .header(HttpHeaders.AUTHORIZATION, bearer("invalid-token")))
+                    .andExpect(MockMvcResultMatchers.status().isOk())
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.openapi").exists())
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.info.title").value("s_map Server API"));
+        }
+
+        @Test
+        @DisplayName("/api/swagger-ui/index.html은 인증 없이 Swagger UI HTML을 반환한다")
+        void apiPrefixedSwaggerUiReturnsHtml() throws Exception {
+            mockMvc.perform(MockMvcRequestBuilders.get("/api/swagger-ui/index.html")
+                            .header(HttpHeaders.AUTHORIZATION, bearer("invalid-token")))
+                    .andExpect(MockMvcResultMatchers.status().isOk())
+                    .andExpect(MockMvcResultMatchers.content().string(org.hamcrest.Matchers.containsString("Swagger UI")));
         }
     }
 

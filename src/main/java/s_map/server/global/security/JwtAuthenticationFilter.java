@@ -35,11 +35,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             "/api/auth/login",
             "/api/token/refresh",
             "/swagger-ui.html",
+            "/api/swagger-ui.html",
             "/actuator/health"
     };
     private static final String[] PUBLIC_PATH_PREFIXES = {
             "/swagger-ui/",
             "/v3/api-docs",
+            "/api/swagger-ui/",
+            "/api/v3/api-docs",
             "/actuator/health/"
     };
 
