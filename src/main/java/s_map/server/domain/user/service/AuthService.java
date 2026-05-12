@@ -5,6 +5,9 @@ import s_map.server.domain.user.dto.req.LoginRequest;
 import s_map.server.domain.user.dto.res.LoginResponse;
 import s_map.server.domain.user.entity.User;
 import s_map.server.domain.user.repository.UserRepository;
+import s_map.server.domain.user.dto.res.AuthMeResponse;
+import s_map.server.domain.user.dto.req.LogoutRequest;
+
 import s_map.server.global.error.CustomException;
 import s_map.server.global.error.ErrorCode;
 import s_map.server.global.security.JwtTokenProvider;
@@ -92,6 +95,52 @@ public class AuthService {
                 jwtTokenProvider.getAccessTokenExpirationMillis(),
                 jwtTokenProvider.getRefreshTokenExpirationMillis()
         );
+    }
+
+    /**
+     * 기능: 현재 로그인한 사용자의 정보를 조회한다.
+     *
+     * Input:
+     * - email / String / 현재 인증된 사용자의 이메일
+     *
+     * Output:
+     * - response / AuthMeResponse / 현재 로그인 사용자 정보 응답 값
+     * - response.id / Long / 사용자 ID
+     * - response.name / String / 사용자 이름
+     * - response.email / String / 사용자 이메일
+     * - response.role / String / 사용자 권한
+     * - response.status / String / 사용자 계정 상태
+     * - response.department / String / 사용자 소속 부서
+     * - response.companyName / String / 사용자 소속 회사명
+     * - response.phoneNumber / String / 사용자 연락처
+     */
+    @Transactional(readOnly = true)
+    public AuthMeResponse getMyInfo(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> {
+                    log.warn("[AuthService] 내 정보 조회 실패 reason=not_found email={}", email);
+                    return new CustomException(ErrorCode.NOT_FOUND);
+                });
+
+        return AuthMeResponse.from(user);
+    }
+
+    /**
+     * 기능: 현재 로그인한 사용자의 Refresh Token인지 검증한 뒤 폐기하여 로그아웃 처리한다.
+     *
+     * Input:
+     * - request / LogoutRequest / 로그아웃 요청 값
+     * - request.refreshToken / String / 폐기할 Refresh Token 원문
+     * - email / String / 현재 로그인한 사용자 이메일
+     *
+     * Output:
+     * - result / void / 반환값 없음, Refresh Token 폐기만 수행
+     */
+    @Transactional
+    public void logout(LogoutRequest request, String email) {
+        refreshTokenService.validateOwnerAndRevoke(request.getRefreshToken(), email);
+
+        log.info("[AuthService] 로그아웃 성공 email={}", email);
     }
 
 }
