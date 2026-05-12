@@ -44,9 +44,8 @@ public class ProductionPlanMaterial {
     @Column(name = "plan_material_id")
     private Long planMaterialId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "plan_id", nullable = false)
-    private ProductionPlan productionPlan;
+    @Column(name = "plan_id", nullable = false)
+    private Long planId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "material_id", nullable = false)

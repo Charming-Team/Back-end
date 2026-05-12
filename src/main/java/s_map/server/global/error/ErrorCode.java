@@ -31,6 +31,7 @@ public enum ErrorCode {
     MATERIAL_INVENTORY_NOT_FOUND(HttpStatus.NOT_FOUND, "404-102", "자재 재고 정보를 찾을 수 없습니다."),
     PRODUCTION_PLAN_NOT_FOUND(HttpStatus.NOT_FOUND, "404-103", "생산계획 정보를 찾을 수 없습니다."),
     BOM_NOT_FOUND(HttpStatus.NOT_FOUND, "404-104", "BOM 정보를 찾을 수 없습니다."),
+    PRODUCT_BOM_NOT_FOUND(HttpStatus.NOT_FOUND, "404-105", "해당 제품에 등록된 BOM 정보가 없습니다."),
 
     // 405 Method Not Allowed
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "405", "지원하지 않는 HTTP 메서드입니다."),

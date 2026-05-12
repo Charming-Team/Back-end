@@ -11,14 +11,14 @@ public interface ProductionPlanMaterialRepository extends JpaRepository<Producti
 
     List<ProductionPlanMaterial> findByProductionPlanPlanId(Long planId);
 
-    List<ProductionPlanMaterial> findByMaterialMaterialId(Long materialId);
+    List<ProductionPlanMaterial> findByPlanId(Long planId);
 
-    Optional<ProductionPlanMaterial> findByProductionPlanPlanIdAndMaterialMaterialId(
+    Optional<ProductionPlanMaterial> findByPlanIdAndMaterialMaterialId(
             Long planId,
             Long materialId
     );
 
-    boolean existsByProductionPlanPlanIdAndMaterialMaterialId(
+    boolean existsByPlanIdAndMaterialMaterialId(
             Long planId,
             Long materialId
     );
