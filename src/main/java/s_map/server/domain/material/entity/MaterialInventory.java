@@ -1,0 +1,146 @@
+package s_map.server.domain.material.entity;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
+@Getter
+@Entity
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Table(name = "material_inventories")
+public class MaterialInventory {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "inventory_id")
+    private Long inventoryId;
+
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "material_id", nullable = false, unique = true)
+    private Material material;
+
+    @Column(name = "current_quantity", nullable = false, precision = 12, scale = 4)
+    private BigDecimal currentQuantity;
+
+    @Column(name = "available_quantity", nullable = false, precision = 12, scale = 4)
+    private BigDecimal availableQuantity;
+
+    @Column(name = "reserved_quantity", nullable = false, precision = 12, scale = 4)
+    private BigDecimal reservedQuantity;
+
+    @Column(name = "safety_stock_quantity", nullable = false, precision = 12, scale = 4)
+    private BigDecimal safetyStockQuantity;
+
+    @Column(name = "expected_inbound_at")
+    private LocalDateTime expectedInboundAt;
+
+    @Column(name = "expected_inbound_quantity", precision = 12, scale = 4)
+    private BigDecimal expectedInboundQuantity;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "inventory_status", nullable = false, length = 30)
+    private InventoryStatus inventoryStatus;
+
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
+
+    public void updateInventory(
+            BigDecimal currentQuantity,
+            BigDecimal availableQuantity,
+            BigDecimal reservedQuantity,
+            BigDecimal safetyStockQuantity,
+            LocalDateTime expectedInboundAt,
+            BigDecimal expectedInboundQuantity,
+            InventoryStatus inventoryStatus
+    ) {
+        this.currentQuantity = currentQuantity;
+        this.availableQuantity = availableQuantity;
+        this.reservedQuantity = reservedQuantity;
+        this.safetyStockQuantity = safetyStockQuantity;
+        this.expectedInboundAt = expectedInboundAt;
+        this.expectedInboundQuantity = expectedInboundQuantity;
+        this.inventoryStatus = inventoryStatus;
+    }
+
+    public void reserve(BigDecimal quantity) {
+        this.reservedQuantity = this.reservedQuantity.add(quantity);
+        this.availableQuantity = this.currentQuantity.subtract(this.reservedQuantity);
+        refreshInventoryStatus();
+    }
+
+    public void releaseReserved(BigDecimal quantity) {
+        this.reservedQuantity = this.reservedQuantity.subtract(quantity);
+        this.availableQuantity = this.currentQuantity.subtract(this.reservedQuantity);
+        refreshInventoryStatus();
+    }
+
+    public void refreshInventoryStatus() {
+        if (this.availableQuantity.compareTo(BigDecimal.ZERO) <= 0) {
+            this.inventoryStatus = InventoryStatus.SHORTAGE;
+            return;
+        }
+
+        if (this.availableQuantity.compareTo(this.safetyStockQuantity) < 0) {
+            this.inventoryStatus = InventoryStatus.LOW;
+            return;
+        }
+
+        if (this.expectedInboundAt != null && this.expectedInboundQuantity != null
+                && this.expectedInboundQuantity.compareTo(BigDecimal.ZERO) > 0) {
+            this.inventoryStatus = InventoryStatus.INBOUND_WAITING;
+            return;
+        }
+
+        this.inventoryStatus = InventoryStatus.NORMAL;
+    }
+
+    @PrePersist
+    public void prePersist() {
+        this.updatedAt = LocalDateTime.now();
+
+        if (this.currentQuantity == null) {
+            this.currentQuantity = BigDecimal.ZERO;
+        }
+
+        if (this.reservedQuantity == null) {
+            this.reservedQuantity = BigDecimal.ZERO;
+        }
+
+        if (this.availableQuantity == null) {
+            this.availableQuantity = this.currentQuantity.subtract(this.reservedQuantity);
+        }
+
+        if (this.safetyStockQuantity == null) {
+            this.safetyStockQuantity = BigDecimal.ZERO;
+        }
+
+        if (this.inventoryStatus == null) {
+            refreshInventoryStatus();
+        }
+    }
+
+    @PreUpdate
+    public void preUpdate() {
+        this.updatedAt = LocalDateTime.now();
+    }
+}
