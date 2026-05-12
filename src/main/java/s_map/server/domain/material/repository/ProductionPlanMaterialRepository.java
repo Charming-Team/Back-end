@@ -1,4 +1,29 @@
 package s_map.server.domain.material.repository;
 
-public class ProductionPlanMaterialRepository {
+import s_map.server.domain.material.entity.MaterialPlanStatus;
+import s_map.server.domain.material.entity.ProductionPlanMaterial;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.List;
+import java.util.Optional;
+
+public interface ProductionPlanMaterialRepository extends JpaRepository<ProductionPlanMaterial, Long> {
+
+    List<ProductionPlanMaterial> findByProductionPlanPlanId(Long planId);
+
+    List<ProductionPlanMaterial> findByMaterialMaterialId(Long materialId);
+
+    Optional<ProductionPlanMaterial> findByProductionPlanPlanIdAndMaterialMaterialId(
+            Long planId,
+            Long materialId
+    );
+
+    boolean existsByProductionPlanPlanIdAndMaterialMaterialId(
+            Long planId,
+            Long materialId
+    );
+
+    List<ProductionPlanMaterial> findByMaterialPlanStatus(MaterialPlanStatus materialPlanStatus);
+
+    List<ProductionPlanMaterial> findByMaterialPlanStatusIn(List<MaterialPlanStatus> materialPlanStatuses);
 }
