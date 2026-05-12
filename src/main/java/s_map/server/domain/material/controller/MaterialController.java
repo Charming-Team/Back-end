@@ -8,6 +8,7 @@ import s_map.server.domain.material.dto.res.MaterialUsageResponse;
 import s_map.server.domain.material.dto.req.MaterialInventoryUpdateRequest;
 import s_map.server.domain.material.service.MaterialService;
 import s_map.server.global.common.BaseResponse;
+import s_map.server.domain.material.dto.res.MaterialShortageResponse;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -45,6 +46,12 @@ public class MaterialController {
     @GetMapping
     public BaseResponse<List<MaterialResponse>> getMaterials() {
         return BaseResponse.success(materialService.getMaterials());
+    }
+
+    @Operation(summary = "부족 자재 목록 조회")
+    @GetMapping("/shortages")
+    public BaseResponse<List<MaterialShortageResponse>> getMaterialShortages() {
+        return BaseResponse.success(materialService.getMaterialShortages());
     }
 
     @Operation(summary = "자재 상세 조회")

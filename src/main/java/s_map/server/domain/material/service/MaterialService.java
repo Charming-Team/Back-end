@@ -13,6 +13,8 @@ import s_map.server.domain.material.repository.MaterialRepository;
 import s_map.server.domain.material.repository.ProductionPlanMaterialRepository;
 import s_map.server.domain.material.dto.req.MaterialInventoryUpdateRequest;
 import s_map.server.domain.material.entity.InventoryStatus;
+import s_map.server.domain.material.dto.res.MaterialShortageResponse;
+import s_map.server.domain.material.entity.MaterialPlanStatus;
 
 import s_map.server.global.error.CustomException;
 import s_map.server.global.error.ErrorCode;
@@ -24,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.Arrays;
 
 @Service
 @RequiredArgsConstructor
@@ -324,5 +327,40 @@ public class MaterialService {
         }
 
         return InventoryStatus.NORMAL;
+    }
+
+    /**
+     * 기능: 생산계획별 자재 계산 결과 중 부족 또는 일부 예약 상태인 자재 목록을 조회한다.
+     *
+     * Input:
+     * - 없음
+     *
+     * Output:
+     * - result / List<MaterialShortageResponse> / 부족 자재 목록
+     * - result[].planMaterialId / Long / 생산계획별 자재 계산 결과 고유 ID
+     * - result[].planId / Long / 생산계획 고유 ID
+     * - result[].materialId / Long / 자재 고유 ID
+     * - result[].materialCode / String / 자재 코드
+     * - result[].materialName / String / 자재명
+     * - result[].materialType / String / 자재 유형
+     * - result[].unit / String / 자재 단위
+     * - result[].requiredQuantity / BigDecimal / 생산계획에 필요한 자재 수량
+     * - result[].reservedQuantity / BigDecimal / 예약된 자재 수량
+     * - result[].consumedQuantity / BigDecimal / 실제 사용된 자재 수량
+     * - result[].shortageQuantity / BigDecimal / 부족한 자재 수량
+     * - result[].materialPlanStatus / MaterialPlanStatus / 생산계획별 자재 상태
+     */
+    public List<MaterialShortageResponse> getMaterialShortages() {
+        List<MaterialPlanStatus> shortageStatuses = Arrays.asList(
+                MaterialPlanStatus.SHORTAGE,
+                MaterialPlanStatus.PARTIAL_RESERVED
+        );
+
+        return productionPlanMaterialRepository.findByMaterialPlanStatusIn(shortageStatuses)
+                .stream()
+                .sorted(Comparator.comparing(ProductionPlanMaterial::getPlanId)
+                        .thenComparing(ProductionPlanMaterial::getPlanMaterialId))
+                .map(MaterialShortageResponse::from)
+                .toList();
     }
 }
