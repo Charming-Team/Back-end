@@ -330,10 +330,8 @@ public class MaterialService {
                 MaterialPlanStatus.PARTIAL_RESERVED
         );
 
-        return productionPlanMaterialRepository.findByMaterialPlanStatusIn(shortageStatuses)
+        return productionPlanMaterialRepository.findByMaterialPlanStatusInWithMaterial(shortageStatuses)
                 .stream()
-                .sorted(Comparator.comparing(ProductionPlanMaterial::getPlanId)
-                        .thenComparing(ProductionPlanMaterial::getPlanMaterialId))
                 .map(MaterialShortageResponse::from)
                 .toList();
     }
