@@ -13,7 +13,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -76,8 +75,7 @@ public class BomService {
      * - result[].lossRate / BigDecimal / 생산 과정에서 발생하는 손실률
      */
     public List<BomResponse> getBoms() {
-        return bomRepository.findAll().stream()
-                .sorted(Comparator.comparing(Bom::getBomId).reversed())
+        return bomRepository.findAllWithMaterial().stream()
                 .map(BomResponse::from)
                 .toList();
     }
@@ -92,8 +90,7 @@ public class BomService {
      * - result / List<BomResponse> / 특정 제품의 BOM 목록
      */
     public List<BomResponse> getBomsByProductId(Long productId) {
-        return bomRepository.findByProductId(productId).stream()
-                .sorted(Comparator.comparing(Bom::getBomId).reversed())
+        return bomRepository.findByProductIdWithMaterial(productId).stream()
                 .map(BomResponse::from)
                 .toList();
     }
