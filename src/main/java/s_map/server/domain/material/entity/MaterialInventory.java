@@ -71,13 +71,11 @@ public class MaterialInventory extends BaseEntity {
 
     public void updateInventory(
             BigDecimal currentQuantity,
-            BigDecimal reservedQuantity,
             BigDecimal safetyStockQuantity,
             LocalDateTime expectedInboundAt,
             BigDecimal expectedInboundQuantity
     ) {
         this.currentQuantity = currentQuantity;
-        this.reservedQuantity = reservedQuantity;
         this.safetyStockQuantity = safetyStockQuantity;
         this.expectedInboundAt = expectedInboundAt;
         this.expectedInboundQuantity = expectedInboundQuantity;

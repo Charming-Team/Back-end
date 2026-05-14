@@ -278,7 +278,6 @@ public class MaterialService {
                     );
                     existingInventory.updateInventory(
                             request.currentQuantity(),
-                            existingInventory.getReservedQuantity(),
                             request.safetyStockQuantity(),
                             request.expectedInboundAt(),
                             request.expectedInboundQuantity()
