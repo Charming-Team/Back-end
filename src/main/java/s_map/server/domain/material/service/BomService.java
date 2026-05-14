@@ -10,6 +10,7 @@ import s_map.server.domain.material.repository.MaterialRepository;
 import s_map.server.global.error.CustomException;
 import s_map.server.global.error.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.transaction.annotation.Transactional;
@@ -54,7 +55,12 @@ public class BomService {
                 .lossRate(request.lossRate())
                 .build();
 
-        Bom savedBom = bomRepository.save(bom);
+        Bom savedBom;
+        try {
+            savedBom = bomRepository.saveAndFlush(bom);
+        } catch (DataIntegrityViolationException exception) {
+            throw new CustomException(ErrorCode.DUPLICATE_BOM);
+        }
 
         return BomResponse.from(savedBom);
     }

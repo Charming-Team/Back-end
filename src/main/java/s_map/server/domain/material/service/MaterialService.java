@@ -20,6 +20,7 @@ import s_map.server.global.error.ErrorCode;
 
 import java.math.BigDecimal;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -65,7 +66,12 @@ public class MaterialService {
                 .description(request.description())
                 .build();
 
-        Material savedMaterial = materialRepository.save(material);
+        Material savedMaterial;
+        try {
+            savedMaterial = materialRepository.saveAndFlush(material);
+        } catch (DataIntegrityViolationException exception) {
+            throw new CustomException(ErrorCode.DUPLICATE_MATERIAL_CODE);
+        }
 
         return MaterialDetailResponse.from(savedMaterial, null);
     }
