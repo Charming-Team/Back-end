@@ -140,11 +140,11 @@ public class MaterialController {
 
     @Operation(
             summary = "자재 재고 등록/수정",
-            description = "자재의 현재 재고, 예약 재고, 안전 재고, 입고 예정 정보를 등록하거나 수정합니다. 예약 재고는 현재 재고보다 클 수 없습니다."
+            description = "자재의 현재 재고, 안전 재고, 입고 예정 정보를 등록하거나 수정합니다. 예약 재고는 생산계획 예약 결과로 관리되며 이 API에서 직접 수정하지 않습니다. 현재 재고는 기존 예약 재고보다 작을 수 없습니다."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "자재 재고 등록/수정 성공"),
-            @ApiResponse(responseCode = "400", description = "요청 값 검증 실패 또는 예약 재고가 현재 재고 초과"),
+            @ApiResponse(responseCode = "400", description = "요청 값 검증 실패 또는 현재 재고가 기존 예약 재고보다 작음"),
             @ApiResponse(responseCode = "401", description = "인증 필요"),
             @ApiResponse(responseCode = "404", description = "자재 없음"),
             @ApiResponse(responseCode = "409", description = "재고 동시 수정 충돌"),

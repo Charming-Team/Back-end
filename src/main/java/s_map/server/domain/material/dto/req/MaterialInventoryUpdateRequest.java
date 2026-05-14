@@ -17,12 +17,6 @@ public record MaterialInventoryUpdateRequest(
         @Digits(integer = 8, fraction = 4, message = "현재 재고 수량은 정수 8자리, 소수 4자리 이하여야 합니다.")
         BigDecimal currentQuantity,
 
-        @Schema(description = "생산계획에 이미 예약된 재고량. 현재 재고 수량보다 클 수 없습니다.", example = "30.0000")
-        @NotNull(message = "예약 재고 수량은 필수입니다.")
-        @DecimalMin(value = "0.0", message = "예약 재고 수량은 0 이상이어야 합니다.")
-        @Digits(integer = 8, fraction = 4, message = "예약 재고 수량은 정수 8자리, 소수 4자리 이하여야 합니다.")
-        BigDecimal reservedQuantity,
-
         @Schema(description = "안전 재고 수량", example = "20.0000")
         @NotNull(message = "안전 재고 수량은 필수입니다.")
         @DecimalMin(value = "0.0", message = "안전 재고 수량은 0 이상이어야 합니다.")

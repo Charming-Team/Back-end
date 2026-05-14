@@ -255,7 +255,6 @@ public class MaterialService {
      * - materialId / Long / 재고를 등록 또는 수정할 자재 고유 ID
      * - request / MaterialInventoryUpdateRequest / 자재 재고 수정 요청 값
      * - request.currentQuantity / BigDecimal / 현재 보유 중인 전체 재고량
-     * - request.reservedQuantity / BigDecimal / 생산계획에 이미 예약된 재고량
      * - request.safetyStockQuantity / BigDecimal / 안전 재고 수량
      * - request.expectedInboundAt / LocalDateTime / 입고 예정 일시
      * - request.expectedInboundQuantity / BigDecimal / 입고 예정 수량
@@ -270,14 +269,16 @@ public class MaterialService {
     ) {
         Material material = getMaterialEntity(materialId);
 
-        validateInventoryQuantities(request.currentQuantity(), request.reservedQuantity());
-
         MaterialInventory inventory = materialInventoryRepository
                 .findByMaterialMaterialId(materialId)
                 .map(existingInventory -> {
+                    validateInventoryQuantities(
+                            request.currentQuantity(),
+                            existingInventory.getReservedQuantity()
+                    );
                     existingInventory.updateInventory(
                             request.currentQuantity(),
-                            request.reservedQuantity(),
+                            existingInventory.getReservedQuantity(),
                             request.safetyStockQuantity(),
                             request.expectedInboundAt(),
                             request.expectedInboundQuantity()
@@ -289,7 +290,7 @@ public class MaterialService {
                         MaterialInventory.builder()
                                 .material(material)
                                 .currentQuantity(request.currentQuantity())
-                                .reservedQuantity(request.reservedQuantity())
+                                .reservedQuantity(BigDecimal.ZERO)
                                 .safetyStockQuantity(request.safetyStockQuantity())
                                 .expectedInboundAt(request.expectedInboundAt())
                                 .expectedInboundQuantity(request.expectedInboundQuantity())
