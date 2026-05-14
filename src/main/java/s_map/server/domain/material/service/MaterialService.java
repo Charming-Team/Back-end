@@ -12,7 +12,6 @@ import s_map.server.domain.material.repository.MaterialInventoryRepository;
 import s_map.server.domain.material.repository.MaterialRepository;
 import s_map.server.domain.material.repository.ProductionPlanMaterialRepository;
 import s_map.server.domain.material.dto.req.MaterialInventoryUpdateRequest;
-import s_map.server.domain.material.entity.InventoryStatus;
 import s_map.server.domain.material.dto.res.MaterialShortageResponse;
 import s_map.server.domain.material.entity.MaterialPlanStatus;
 
@@ -255,27 +254,15 @@ public class MaterialService {
 
         validateInventoryQuantities(request.currentQuantity(), request.reservedQuantity());
 
-        BigDecimal availableQuantity = request.currentQuantity()
-                .subtract(request.reservedQuantity());
-
-        InventoryStatus inventoryStatus = calculateInventoryStatus(
-                availableQuantity,
-                request.safetyStockQuantity(),
-                request.expectedInboundAt(),
-                request.expectedInboundQuantity()
-        );
-
         MaterialInventory inventory = materialInventoryRepository
                 .findByMaterialMaterialId(materialId)
                 .map(existingInventory -> {
                     existingInventory.updateInventory(
                             request.currentQuantity(),
-                            availableQuantity,
                             request.reservedQuantity(),
                             request.safetyStockQuantity(),
                             request.expectedInboundAt(),
-                            request.expectedInboundQuantity(),
-                            inventoryStatus
+                            request.expectedInboundQuantity()
                     );
 
                     return existingInventory;
@@ -284,51 +271,14 @@ public class MaterialService {
                         MaterialInventory.builder()
                                 .material(material)
                                 .currentQuantity(request.currentQuantity())
-                                .availableQuantity(availableQuantity)
                                 .reservedQuantity(request.reservedQuantity())
                                 .safetyStockQuantity(request.safetyStockQuantity())
                                 .expectedInboundAt(request.expectedInboundAt())
                                 .expectedInboundQuantity(request.expectedInboundQuantity())
-                                .inventoryStatus(inventoryStatus)
                                 .build()
                 ));
 
         return MaterialDetailResponse.from(material, inventory);
-    }
-
-    /**
-     * 기능: 가용 재고, 안전 재고, 입고 예정 정보를 기준으로 재고 상태를 계산한다.
-     *
-     * Input:
-     * - availableQuantity / BigDecimal / 실제 생산에 사용 가능한 재고량
-     * - safetyStockQuantity / BigDecimal / 안전 재고 수량
-     * - expectedInboundAt / LocalDateTime / 입고 예정 일시
-     * - expectedInboundQuantity / BigDecimal / 입고 예정 수량
-     *
-     * Output:
-     * - result / InventoryStatus / 계산된 재고 상태
-     */
-    private InventoryStatus calculateInventoryStatus(
-            BigDecimal availableQuantity,
-            BigDecimal safetyStockQuantity,
-            java.time.LocalDateTime expectedInboundAt,
-            BigDecimal expectedInboundQuantity
-    ) {
-        if (availableQuantity.compareTo(BigDecimal.ZERO) <= 0) {
-            return InventoryStatus.SHORTAGE;
-        }
-
-        if (availableQuantity.compareTo(safetyStockQuantity) < 0) {
-            return InventoryStatus.LOW;
-        }
-
-        if (expectedInboundAt != null
-                && expectedInboundQuantity != null
-                && expectedInboundQuantity.compareTo(BigDecimal.ZERO) > 0) {
-            return InventoryStatus.INBOUND_WAITING;
-        }
-
-        return InventoryStatus.NORMAL;
     }
 
     private void validateInventoryQuantities(

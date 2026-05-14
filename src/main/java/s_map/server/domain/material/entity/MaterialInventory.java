@@ -68,20 +68,17 @@ public class MaterialInventory {
 
     public void updateInventory(
             BigDecimal currentQuantity,
-            BigDecimal availableQuantity,
             BigDecimal reservedQuantity,
             BigDecimal safetyStockQuantity,
             LocalDateTime expectedInboundAt,
-            BigDecimal expectedInboundQuantity,
-            InventoryStatus inventoryStatus
+            BigDecimal expectedInboundQuantity
     ) {
         this.currentQuantity = currentQuantity;
-        this.availableQuantity = availableQuantity;
         this.reservedQuantity = reservedQuantity;
         this.safetyStockQuantity = safetyStockQuantity;
         this.expectedInboundAt = expectedInboundAt;
         this.expectedInboundQuantity = expectedInboundQuantity;
-        this.inventoryStatus = inventoryStatus;
+        recalculateInventoryState();
     }
 
     public void reserve(BigDecimal quantity) {
@@ -111,6 +108,26 @@ public class MaterialInventory {
     private void validatePositiveQuantity(BigDecimal quantity) {
         if (quantity == null || quantity.compareTo(BigDecimal.ZERO) <= 0) {
             throw new CustomException(ErrorCode.INVALID_INVENTORY_OPERATION_QUANTITY);
+        }
+    }
+
+    private void recalculateInventoryState() {
+        validateInventoryQuantities();
+        this.availableQuantity = this.currentQuantity.subtract(this.reservedQuantity);
+        refreshInventoryStatus();
+    }
+
+    private void validateInventoryQuantities() {
+        if (this.currentQuantity == null
+                || this.reservedQuantity == null
+                || this.safetyStockQuantity == null
+                || this.currentQuantity.compareTo(BigDecimal.ZERO) < 0
+                || this.reservedQuantity.compareTo(BigDecimal.ZERO) < 0
+                || this.safetyStockQuantity.compareTo(BigDecimal.ZERO) < 0
+                || (this.expectedInboundQuantity != null
+                && this.expectedInboundQuantity.compareTo(BigDecimal.ZERO) < 0)
+                || this.reservedQuantity.compareTo(this.currentQuantity) > 0) {
+            throw new CustomException(ErrorCode.INVALID_INVENTORY_QUANTITY);
         }
     }
 
@@ -154,13 +171,12 @@ public class MaterialInventory {
             this.safetyStockQuantity = BigDecimal.ZERO;
         }
 
-        if (this.inventoryStatus == null) {
-            refreshInventoryStatus();
-        }
+        recalculateInventoryState();
     }
 
     @PreUpdate
     public void preUpdate() {
+        recalculateInventoryState();
         this.updatedAt = LocalDateTime.now();
     }
 }
