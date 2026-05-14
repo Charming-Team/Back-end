@@ -14,6 +14,9 @@ public enum ErrorCode {
     INVALID_REQUEST_BODY(HttpStatus.BAD_REQUEST, "400-002", "요청 본문을 읽을 수 없습니다."),
     PASSWORD_CONFIRM_MISMATCH(HttpStatus.BAD_REQUEST, "400-003", "비밀번호와 비밀번호 확인이 일치하지 않습니다."),
     INVALID_INVENTORY_QUANTITY(HttpStatus.BAD_REQUEST, "400-101", "예약 재고 수량은 현재 재고 수량보다 클 수 없습니다."),
+    INVALID_INVENTORY_OPERATION_QUANTITY(HttpStatus.BAD_REQUEST, "400-102", "재고 처리 수량은 0보다 커야 합니다."),
+    INSUFFICIENT_AVAILABLE_INVENTORY(HttpStatus.BAD_REQUEST, "400-103", "예약 가능한 재고 수량이 부족합니다."),
+    INVALID_INVENTORY_RELEASE_QUANTITY(HttpStatus.BAD_REQUEST, "400-104", "해제할 예약 수량은 현재 예약 재고보다 클 수 없습니다."),
 
     // 401 Unauthorized
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "401", "인증이 필요합니다."),

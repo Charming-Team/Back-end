@@ -18,6 +18,8 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import s_map.server.global.error.CustomException;
+import s_map.server.global.error.ErrorCode;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -83,15 +85,33 @@ public class MaterialInventory {
     }
 
     public void reserve(BigDecimal quantity) {
+        validatePositiveQuantity(quantity);
+
+        if (this.availableQuantity.compareTo(quantity) < 0) {
+            throw new CustomException(ErrorCode.INSUFFICIENT_AVAILABLE_INVENTORY);
+        }
+
         this.reservedQuantity = this.reservedQuantity.add(quantity);
         this.availableQuantity = this.currentQuantity.subtract(this.reservedQuantity);
         refreshInventoryStatus();
     }
 
     public void releaseReserved(BigDecimal quantity) {
+        validatePositiveQuantity(quantity);
+
+        if (this.reservedQuantity.compareTo(quantity) < 0) {
+            throw new CustomException(ErrorCode.INVALID_INVENTORY_RELEASE_QUANTITY);
+        }
+
         this.reservedQuantity = this.reservedQuantity.subtract(quantity);
         this.availableQuantity = this.currentQuantity.subtract(this.reservedQuantity);
         refreshInventoryStatus();
+    }
+
+    private void validatePositiveQuantity(BigDecimal quantity) {
+        if (quantity == null || quantity.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new CustomException(ErrorCode.INVALID_INVENTORY_OPERATION_QUANTITY);
+        }
     }
 
     public void refreshInventoryStatus() {
