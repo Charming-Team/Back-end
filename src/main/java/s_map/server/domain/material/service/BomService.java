@@ -11,6 +11,7 @@ import s_map.server.global.error.CustomException;
 import s_map.server.global.error.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -43,7 +44,7 @@ public class BomService {
 
         validateDuplicateBom(request.productId(), request.materialId());
 
-        String unit = request.unit() != null ? request.unit() : material.getUnit();
+        String unit = StringUtils.hasText(request.unit()) ? request.unit() : material.getUnit();
 
         Bom bom = Bom.builder()
                 .productId(request.productId())
@@ -112,7 +113,7 @@ public class BomService {
     public BomResponse updateBom(Long bomId, BomUpdateRequest request) {
         Bom bom = getBomEntity(bomId);
 
-        String unit = request.unit() != null ? request.unit() : bom.getMaterial().getUnit();
+        String unit = StringUtils.hasText(request.unit()) ? request.unit() : bom.getMaterial().getUnit();
 
         bom.update(
                 request.requiredQuantityPerUnit(),
