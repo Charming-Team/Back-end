@@ -135,19 +135,21 @@ public class MaterialInventory extends BaseEntity {
     }
 
     public void refreshInventoryStatus() {
+        boolean hasExpectedInbound = this.expectedInboundAt != null
+                && this.expectedInboundQuantity != null
+                && this.expectedInboundQuantity.compareTo(BigDecimal.ZERO) > 0;
+
         if (this.availableQuantity.compareTo(BigDecimal.ZERO) <= 0) {
-            this.inventoryStatus = InventoryStatus.SHORTAGE;
+            this.inventoryStatus = hasExpectedInbound
+                    ? InventoryStatus.INBOUND_WAITING
+                    : InventoryStatus.SHORTAGE;
             return;
         }
 
         if (this.availableQuantity.compareTo(this.safetyStockQuantity) < 0) {
-            this.inventoryStatus = InventoryStatus.LOW;
-            return;
-        }
-
-        if (this.expectedInboundAt != null && this.expectedInboundQuantity != null
-                && this.expectedInboundQuantity.compareTo(BigDecimal.ZERO) > 0) {
-            this.inventoryStatus = InventoryStatus.INBOUND_WAITING;
+            this.inventoryStatus = hasExpectedInbound
+                    ? InventoryStatus.INBOUND_WAITING
+                    : InventoryStatus.LOW;
             return;
         }
 
