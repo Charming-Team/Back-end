@@ -64,7 +64,7 @@ public class Bom extends BaseEntity {
     ) {
         this.requiredQuantityPerUnit = requiredQuantityPerUnit;
         this.unit = unit;
-        this.lossRate = lossRate;
+        this.lossRate = zeroIfNull(lossRate);
     }
 
     public BigDecimal calculateRequiredQuantity(BigDecimal plannedQuantity) {
@@ -83,8 +83,10 @@ public class Bom extends BaseEntity {
 
     @PrePersist
     public void prePersist() {
-        if (this.lossRate == null) {
-            this.lossRate = BigDecimal.ZERO;
-        }
+        this.lossRate = zeroIfNull(this.lossRate);
+    }
+
+    private BigDecimal zeroIfNull(BigDecimal value) {
+        return value != null ? value : BigDecimal.ZERO;
     }
 }
