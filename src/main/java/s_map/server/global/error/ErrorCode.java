@@ -13,6 +13,7 @@ public enum ErrorCode {
     VALIDATION_ERROR(HttpStatus.BAD_REQUEST, "400-001", "요청 값 검증에 실패했습니다."),
     INVALID_REQUEST_BODY(HttpStatus.BAD_REQUEST, "400-002", "요청 본문을 읽을 수 없습니다."),
     PASSWORD_CONFIRM_MISMATCH(HttpStatus.BAD_REQUEST, "400-003", "비밀번호와 비밀번호 확인이 일치하지 않습니다."),
+    INVALID_INVENTORY_QUANTITY(HttpStatus.BAD_REQUEST, "400-101", "예약 재고 수량은 현재 재고 수량보다 클 수 없습니다."),
 
     // 401 Unauthorized
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "401", "인증이 필요합니다."),

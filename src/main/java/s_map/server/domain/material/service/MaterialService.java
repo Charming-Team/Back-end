@@ -253,6 +253,8 @@ public class MaterialService {
     ) {
         Material material = getMaterialEntity(materialId);
 
+        validateInventoryQuantities(request.currentQuantity(), request.reservedQuantity());
+
         BigDecimal availableQuantity = request.currentQuantity()
                 .subtract(request.reservedQuantity());
 
@@ -327,6 +329,15 @@ public class MaterialService {
         }
 
         return InventoryStatus.NORMAL;
+    }
+
+    private void validateInventoryQuantities(
+            BigDecimal currentQuantity,
+            BigDecimal reservedQuantity
+    ) {
+        if (reservedQuantity.compareTo(currentQuantity) > 0) {
+            throw new CustomException(ErrorCode.INVALID_INVENTORY_QUANTITY);
+        }
     }
 
     /**
