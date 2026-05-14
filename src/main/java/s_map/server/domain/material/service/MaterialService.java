@@ -23,7 +23,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Comparator;
 import java.util.Collections;
 import java.util.Map;
 import java.util.List;
@@ -91,7 +90,7 @@ public class MaterialService {
      * - result[].inventoryStatus / InventoryStatus / 재고 상태
      */
     public List<MaterialResponse> getMaterials() {
-        List<Material> materials = materialRepository.findAll();
+        List<Material> materials = materialRepository.findAllByOrderByMaterialIdDesc();
         List<Long> materialIds = materials.stream()
                 .map(Material::getMaterialId)
                 .toList();
@@ -106,7 +105,6 @@ public class MaterialService {
                         ));
 
         return materials.stream()
-                .sorted(Comparator.comparing(Material::getMaterialId).reversed())
                 .map(material -> MaterialResponse.from(
                         material,
                         inventoryMap.get(material.getMaterialId())
