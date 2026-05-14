@@ -80,10 +80,10 @@ public class ProductionPlanMaterial {
             BigDecimal shortageQuantity,
             MaterialPlanStatus materialPlanStatus
     ) {
-        this.requiredQuantity = requiredQuantity;
-        this.reservedQuantity = reservedQuantity;
-        this.consumedQuantity = consumedQuantity;
-        this.shortageQuantity = shortageQuantity;
+        this.requiredQuantity = zeroIfNull(requiredQuantity);
+        this.reservedQuantity = zeroIfNull(reservedQuantity);
+        this.consumedQuantity = zeroIfNull(consumedQuantity);
+        this.shortageQuantity = zeroIfNull(shortageQuantity);
         this.materialPlanStatus = materialPlanStatus;
     }
 
@@ -118,6 +118,10 @@ public class ProductionPlanMaterial {
         if (this.materialPlanStatus == null) {
             this.materialPlanStatus = MaterialPlanStatus.READY;
         }
+    }
+
+    private BigDecimal zeroIfNull(BigDecimal quantity) {
+        return quantity != null ? quantity : BigDecimal.ZERO;
     }
 
     @PreUpdate

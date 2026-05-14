@@ -33,19 +33,19 @@ public record MaterialUsageResponse(
                 .toList();
 
         BigDecimal totalExpectedUsage = planMaterials.stream()
-                .map(ProductionPlanMaterial::getRequiredQuantity)
+                .map(planMaterial -> zeroIfNull(planMaterial.getRequiredQuantity()))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         BigDecimal totalReservedQuantity = planMaterials.stream()
-                .map(ProductionPlanMaterial::getReservedQuantity)
+                .map(planMaterial -> zeroIfNull(planMaterial.getReservedQuantity()))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         BigDecimal totalConsumedQuantity = planMaterials.stream()
-                .map(ProductionPlanMaterial::getConsumedQuantity)
+                .map(planMaterial -> zeroIfNull(planMaterial.getConsumedQuantity()))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         BigDecimal totalShortageQuantity = planMaterials.stream()
-                .map(ProductionPlanMaterial::getShortageQuantity)
+                .map(planMaterial -> zeroIfNull(planMaterial.getShortageQuantity()))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         return new MaterialUsageResponse(
@@ -63,5 +63,9 @@ public record MaterialUsageResponse(
                 totalShortageQuantity,
                 usages
         );
+    }
+
+    private static BigDecimal zeroIfNull(BigDecimal quantity) {
+        return quantity != null ? quantity : BigDecimal.ZERO;
     }
 }
