@@ -45,6 +45,7 @@ public enum ErrorCode {
     DUPLICATE_EMAIL(HttpStatus.CONFLICT, "409-001", "이미 사용 중인 이메일입니다."),
     DUPLICATE_MATERIAL_CODE(HttpStatus.CONFLICT, "409-101", "이미 사용 중인 자재 코드입니다."),
     DUPLICATE_BOM(HttpStatus.CONFLICT, "409-102", "이미 등록된 제품-자재 BOM 정보입니다."),
+    CONCURRENT_INVENTORY_UPDATE(HttpStatus.CONFLICT, "409-103", "재고 정보가 동시에 수정되었습니다. 다시 조회 후 시도해주세요."),
 
     // 500 Internal Server Error
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "500", "서버 내부 오류가 발생했습니다.");

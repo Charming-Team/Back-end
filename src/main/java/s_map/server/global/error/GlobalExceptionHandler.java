@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
@@ -88,6 +89,15 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<BaseResponse<Void>> handleAccessDeniedException() {
         ErrorCode errorCode = ErrorCode.FORBIDDEN;
+
+        return ResponseEntity
+                .status(errorCode.getHttpStatus())
+                .body(BaseResponse.fail(errorCode));
+    }
+
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ResponseEntity<BaseResponse<Void>> handleOptimisticLockingFailureException() {
+        ErrorCode errorCode = ErrorCode.CONCURRENT_INVENTORY_UPDATE;
 
         return ResponseEntity
                 .status(errorCode.getHttpStatus())

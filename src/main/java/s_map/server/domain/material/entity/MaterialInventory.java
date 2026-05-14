@@ -13,6 +13,7 @@ import jakarta.persistence.OneToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -62,6 +63,10 @@ public class MaterialInventory {
     @Enumerated(EnumType.STRING)
     @Column(name = "inventory_status", nullable = false, length = 30)
     private InventoryStatus inventoryStatus;
+
+    @Version
+    @Column(name = "version")
+    private Long version;
 
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
