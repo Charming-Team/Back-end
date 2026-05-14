@@ -5,6 +5,7 @@ import s_map.server.domain.material.dto.req.MaterialUpdateRequest;
 import s_map.server.domain.material.dto.res.MaterialDetailResponse;
 import s_map.server.domain.material.dto.res.MaterialResponse;
 import s_map.server.domain.material.dto.res.MaterialUsageResponse;
+import s_map.server.domain.material.dto.res.MaterialUsageTotals;
 import s_map.server.domain.material.entity.Material;
 import s_map.server.domain.material.entity.MaterialInventory;
 import s_map.server.domain.material.entity.ProductionPlanMaterial;
@@ -213,9 +214,9 @@ public class MaterialService {
      * - result.totalReservedQuantity / BigDecimal / 전체 생산계획 기준 예약 수량 합계
      * - result.totalConsumedQuantity / BigDecimal / 전체 생산계획 기준 실제 사용 수량 합계
      * - result.totalShortageQuantity / BigDecimal / 전체 생산계획 기준 부족 수량 합계
-     * - result.usages / List<MaterialUsageItemResponse> / 생산계획별 자재 사용량 상세 목록
+     * - result.usages / Page<MaterialUsageItemResponse> / 생산계획별 자재 사용량 상세 페이지
      */
-    public MaterialUsageResponse getMaterialUsage(Long materialId) {
+    public MaterialUsageResponse getMaterialUsage(Long materialId, int page, int size) {
         Material material = getMaterialEntity(materialId);
 
         MaterialInventory inventory = materialInventoryRepository
@@ -223,10 +224,16 @@ public class MaterialService {
                 .orElse(null);
 
         // TODO: ProductionPlan 도메인 연동 후 현재 반영/활성 생산계획만 합산하도록 필터링한다.
-        List<ProductionPlanMaterial> planMaterials = productionPlanMaterialRepository
-                .findByMaterialMaterialId(materialId);
+        MaterialUsageTotals totals = productionPlanMaterialRepository
+                .sumUsageByMaterialId(materialId);
 
-        return MaterialUsageResponse.from(material, inventory, planMaterials);
+        Page<ProductionPlanMaterial> planMaterials = productionPlanMaterialRepository
+                .findByMaterialMaterialId(
+                        materialId,
+                        createPageable(page, size, "planMaterialId")
+                );
+
+        return MaterialUsageResponse.from(material, inventory, totals, planMaterials);
     }
 
     /**

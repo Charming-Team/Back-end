@@ -129,7 +129,7 @@ public class MaterialController {
 
     @Operation(
             summary = "자재 사용량 조회",
-            description = "특정 자재의 재고 요약과 생산계획별 필요/예약/사용/부족 수량을 조회합니다."
+            description = "특정 자재의 재고 요약과 생산계획별 필요/예약/사용/부족 수량 페이지를 조회합니다. 합계는 전체 생산계획별 자재 사용량 기준으로 계산합니다."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "자재 사용량 조회 성공"),
@@ -140,9 +140,13 @@ public class MaterialController {
     @GetMapping("/{materialId}/usage")
     public BaseResponse<MaterialUsageResponse> getMaterialUsage(
             @Parameter(description = "자재 ID", example = "1")
-            @PathVariable Long materialId
+            @PathVariable Long materialId,
+            @Parameter(description = "페이지 번호, 0부터 시작", example = "0")
+            @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "페이지 크기, 최대 100", example = "20")
+            @RequestParam(defaultValue = "20") int size
     ) {
-        return BaseResponse.success(materialService.getMaterialUsage(materialId));
+        return BaseResponse.success(materialService.getMaterialUsage(materialId, page, size));
     }
 
     @Operation(
