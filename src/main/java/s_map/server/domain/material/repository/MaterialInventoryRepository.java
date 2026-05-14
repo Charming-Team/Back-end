@@ -11,6 +11,8 @@ public interface MaterialInventoryRepository extends JpaRepository<MaterialInven
 
     Optional<MaterialInventory> findByMaterialMaterialId(Long materialId);
 
+    List<MaterialInventory> findByMaterialMaterialIdIn(List<Long> materialIds);
+
     List<MaterialInventory> findByInventoryStatus(InventoryStatus inventoryStatus);
 
     List<MaterialInventory> findByInventoryStatusIn(List<InventoryStatus> inventoryStatuses);

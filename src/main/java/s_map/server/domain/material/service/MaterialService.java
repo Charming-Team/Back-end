@@ -24,8 +24,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Comparator;
+import java.util.Collections;
+import java.util.Map;
 import java.util.List;
 import java.util.Arrays;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -88,16 +92,25 @@ public class MaterialService {
      */
     public List<MaterialResponse> getMaterials() {
         List<Material> materials = materialRepository.findAll();
+        List<Long> materialIds = materials.stream()
+                .map(Material::getMaterialId)
+                .toList();
+
+        Map<Long, MaterialInventory> inventoryMap = materialIds.isEmpty()
+                ? Collections.emptyMap()
+                : materialInventoryRepository.findByMaterialMaterialIdIn(materialIds)
+                        .stream()
+                        .collect(Collectors.toMap(
+                                inventory -> inventory.getMaterial().getMaterialId(),
+                                Function.identity()
+                        ));
 
         return materials.stream()
                 .sorted(Comparator.comparing(Material::getMaterialId).reversed())
-                .map(material -> {
-                    MaterialInventory inventory = materialInventoryRepository
-                            .findByMaterialMaterialId(material.getMaterialId())
-                            .orElse(null);
-
-                    return MaterialResponse.from(material, inventory);
-                })
+                .map(material -> MaterialResponse.from(
+                        material,
+                        inventoryMap.get(material.getMaterialId())
+                ))
                 .toList();
     }
 
