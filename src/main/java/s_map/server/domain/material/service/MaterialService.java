@@ -21,6 +21,10 @@ import s_map.server.global.error.ErrorCode;
 import java.math.BigDecimal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,6 +39,10 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class MaterialService {
+
+    private static final int DEFAULT_PAGE = 0;
+    private static final int DEFAULT_SIZE = 20;
+    private static final int MAX_SIZE = 100;
 
     private final MaterialRepository materialRepository;
     private final MaterialInventoryRepository materialInventoryRepository;
@@ -77,27 +85,20 @@ public class MaterialService {
     }
 
     /**
-     * 기능: 전체 자재 목록과 각 자재의 재고 현황을 조회한다.
+     * 기능: 자재 목록과 각 자재의 재고 현황을 페이지 단위로 조회한다.
      *
      * Input:
-     * - 없음
+     * - page / int / 조회할 페이지 번호
+     * - size / int / 한 페이지에 조회할 자재 수
      *
      * Output:
-     * - result / List<MaterialResponse> / 자재 목록 및 재고 현황 목록
-     * - result[].materialId / Long / 자재 고유 ID
-     * - result[].materialCode / String / 자재 코드
-     * - result[].materialName / String / 자재명
-     * - result[].materialType / String / 자재 유형
-     * - result[].unit / String / 자재 단위
-     * - result[].currentQuantity / BigDecimal / 현재 보유 중인 전체 재고량
-     * - result[].availableQuantity / BigDecimal / 실제 생산에 사용 가능한 재고량
-     * - result[].reservedQuantity / BigDecimal / 생산계획에 이미 예약된 재고량
-     * - result[].safetyStockQuantity / BigDecimal / 안전 재고 수량
-     * - result[].inventoryStatus / InventoryStatus / 재고 상태
+     * - result / Page<MaterialResponse> / 자재 목록 및 재고 현황 페이지
      */
-    public List<MaterialResponse> getMaterials() {
-        List<Material> materials = materialRepository.findAllByOrderByMaterialIdDesc();
-        List<Long> materialIds = materials.stream()
+    public Page<MaterialResponse> getMaterials(int page, int size) {
+        Pageable pageable = createPageable(page, size, "materialId");
+        Page<Material> materials = materialRepository.findAll(pageable);
+
+        List<Long> materialIds = materials.getContent().stream()
                 .map(Material::getMaterialId)
                 .toList();
 
@@ -110,12 +111,21 @@ public class MaterialService {
                                 Function.identity()
                         ));
 
-        return materials.stream()
-                .map(material -> MaterialResponse.from(
+        return materials.map(material -> MaterialResponse.from(
                         material,
                         inventoryMap.get(material.getMaterialId())
-                ))
-                .toList();
+                ));
+    }
+
+    private Pageable createPageable(int page, int size, String sortProperty) {
+        int safePage = Math.max(page, DEFAULT_PAGE);
+        int safeSize = size <= 0 ? DEFAULT_SIZE : Math.min(size, MAX_SIZE);
+
+        return PageRequest.of(
+                safePage,
+                safeSize,
+                Sort.by(Sort.Direction.DESC, sortProperty)
+        );
     }
 
     /**

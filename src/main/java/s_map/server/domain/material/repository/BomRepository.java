@@ -1,6 +1,8 @@
 package s_map.server.domain.material.repository;
 
 import s_map.server.domain.material.entity.Bom;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -10,8 +12,11 @@ import java.util.Optional;
 
 public interface BomRepository extends JpaRepository<Bom, Long> {
 
-    @Query("select b from Bom b join fetch b.material order by b.bomId desc")
-    List<Bom> findAllWithMaterial();
+    @Query(
+            value = "select b from Bom b join fetch b.material",
+            countQuery = "select count(b) from Bom b"
+    )
+    Page<Bom> findAllWithMaterial(Pageable pageable);
 
     List<Bom> findByProductId(Long productId);
 
