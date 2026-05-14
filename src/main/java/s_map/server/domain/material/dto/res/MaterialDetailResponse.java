@@ -20,6 +20,7 @@ public record MaterialDetailResponse(
         BigDecimal safetyStockQuantity,
         LocalDateTime expectedInboundAt,
         BigDecimal expectedInboundQuantity,
+        boolean inventoryRegistered,
         InventoryStatus inventoryStatus,
         LocalDateTime updatedAt
 ) {
@@ -38,6 +39,7 @@ public record MaterialDetailResponse(
                 inventory != null ? inventory.getSafetyStockQuantity() : BigDecimal.ZERO,
                 inventory != null ? inventory.getExpectedInboundAt() : null,
                 inventory != null ? inventory.getExpectedInboundQuantity() : null,
+                inventory != null,
                 inventory != null ? inventory.getInventoryStatus() : null,
                 material.getUpdatedAt()
         );

@@ -17,6 +17,7 @@ public record MaterialResponse(
         BigDecimal availableQuantity,
         BigDecimal reservedQuantity,
         BigDecimal safetyStockQuantity,
+        boolean inventoryRegistered,
         InventoryStatus inventoryStatus
 ) {
 
@@ -32,6 +33,7 @@ public record MaterialResponse(
                 inventory != null ? inventory.getAvailableQuantity() : BigDecimal.ZERO,
                 inventory != null ? inventory.getReservedQuantity() : BigDecimal.ZERO,
                 inventory != null ? inventory.getSafetyStockQuantity() : BigDecimal.ZERO,
+                inventory != null,
                 inventory != null ? inventory.getInventoryStatus() : null
         );
     }
