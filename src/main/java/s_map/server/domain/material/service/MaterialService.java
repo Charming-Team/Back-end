@@ -206,6 +206,7 @@ public class MaterialService {
                 .findByMaterialMaterialId(materialId)
                 .orElse(null);
 
+        // TODO: ProductionPlan 도메인 연동 후 현재 반영/활성 생산계획만 합산하도록 필터링한다.
         List<ProductionPlanMaterial> planMaterials = productionPlanMaterialRepository
                 .findByMaterialMaterialId(materialId);
 
