@@ -11,6 +11,9 @@ import s_map.server.global.common.BaseResponse;
 import s_map.server.domain.material.dto.res.MaterialShortageResponse;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -33,7 +36,17 @@ public class MaterialController {
 
     private final MaterialService materialService;
 
-    @Operation(summary = "자재 등록")
+    @Operation(
+            summary = "자재 등록",
+            description = "자재 코드, 자재명, 자재 유형, 단위, 설명을 등록합니다. 자재 코드는 중복될 수 없습니다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "자재 등록 성공"),
+            @ApiResponse(responseCode = "400", description = "요청 값 검증 실패"),
+            @ApiResponse(responseCode = "401", description = "인증 필요"),
+            @ApiResponse(responseCode = "409", description = "이미 사용 중인 자재 코드"),
+            @ApiResponse(responseCode = "500", description = "서버 내부 오류")
+    })
     @PostMapping
     public BaseResponse<MaterialDetailResponse> createMaterial(
             @Valid @RequestBody MaterialCreateRequest request
@@ -41,46 +54,105 @@ public class MaterialController {
         return BaseResponse.success(materialService.createMaterial(request));
     }
 
-    @Operation(summary = "자재 목록 조회")
+    @Operation(
+            summary = "자재 목록 조회",
+            description = "전체 자재 목록과 각 자재의 재고 요약 정보를 materialId 내림차순으로 조회합니다. 재고가 등록되지 않은 자재는 inventoryRegistered=false로 표시됩니다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "자재 목록 조회 성공"),
+            @ApiResponse(responseCode = "401", description = "인증 필요"),
+            @ApiResponse(responseCode = "500", description = "서버 내부 오류")
+    })
     @GetMapping
     public BaseResponse<List<MaterialResponse>> getMaterials() {
         return BaseResponse.success(materialService.getMaterials());
     }
 
-    @Operation(summary = "부족 자재 목록 조회")
+    @Operation(
+            summary = "부족 자재 목록 조회",
+            description = "생산계획별 자재 계산 결과 중 부족 또는 일부 예약 상태인 자재 목록을 조회합니다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "부족 자재 목록 조회 성공"),
+            @ApiResponse(responseCode = "401", description = "인증 필요"),
+            @ApiResponse(responseCode = "500", description = "서버 내부 오류")
+    })
     @GetMapping("/shortages")
     public BaseResponse<List<MaterialShortageResponse>> getMaterialShortages() {
         return BaseResponse.success(materialService.getMaterialShortages());
     }
 
-    @Operation(summary = "자재 상세 조회")
+    @Operation(
+            summary = "자재 상세 조회",
+            description = "자재 ID를 기준으로 자재 기본 정보와 재고 상세 정보를 조회합니다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "자재 상세 조회 성공"),
+            @ApiResponse(responseCode = "401", description = "인증 필요"),
+            @ApiResponse(responseCode = "404", description = "자재 없음"),
+            @ApiResponse(responseCode = "500", description = "서버 내부 오류")
+    })
     @GetMapping("/{materialId}")
     public BaseResponse<MaterialDetailResponse> getMaterial(
+            @Parameter(description = "자재 ID", example = "1")
             @PathVariable Long materialId
     ) {
         return BaseResponse.success(materialService.getMaterial(materialId));
     }
 
-    @Operation(summary = "자재 정보 수정")
+    @Operation(
+            summary = "자재 정보 수정",
+            description = "자재명, 자재 유형, 단위, 설명을 전체 수정합니다. 모든 필수 필드를 함께 전달해야 합니다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "자재 정보 수정 성공"),
+            @ApiResponse(responseCode = "400", description = "요청 값 검증 실패"),
+            @ApiResponse(responseCode = "401", description = "인증 필요"),
+            @ApiResponse(responseCode = "404", description = "자재 없음"),
+            @ApiResponse(responseCode = "500", description = "서버 내부 오류")
+    })
     @PutMapping("/{materialId}")
     public BaseResponse<MaterialDetailResponse> updateMaterial(
+            @Parameter(description = "자재 ID", example = "1")
             @PathVariable Long materialId,
             @Valid @RequestBody MaterialUpdateRequest request
     ) {
         return BaseResponse.success(materialService.updateMaterial(materialId, request));
     }
 
-    @Operation(summary = "자재 사용량 조회")
+    @Operation(
+            summary = "자재 사용량 조회",
+            description = "특정 자재의 재고 요약과 생산계획별 필요/예약/사용/부족 수량을 조회합니다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "자재 사용량 조회 성공"),
+            @ApiResponse(responseCode = "401", description = "인증 필요"),
+            @ApiResponse(responseCode = "404", description = "자재 없음"),
+            @ApiResponse(responseCode = "500", description = "서버 내부 오류")
+    })
     @GetMapping("/{materialId}/usage")
     public BaseResponse<MaterialUsageResponse> getMaterialUsage(
+            @Parameter(description = "자재 ID", example = "1")
             @PathVariable Long materialId
     ) {
         return BaseResponse.success(materialService.getMaterialUsage(materialId));
     }
 
-    @Operation(summary = "자재 재고 등록/수정")
+    @Operation(
+            summary = "자재 재고 등록/수정",
+            description = "자재의 현재 재고, 예약 재고, 안전 재고, 입고 예정 정보를 등록하거나 수정합니다. 예약 재고는 현재 재고보다 클 수 없습니다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "자재 재고 등록/수정 성공"),
+            @ApiResponse(responseCode = "400", description = "요청 값 검증 실패 또는 예약 재고가 현재 재고 초과"),
+            @ApiResponse(responseCode = "401", description = "인증 필요"),
+            @ApiResponse(responseCode = "404", description = "자재 없음"),
+            @ApiResponse(responseCode = "409", description = "재고 동시 수정 충돌"),
+            @ApiResponse(responseCode = "500", description = "서버 내부 오류")
+    })
     @PutMapping("/{materialId}/inventory")
     public BaseResponse<MaterialDetailResponse> updateMaterialInventory(
+            @Parameter(description = "자재 ID", example = "1")
             @PathVariable Long materialId,
             @Valid @RequestBody MaterialInventoryUpdateRequest request
     ) {
