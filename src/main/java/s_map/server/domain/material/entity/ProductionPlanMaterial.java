@@ -11,7 +11,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
@@ -19,9 +18,9 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import s_map.server.global.common.BaseEntity;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 
 @Getter
 @Entity
@@ -37,7 +36,7 @@ import java.time.LocalDateTime;
                 )
         }
 )
-public class ProductionPlanMaterial {
+public class ProductionPlanMaterial extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -67,12 +66,6 @@ public class ProductionPlanMaterial {
     @Column(name = "material_plan_status", nullable = false, length = 30)
     private MaterialPlanStatus materialPlanStatus;
 
-    @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt;
-
-    @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
-
     public void updateCalculationResult(
             BigDecimal requiredQuantity,
             BigDecimal reservedQuantity,
@@ -94,11 +87,6 @@ public class ProductionPlanMaterial {
 
     @PrePersist
     public void prePersist() {
-        LocalDateTime now = LocalDateTime.now();
-
-        this.createdAt = now;
-        this.updatedAt = now;
-
         if (this.requiredQuantity == null) {
             this.requiredQuantity = BigDecimal.ZERO;
         }
@@ -122,10 +110,5 @@ public class ProductionPlanMaterial {
 
     private BigDecimal zeroIfNull(BigDecimal quantity) {
         return quantity != null ? quantity : BigDecimal.ZERO;
-    }
-
-    @PreUpdate
-    public void preUpdate() {
-        this.updatedAt = LocalDateTime.now();
     }
 }

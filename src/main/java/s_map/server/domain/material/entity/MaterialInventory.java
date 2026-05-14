@@ -19,6 +19,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import s_map.server.global.common.BaseEntity;
 import s_map.server.global.error.CustomException;
 import s_map.server.global.error.ErrorCode;
 
@@ -31,7 +32,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "material_inventories")
-public class MaterialInventory {
+public class MaterialInventory extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -67,9 +68,6 @@ public class MaterialInventory {
     @Version
     @Column(name = "version")
     private Long version;
-
-    @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
 
     public void updateInventory(
             BigDecimal currentQuantity,
@@ -158,8 +156,6 @@ public class MaterialInventory {
 
     @PrePersist
     public void prePersist() {
-        this.updatedAt = LocalDateTime.now();
-
         if (this.currentQuantity == null) {
             this.currentQuantity = BigDecimal.ZERO;
         }
@@ -182,6 +178,5 @@ public class MaterialInventory {
     @PreUpdate
     public void preUpdate() {
         recalculateInventoryState();
-        this.updatedAt = LocalDateTime.now();
     }
 }

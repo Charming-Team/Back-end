@@ -9,7 +9,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
@@ -17,9 +16,9 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import s_map.server.global.common.BaseEntity;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 
 @Getter
 @Entity
@@ -35,7 +34,7 @@ import java.time.LocalDateTime;
                 )
         }
 )
-public class Bom {
+public class Bom extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -57,9 +56,6 @@ public class Bom {
 
     @Column(name = "loss_rate", precision = 5, scale = 2)
     private BigDecimal lossRate;
-
-    @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
 
     public void update(
             BigDecimal requiredQuantityPerUnit,
@@ -87,15 +83,8 @@ public class Bom {
 
     @PrePersist
     public void prePersist() {
-        this.updatedAt = LocalDateTime.now();
-
         if (this.lossRate == null) {
             this.lossRate = BigDecimal.ZERO;
         }
-    }
-
-    @PreUpdate
-    public void preUpdate() {
-        this.updatedAt = LocalDateTime.now();
     }
 }
