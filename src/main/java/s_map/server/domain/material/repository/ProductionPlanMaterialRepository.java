@@ -10,11 +10,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
-import java.util.Optional;
 
 public interface ProductionPlanMaterialRepository extends JpaRepository<ProductionPlanMaterial, Long> {
-
-    List<ProductionPlanMaterial> findByPlanId(Long planId);
 
     Page<ProductionPlanMaterial> findByMaterialMaterialId(Long materialId, Pageable pageable);
 
@@ -29,20 +26,6 @@ public interface ProductionPlanMaterialRepository extends JpaRepository<Producti
             where planMaterial.material.materialId = :materialId
             """)
     MaterialUsageTotals sumUsageByMaterialId(@Param("materialId") Long materialId);
-
-    Optional<ProductionPlanMaterial> findByPlanIdAndMaterialMaterialId(
-            Long planId,
-            Long materialId
-    );
-
-    boolean existsByPlanIdAndMaterialMaterialId(
-            Long planId,
-            Long materialId
-    );
-
-    List<ProductionPlanMaterial> findByMaterialPlanStatus(MaterialPlanStatus materialPlanStatus);
-
-    List<ProductionPlanMaterial> findByMaterialPlanStatusIn(List<MaterialPlanStatus> materialPlanStatuses);
 
     @Query("""
             select planMaterial from ProductionPlanMaterial planMaterial

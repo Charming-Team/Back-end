@@ -1,6 +1,5 @@
 package s_map.server.domain.material.repository;
 
-import s_map.server.domain.material.entity.InventoryStatus;
 import s_map.server.domain.material.entity.MaterialInventory;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -12,8 +11,4 @@ public interface MaterialInventoryRepository extends JpaRepository<MaterialInven
     Optional<MaterialInventory> findByMaterialMaterialId(Long materialId);
 
     List<MaterialInventory> findByMaterialMaterialIdIn(List<Long> materialIds);
-
-    List<MaterialInventory> findByInventoryStatus(InventoryStatus inventoryStatus);
-
-    List<MaterialInventory> findByInventoryStatusIn(List<InventoryStatus> inventoryStatuses);
 }

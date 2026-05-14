@@ -8,7 +8,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
-import java.util.Optional;
 
 public interface BomRepository extends JpaRepository<Bom, Long> {
 
@@ -18,8 +17,6 @@ public interface BomRepository extends JpaRepository<Bom, Long> {
     )
     Page<Bom> findAllWithMaterial(Pageable pageable);
 
-    List<Bom> findByProductId(Long productId);
-
     @Query("""
             select b from Bom b
             join fetch b.material
@@ -27,10 +24,6 @@ public interface BomRepository extends JpaRepository<Bom, Long> {
             order by b.bomId desc
             """)
     List<Bom> findByProductIdWithMaterial(@Param("productId") Long productId);
-
-    List<Bom> findByMaterialMaterialId(Long materialId);
-
-    Optional<Bom> findByProductIdAndMaterialMaterialId(Long productId, Long materialId);
 
     boolean existsByProductIdAndMaterialMaterialId(Long productId, Long materialId);
 }
