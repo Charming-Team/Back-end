@@ -1,4 +1,9 @@
 package s_map.server.domain.plan.entity;
 
-public class PlanStatus {
+public enum PlanStatus {
+    SCHEDULED,
+    IN_PROGRESS,
+    COMPLETED,
+    DELAYED,
+    CANCELLED
 }
