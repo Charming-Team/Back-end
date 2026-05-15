@@ -42,6 +42,7 @@ import java.util.stream.Collectors;
 public class MaterialService {
 
     private static final int DEFAULT_PAGE = 0;
+    private static final int DEFAULT_MATERIAL_LIST_SIZE = 10;
     private static final int DEFAULT_SIZE = 20;
     private static final int MAX_SIZE = 100;
 
@@ -96,7 +97,7 @@ public class MaterialService {
      * - result / Page<MaterialResponse> / 자재 목록 및 재고 현황 페이지
      */
     public Page<MaterialResponse> getMaterials(int page, int size) {
-        Pageable pageable = createPageable(page, size, "materialId");
+        Pageable pageable = createPageable(page, size, "materialId", DEFAULT_MATERIAL_LIST_SIZE);
         Page<Material> materials = materialRepository.findAll(pageable);
 
         List<Long> materialIds = materials.getContent().stream()
@@ -119,8 +120,12 @@ public class MaterialService {
     }
 
     private Pageable createPageable(int page, int size, String sortProperty) {
+        return createPageable(page, size, sortProperty, DEFAULT_SIZE);
+    }
+
+    private Pageable createPageable(int page, int size, String sortProperty, int defaultSize) {
         int safePage = Math.max(page, DEFAULT_PAGE);
-        int safeSize = size <= 0 ? DEFAULT_SIZE : Math.min(size, MAX_SIZE);
+        int safeSize = size <= 0 ? defaultSize : Math.min(size, MAX_SIZE);
 
         return PageRequest.of(
                 safePage,

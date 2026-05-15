@@ -69,8 +69,8 @@ public class MaterialController {
     public BaseResponse<Page<MaterialResponse>> getMaterials(
             @Parameter(description = "페이지 번호, 0부터 시작", example = "0")
             @RequestParam(defaultValue = "0") int page,
-            @Parameter(description = "페이지 크기, 최대 100", example = "20")
-            @RequestParam(defaultValue = "20") int size
+            @Parameter(description = "페이지 크기, 최대 100", example = "10")
+            @RequestParam(defaultValue = "10") int size
     ) {
         return BaseResponse.success(materialService.getMaterials(page, size));
     }
