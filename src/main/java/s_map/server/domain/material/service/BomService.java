@@ -10,16 +10,25 @@ import s_map.server.domain.material.repository.MaterialRepository;
 import s_map.server.global.error.CustomException;
 import s_map.server.global.error.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Comparator;
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class BomService {
+
+    private static final int DEFAULT_PAGE = 0;
+    private static final int DEFAULT_SIZE = 20;
+    private static final int MAX_SIZE = 100;
 
     private final BomRepository bomRepository;
     private final MaterialRepository materialRepository;
@@ -44,7 +53,7 @@ public class BomService {
 
         validateDuplicateBom(request.productId(), request.materialId());
 
-        String unit = request.unit() != null ? request.unit() : material.getUnit();
+        String unit = StringUtils.hasText(request.unit()) ? request.unit() : material.getUnit();
 
         Bom bom = Bom.builder()
                 .productId(request.productId())
@@ -54,32 +63,31 @@ public class BomService {
                 .lossRate(request.lossRate())
                 .build();
 
-        Bom savedBom = bomRepository.save(bom);
+        Bom savedBom;
+        try {
+            savedBom = bomRepository.saveAndFlush(bom);
+        } catch (DataIntegrityViolationException exception) {
+            throw new CustomException(ErrorCode.DUPLICATE_BOM);
+        }
 
         return BomResponse.from(savedBom);
     }
 
     /**
-     * 기능: 전체 BOM 목록을 조회한다.
+     * 기능: BOM 목록을 페이지 단위로 조회한다.
      *
      * Input:
-     * - 없음
+     * - page / int / 조회할 페이지 번호
+     * - size / int / 한 페이지에 조회할 BOM 수
      *
      * Output:
-     * - result / List<BomResponse> / BOM 목록
-     * - result[].bomId / Long / BOM 고유 ID
-     * - result[].productId / Long / 제품 고유 ID
-     * - result[].materialId / Long / 자재 고유 ID
-     * - result[].materialCode / String / 자재 코드
-     * - result[].materialName / String / 자재명
-     * - result[].requiredQuantityPerUnit / BigDecimal / 제품 1단위 생산에 필요한 자재 소요량
-     * - result[].lossRate / BigDecimal / 생산 과정에서 발생하는 손실률
+     * - result / Page<BomResponse> / BOM 목록 페이지
      */
-    public List<BomResponse> getBoms() {
-        return bomRepository.findAll().stream()
-                .sorted(Comparator.comparing(Bom::getBomId).reversed())
-                .map(BomResponse::from)
-                .toList();
+    public Page<BomResponse> getBoms(int page, int size) {
+        Pageable pageable = createPageable(page, size);
+
+        return bomRepository.findAllWithMaterial(pageable)
+                .map(BomResponse::from);
     }
 
     /**
@@ -92,10 +100,20 @@ public class BomService {
      * - result / List<BomResponse> / 특정 제품의 BOM 목록
      */
     public List<BomResponse> getBomsByProductId(Long productId) {
-        return bomRepository.findByProductId(productId).stream()
-                .sorted(Comparator.comparing(Bom::getBomId).reversed())
+        return bomRepository.findByProductIdWithMaterial(productId).stream()
                 .map(BomResponse::from)
                 .toList();
+    }
+
+    private Pageable createPageable(int page, int size) {
+        int safePage = Math.max(page, DEFAULT_PAGE);
+        int safeSize = size <= 0 ? DEFAULT_SIZE : Math.min(size, MAX_SIZE);
+
+        return PageRequest.of(
+                safePage,
+                safeSize,
+                Sort.by(Sort.Direction.DESC, "bomId")
+        );
     }
 
     /**
@@ -115,7 +133,7 @@ public class BomService {
     public BomResponse updateBom(Long bomId, BomUpdateRequest request) {
         Bom bom = getBomEntity(bomId);
 
-        String unit = request.unit() != null ? request.unit() : bom.getMaterial().getUnit();
+        String unit = StringUtils.hasText(request.unit()) ? request.unit() : bom.getMaterial().getUnit();
 
         bom.update(
                 request.requiredQuantityPerUnit(),

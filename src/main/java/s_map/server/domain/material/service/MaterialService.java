@@ -5,6 +5,7 @@ import s_map.server.domain.material.dto.req.MaterialUpdateRequest;
 import s_map.server.domain.material.dto.res.MaterialDetailResponse;
 import s_map.server.domain.material.dto.res.MaterialResponse;
 import s_map.server.domain.material.dto.res.MaterialUsageResponse;
+import s_map.server.domain.material.dto.res.MaterialUsageTotals;
 import s_map.server.domain.material.entity.Material;
 import s_map.server.domain.material.entity.MaterialInventory;
 import s_map.server.domain.material.entity.ProductionPlanMaterial;
@@ -12,7 +13,6 @@ import s_map.server.domain.material.repository.MaterialInventoryRepository;
 import s_map.server.domain.material.repository.MaterialRepository;
 import s_map.server.domain.material.repository.ProductionPlanMaterialRepository;
 import s_map.server.domain.material.dto.req.MaterialInventoryUpdateRequest;
-import s_map.server.domain.material.entity.InventoryStatus;
 import s_map.server.domain.material.dto.res.MaterialShortageResponse;
 import s_map.server.domain.material.entity.MaterialPlanStatus;
 
@@ -21,17 +21,29 @@ import s_map.server.global.error.ErrorCode;
 
 import java.math.BigDecimal;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Comparator;
+import java.util.Collections;
+import java.util.Map;
 import java.util.List;
 import java.util.Arrays;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class MaterialService {
+
+    private static final int DEFAULT_PAGE = 0;
+    private static final int DEFAULT_SIZE = 20;
+    private static final int MAX_SIZE = 100;
 
     private final MaterialRepository materialRepository;
     private final MaterialInventoryRepository materialInventoryRepository;
@@ -63,43 +75,58 @@ public class MaterialService {
                 .description(request.description())
                 .build();
 
-        Material savedMaterial = materialRepository.save(material);
+        Material savedMaterial;
+        try {
+            savedMaterial = materialRepository.saveAndFlush(material);
+        } catch (DataIntegrityViolationException exception) {
+            throw new CustomException(ErrorCode.DUPLICATE_MATERIAL_CODE);
+        }
 
         return MaterialDetailResponse.from(savedMaterial, null);
     }
 
     /**
-     * 기능: 전체 자재 목록과 각 자재의 재고 현황을 조회한다.
+     * 기능: 자재 목록과 각 자재의 재고 현황을 페이지 단위로 조회한다.
      *
      * Input:
-     * - 없음
+     * - page / int / 조회할 페이지 번호
+     * - size / int / 한 페이지에 조회할 자재 수
      *
      * Output:
-     * - result / List<MaterialResponse> / 자재 목록 및 재고 현황 목록
-     * - result[].materialId / Long / 자재 고유 ID
-     * - result[].materialCode / String / 자재 코드
-     * - result[].materialName / String / 자재명
-     * - result[].materialType / String / 자재 유형
-     * - result[].unit / String / 자재 단위
-     * - result[].currentQuantity / BigDecimal / 현재 보유 중인 전체 재고량
-     * - result[].availableQuantity / BigDecimal / 실제 생산에 사용 가능한 재고량
-     * - result[].reservedQuantity / BigDecimal / 생산계획에 이미 예약된 재고량
-     * - result[].safetyStockQuantity / BigDecimal / 안전 재고 수량
-     * - result[].inventoryStatus / InventoryStatus / 재고 상태
+     * - result / Page<MaterialResponse> / 자재 목록 및 재고 현황 페이지
      */
-    public List<MaterialResponse> getMaterials() {
-        List<Material> materials = materialRepository.findAll();
+    public Page<MaterialResponse> getMaterials(int page, int size) {
+        Pageable pageable = createPageable(page, size, "materialId");
+        Page<Material> materials = materialRepository.findAll(pageable);
 
-        return materials.stream()
-                .sorted(Comparator.comparing(Material::getMaterialId).reversed())
-                .map(material -> {
-                    MaterialInventory inventory = materialInventoryRepository
-                            .findByMaterialMaterialId(material.getMaterialId())
-                            .orElse(null);
-
-                    return MaterialResponse.from(material, inventory);
-                })
+        List<Long> materialIds = materials.getContent().stream()
+                .map(Material::getMaterialId)
                 .toList();
+
+        Map<Long, MaterialInventory> inventoryMap = materialIds.isEmpty()
+                ? Collections.emptyMap()
+                : materialInventoryRepository.findByMaterialMaterialIdIn(materialIds)
+                        .stream()
+                        .collect(Collectors.toMap(
+                                inventory -> inventory.getMaterial().getMaterialId(),
+                                Function.identity()
+                        ));
+
+        return materials.map(material -> MaterialResponse.from(
+                        material,
+                        inventoryMap.get(material.getMaterialId())
+                ));
+    }
+
+    private Pageable createPageable(int page, int size, String sortProperty) {
+        int safePage = Math.max(page, DEFAULT_PAGE);
+        int safeSize = size <= 0 ? DEFAULT_SIZE : Math.min(size, MAX_SIZE);
+
+        return PageRequest.of(
+                safePage,
+                safeSize,
+                Sort.by(Sort.Direction.DESC, sortProperty)
+        );
     }
 
     /**
@@ -187,19 +214,26 @@ public class MaterialService {
      * - result.totalReservedQuantity / BigDecimal / 전체 생산계획 기준 예약 수량 합계
      * - result.totalConsumedQuantity / BigDecimal / 전체 생산계획 기준 실제 사용 수량 합계
      * - result.totalShortageQuantity / BigDecimal / 전체 생산계획 기준 부족 수량 합계
-     * - result.usages / List<MaterialUsageItemResponse> / 생산계획별 자재 사용량 상세 목록
+     * - result.usages / Page<MaterialUsageItemResponse> / 생산계획별 자재 사용량 상세 페이지
      */
-    public MaterialUsageResponse getMaterialUsage(Long materialId) {
+    public MaterialUsageResponse getMaterialUsage(Long materialId, int page, int size) {
         Material material = getMaterialEntity(materialId);
 
         MaterialInventory inventory = materialInventoryRepository
                 .findByMaterialMaterialId(materialId)
                 .orElse(null);
 
-        List<ProductionPlanMaterial> planMaterials = productionPlanMaterialRepository
-                .findByMaterialMaterialId(materialId);
+        // TODO: ProductionPlan 도메인 연동 후 현재 반영/활성 생산계획만 합산하도록 필터링한다.
+        MaterialUsageTotals totals = productionPlanMaterialRepository
+                .sumUsageByMaterialId(materialId);
 
-        return MaterialUsageResponse.from(material, inventory, planMaterials);
+        Page<ProductionPlanMaterial> planMaterials = productionPlanMaterialRepository
+                .findByMaterialMaterialId(
+                        materialId,
+                        createPageable(page, size, "planMaterialId")
+                );
+
+        return MaterialUsageResponse.from(material, inventory, totals, planMaterials);
     }
 
     /**
@@ -238,7 +272,6 @@ public class MaterialService {
      * - materialId / Long / 재고를 등록 또는 수정할 자재 고유 ID
      * - request / MaterialInventoryUpdateRequest / 자재 재고 수정 요청 값
      * - request.currentQuantity / BigDecimal / 현재 보유 중인 전체 재고량
-     * - request.reservedQuantity / BigDecimal / 생산계획에 이미 예약된 재고량
      * - request.safetyStockQuantity / BigDecimal / 안전 재고 수량
      * - request.expectedInboundAt / LocalDateTime / 입고 예정 일시
      * - request.expectedInboundQuantity / BigDecimal / 입고 예정 수량
@@ -253,27 +286,18 @@ public class MaterialService {
     ) {
         Material material = getMaterialEntity(materialId);
 
-        BigDecimal availableQuantity = request.currentQuantity()
-                .subtract(request.reservedQuantity());
-
-        InventoryStatus inventoryStatus = calculateInventoryStatus(
-                availableQuantity,
-                request.safetyStockQuantity(),
-                request.expectedInboundAt(),
-                request.expectedInboundQuantity()
-        );
-
         MaterialInventory inventory = materialInventoryRepository
                 .findByMaterialMaterialId(materialId)
                 .map(existingInventory -> {
+                    validateInventoryQuantities(
+                            request.currentQuantity(),
+                            existingInventory.getReservedQuantity()
+                    );
                     existingInventory.updateInventory(
                             request.currentQuantity(),
-                            availableQuantity,
-                            request.reservedQuantity(),
                             request.safetyStockQuantity(),
                             request.expectedInboundAt(),
-                            request.expectedInboundQuantity(),
-                            inventoryStatus
+                            request.expectedInboundQuantity()
                     );
 
                     return existingInventory;
@@ -282,51 +306,23 @@ public class MaterialService {
                         MaterialInventory.builder()
                                 .material(material)
                                 .currentQuantity(request.currentQuantity())
-                                .availableQuantity(availableQuantity)
-                                .reservedQuantity(request.reservedQuantity())
+                                .reservedQuantity(BigDecimal.ZERO)
                                 .safetyStockQuantity(request.safetyStockQuantity())
                                 .expectedInboundAt(request.expectedInboundAt())
                                 .expectedInboundQuantity(request.expectedInboundQuantity())
-                                .inventoryStatus(inventoryStatus)
                                 .build()
                 ));
 
         return MaterialDetailResponse.from(material, inventory);
     }
 
-    /**
-     * 기능: 가용 재고, 안전 재고, 입고 예정 정보를 기준으로 재고 상태를 계산한다.
-     *
-     * Input:
-     * - availableQuantity / BigDecimal / 실제 생산에 사용 가능한 재고량
-     * - safetyStockQuantity / BigDecimal / 안전 재고 수량
-     * - expectedInboundAt / LocalDateTime / 입고 예정 일시
-     * - expectedInboundQuantity / BigDecimal / 입고 예정 수량
-     *
-     * Output:
-     * - result / InventoryStatus / 계산된 재고 상태
-     */
-    private InventoryStatus calculateInventoryStatus(
-            BigDecimal availableQuantity,
-            BigDecimal safetyStockQuantity,
-            java.time.LocalDateTime expectedInboundAt,
-            BigDecimal expectedInboundQuantity
+    private void validateInventoryQuantities(
+            BigDecimal currentQuantity,
+            BigDecimal reservedQuantity
     ) {
-        if (availableQuantity.compareTo(BigDecimal.ZERO) <= 0) {
-            return InventoryStatus.SHORTAGE;
+        if (reservedQuantity.compareTo(currentQuantity) > 0) {
+            throw new CustomException(ErrorCode.INVALID_INVENTORY_QUANTITY);
         }
-
-        if (availableQuantity.compareTo(safetyStockQuantity) < 0) {
-            return InventoryStatus.LOW;
-        }
-
-        if (expectedInboundAt != null
-                && expectedInboundQuantity != null
-                && expectedInboundQuantity.compareTo(BigDecimal.ZERO) > 0) {
-            return InventoryStatus.INBOUND_WAITING;
-        }
-
-        return InventoryStatus.NORMAL;
     }
 
     /**
@@ -356,10 +352,8 @@ public class MaterialService {
                 MaterialPlanStatus.PARTIAL_RESERVED
         );
 
-        return productionPlanMaterialRepository.findByMaterialPlanStatusIn(shortageStatuses)
+        return productionPlanMaterialRepository.findByMaterialPlanStatusInWithMaterial(shortageStatuses)
                 .stream()
-                .sorted(Comparator.comparing(ProductionPlanMaterial::getPlanId)
-                        .thenComparing(ProductionPlanMaterial::getPlanMaterialId))
                 .map(MaterialShortageResponse::from)
                 .toList();
     }
