@@ -5,6 +5,10 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import s_map.server.domain.plan.dto.req.PlanUpdateRequest;
+import s_map.server.domain.plan.dto.res.PlanUpdateResponse;
 import s_map.server.domain.plan.dto.res.CurrentPlanResponse;
 import s_map.server.domain.plan.dto.res.PlanDetailResponse;
 import s_map.server.domain.plan.dto.res.PlanListResponse;
@@ -35,5 +39,13 @@ public class PlanController {
     @GetMapping("/current")
     public BaseResponse<List<CurrentPlanResponse>> getCurrentPlans() {
         return BaseResponse.success(planService.getCurrentPlans());
+    }
+
+    @PatchMapping("/{planId}")
+    public BaseResponse<PlanUpdateResponse> updatePlan(
+            @PathVariable Long planId,
+            @RequestBody PlanUpdateRequest request
+    ) {
+        return BaseResponse.success(planService.updatePlan(planId, request));
     }
 }

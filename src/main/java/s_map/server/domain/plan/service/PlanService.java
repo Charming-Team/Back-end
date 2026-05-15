@@ -12,6 +12,9 @@ import s_map.server.domain.plan.entity.ProductionPlan;
 import s_map.server.domain.plan.entity.ProductionResult;
 import s_map.server.domain.plan.repository.ProductionPlanRepository;
 import s_map.server.domain.plan.repository.ProductionResultRepository;
+import s_map.server.domain.plan.dto.req.PlanUpdateRequest;
+import s_map.server.domain.plan.dto.res.PlanUpdateResponse;
+
 import s_map.server.global.error.CustomException;
 import s_map.server.global.error.ErrorCode;
 
@@ -22,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.math.BigDecimal;
 
 @Service
 @RequiredArgsConstructor
@@ -138,5 +142,102 @@ public class PlanService {
                         resultMap.get(plan.getPlanId())
                 ))
                 .toList();
+    }
+
+    /**
+     * [기능]
+     * 특정 생산계획 정보를 수정한다.
+     *
+     * [Input]
+     * - planId: 수정할 생산계획 ID
+     * - request: 수정할 생산계획 정보
+     *   - lineId: 변경할 생산라인 ID
+     *   - operatorId: 변경할 담당자 ID
+     *   - plannedStartAt: 계획 시작 시각
+     *   - plannedEndAt: 계획 종료 시각
+     *   - estimatedDurationHr: 예상 소요 시간
+     *   - plannedQuantity: 계획 생산 수량
+     *   - planSequence: 라인 내 생산 순서
+     *   - planStatus: 생산계획 상태
+     *
+     * [Process]
+     * - planId로 생산계획을 조회한다.
+     * - 생산계획이 없으면 PRODUCTION_PLAN_NOT_FOUND 예외를 발생시킨다.
+     * - 시작 시각이 종료 시각보다 늦거나 같으면 BAD_REQUEST 예외를 발생시킨다.
+     * - 예상 소요 시간이 음수이면 BAD_REQUEST 예외를 발생시킨다.
+     * - 계획 수량이 0 이하이면 BAD_REQUEST 예외를 발생시킨다.
+     * - Entity의 updatePlan 메서드를 통해 값을 변경한다.
+     * - @Transactional에 의해 변경 감지로 DB에 반영된다.
+     *
+     * [Output]
+     * - PlanUpdateResponse
+     * - 수정된 생산계획 정보를 반환한다.
+     */
+    @Transactional
+    public PlanUpdateResponse updatePlan(Long planId, PlanUpdateRequest request) {
+        ProductionPlan plan = productionPlanRepository.findById(planId)
+                .orElseThrow(() -> new CustomException(ErrorCode.PRODUCTION_PLAN_NOT_FOUND));
+
+        validateUpdateRequest(request);
+
+        plan.updatePlan(
+                request.getLineId(),
+                request.getOperatorId(),
+                request.getPlannedStartAt(),
+                request.getPlannedEndAt(),
+                request.getEstimatedDurationHr(),
+                request.getPlannedQuantity(),
+                request.getPlanSequence(),
+                request.getPlanStatus()
+        );
+
+        return PlanUpdateResponse.from(plan);
+    }
+
+    /**
+     * [기능]
+     * 생산계획 수정 요청 값의 유효성을 검증한다.
+     *
+     * [Input]
+     * - request: 생산계획 수정 요청 DTO
+     *
+     * [Process]
+     * - 필수 값 누락 여부를 확인한다.
+     * - 계획 시작 시각이 종료 시각보다 이전인지 확인한다.
+     * - 예상 소요 시간이 0 이상인지 확인한다.
+     * - 계획 수량이 1 이상인지 확인한다.
+     * - 계획 순서가 0 이상인지 확인한다.
+     * - 계획 상태 값이 존재하는지 확인한다.
+     *
+     * [Output]
+     * - 없음
+     * - 검증 실패 시 BAD_REQUEST 예외를 발생시킨다.
+     */
+    private void validateUpdateRequest(PlanUpdateRequest request) {
+        if (request.getLineId() == null
+                || request.getPlannedStartAt() == null
+                || request.getPlannedEndAt() == null
+                || request.getEstimatedDurationHr() == null
+                || request.getPlannedQuantity() == null
+                || request.getPlanSequence() == null
+                || request.getPlanStatus() == null) {
+            throw new CustomException(ErrorCode.BAD_REQUEST);
+        }
+
+        if (!request.getPlannedStartAt().isBefore(request.getPlannedEndAt())) {
+            throw new CustomException(ErrorCode.BAD_REQUEST);
+        }
+
+        if (request.getEstimatedDurationHr().compareTo(BigDecimal.ZERO) < 0) {
+            throw new CustomException(ErrorCode.BAD_REQUEST);
+        }
+
+        if (request.getPlannedQuantity() <= 0) {
+            throw new CustomException(ErrorCode.BAD_REQUEST);
+        }
+
+        if (request.getPlanSequence() < 0) {
+            throw new CustomException(ErrorCode.BAD_REQUEST);
+        }
     }
 }
