@@ -69,9 +69,40 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Build and push Docker image
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
+
+      - name: Checkout infra repository
+        uses: actions/checkout@v4
+        with:
+          repository: Charming-Team/infra
+          token: ${{ secrets.INFRA_REPO_TOKEN }}
+          path: infra
+
+      - name: Update backend image digest
+        env:
+          IMAGE_REF: ${{ steps.meta.outputs.image }}@${{ steps.build.outputs.digest }}
+        run: |
+          sed -i "s|image: .*skala26a-ai3/server.*|image: ${IMAGE_REF}|" infra/k8s/backend/deployment.yaml
+          grep "image:" infra/k8s/backend/deployment.yaml
+
+      - name: Create infra manifest update PR
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.INFRA_REPO_TOKEN }}
+          path: infra
+          branch: chore/update-backend-image-${{ steps.meta.outputs.tag }}
+          base: main
+          title: "chore: update backend image to ${{ steps.meta.outputs.tag }}"
+          commit-message: "chore: update backend image to ${{ steps.meta.outputs.tag }}"
+          body: |
+            Updates the backend deployment image after a successful server image build.
+
+            - Image: `${{ steps.meta.outputs.image }}`
+            - Tag: `${{ steps.meta.outputs.tag }}`
+            - Digest: `${{ steps.build.outputs.digest }}`
