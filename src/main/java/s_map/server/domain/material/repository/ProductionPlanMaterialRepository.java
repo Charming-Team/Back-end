@@ -36,4 +36,28 @@ public interface ProductionPlanMaterialRepository extends JpaRepository<Producti
     List<ProductionPlanMaterial> findByMaterialPlanStatusInWithMaterial(
             @Param("materialPlanStatuses") List<MaterialPlanStatus> materialPlanStatuses
     );
+
+    @Query("""
+            select planMaterial from ProductionPlanMaterial planMaterial
+            join fetch planMaterial.material
+            where planMaterial.materialPlanStatus in :materialPlanStatuses
+            order by planMaterial.planId asc, planMaterial.planMaterialId asc
+            """)
+    List<ProductionPlanMaterial> findLimitedByMaterialPlanStatusInWithMaterial(
+            @Param("materialPlanStatuses") List<MaterialPlanStatus> materialPlanStatuses,
+            Pageable pageable
+    );
+
+    @Query("""
+            select planMaterial from ProductionPlanMaterial planMaterial
+            join fetch planMaterial.material material
+            where planMaterial.materialPlanStatus in :materialPlanStatuses
+              and material.materialCode = :materialCode
+            order by planMaterial.planId asc, planMaterial.planMaterialId asc
+            """)
+    List<ProductionPlanMaterial> findLimitedByMaterialPlanStatusInAndMaterialCodeWithMaterial(
+            @Param("materialPlanStatuses") List<MaterialPlanStatus> materialPlanStatuses,
+            @Param("materialCode") String materialCode,
+            Pageable pageable
+    );
 }
