@@ -33,6 +33,7 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.List;
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -66,10 +67,11 @@ public class MaterialService {
      */
     @Transactional
     public MaterialDetailResponse createMaterial(MaterialCreateRequest request) {
-        validateDuplicateMaterialCode(request.materialCode());
+        String materialCode = normalizeMaterialCode(request.materialCode());
+        validateDuplicateMaterialCode(materialCode);
 
         Material material = Material.builder()
-                .materialCode(request.materialCode())
+                .materialCode(materialCode)
                 .materialName(request.materialName())
                 .materialType(request.materialType())
                 .unit(request.unit())
@@ -361,5 +363,46 @@ public class MaterialService {
                 .stream()
                 .map(MaterialShortageResponse::from)
                 .toList();
+    }
+
+    /**
+     * 기능: 챗봇 Evidence 생성을 위해 부족 또는 일부 예약 상태인 자재 목록을 제한된 개수로 조회한다.
+     *
+     * Input:
+     * - limit / int / 조회할 최대 자재 부족 Evidence 개수
+     * - materialCode / String / 특정 자재 코드, 없으면 전체 부족 자재 조회
+     *
+     * Output:
+     * - result / List<MaterialShortageResponse> / 부족 자재 목록
+     */
+    public List<MaterialShortageResponse> getMaterialShortages(int limit, String materialCode) {
+        List<MaterialPlanStatus> shortageStatuses = Arrays.asList(
+                MaterialPlanStatus.SHORTAGE,
+                MaterialPlanStatus.PARTIAL_RESERVED
+        );
+        Pageable pageable = PageRequest.of(DEFAULT_PAGE, Math.max(1, limit));
+        String normalizedMaterialCode = normalizeMaterialCode(materialCode);
+
+        List<ProductionPlanMaterial> shortages = normalizedMaterialCode == null
+                ? productionPlanMaterialRepository.findLimitedByMaterialPlanStatusInWithMaterial(
+                        shortageStatuses,
+                        pageable
+                )
+                : productionPlanMaterialRepository.findLimitedByMaterialPlanStatusInAndMaterialCodeWithMaterial(
+                        shortageStatuses,
+                        normalizedMaterialCode,
+                        pageable
+                );
+
+        return shortages.stream()
+                .map(MaterialShortageResponse::from)
+                .toList();
+    }
+
+    private String normalizeMaterialCode(String materialCode) {
+        if (materialCode == null || materialCode.isBlank()) {
+            return null;
+        }
+        return materialCode.trim().toUpperCase(Locale.ROOT);
     }
 }
