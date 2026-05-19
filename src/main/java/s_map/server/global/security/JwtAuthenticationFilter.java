@@ -34,6 +34,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final String[] PUBLIC_EXACT_PATHS = {
             "/api/auth/login",
             "/api/token/refresh",
+            "/internal/chat/evidence",
             "/swagger-ui.html",
             "/api/swagger-ui.html",
             "/actuator/health"

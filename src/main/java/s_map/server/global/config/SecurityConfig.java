@@ -47,6 +47,10 @@ public class SecurityConfig {
             "/api/token/refresh"
     };
 
+    private static final String[] INTERNAL_PATHS = {
+            "/internal/chat/evidence"
+    };
+
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
     private final JwtAccessDeniedHandler jwtAccessDeniedHandler;
@@ -71,6 +75,7 @@ public class SecurityConfig {
                         .requestMatchers(ACTUATOR_PATHS).permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(AUTH_PATHS).permitAll()
+                        .requestMatchers(INTERNAL_PATHS).permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
