@@ -74,7 +74,6 @@ public class ProductionPlan {
             Long operatorId,
             LocalDateTime plannedStartAt,
             LocalDateTime plannedEndAt,
-            BigDecimal estimatedDurationHr,
             Integer plannedQuantity,
             Integer planSequence,
             PlanStatus planStatus
@@ -83,7 +82,6 @@ public class ProductionPlan {
         this.operatorId = operatorId;
         this.plannedStartAt = plannedStartAt;
         this.plannedEndAt = plannedEndAt;
-        this.estimatedDurationHr = estimatedDurationHr;
         this.plannedQuantity = plannedQuantity;
         this.planSequence = planSequence;
         this.planStatus = planStatus;

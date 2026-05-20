@@ -15,6 +15,16 @@ public interface ProductionPlanMaterialRepository extends JpaRepository<Producti
 
     Page<ProductionPlanMaterial> findByMaterialMaterialId(Long materialId, Pageable pageable);
 
+    List<ProductionPlanMaterial> findByPlanId(Long planId);
+
+    @Query("""
+            select planMaterial from ProductionPlanMaterial planMaterial
+            join fetch planMaterial.material
+            where planMaterial.planId = :planId
+            order by planMaterial.planMaterialId asc
+            """)
+    List<ProductionPlanMaterial> findByPlanIdWithMaterial(@Param("planId") Long planId);
+
     @Query("""
             select new s_map.server.domain.material.dto.res.MaterialUsageTotals(
                 sum(planMaterial.requiredQuantity),

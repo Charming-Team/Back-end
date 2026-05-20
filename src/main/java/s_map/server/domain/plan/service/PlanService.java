@@ -5,16 +5,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import s_map.server.domain.material.entity.ProductionPlanMaterial;
 import s_map.server.domain.material.repository.ProductionPlanMaterialRepository;
+import s_map.server.domain.plan.dto.req.PlanUpdateRequest;
 import s_map.server.domain.plan.dto.res.CurrentPlanResponse;
 import s_map.server.domain.plan.dto.res.PlanDetailResponse;
 import s_map.server.domain.plan.dto.res.PlanListResponse;
+import s_map.server.domain.plan.dto.res.PlanUpdateResponse;
+import s_map.server.domain.plan.entity.PlanStatus;
 import s_map.server.domain.plan.entity.ProductionPlan;
 import s_map.server.domain.plan.entity.ProductionResult;
 import s_map.server.domain.plan.repository.ProductionPlanRepository;
 import s_map.server.domain.plan.repository.ProductionResultRepository;
-import s_map.server.domain.plan.dto.req.PlanUpdateRequest;
-import s_map.server.domain.plan.dto.res.PlanUpdateResponse;
-
 import s_map.server.global.error.CustomException;
 import s_map.server.global.error.ErrorCode;
 
@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.math.BigDecimal;
 
 @Service
 @RequiredArgsConstructor
@@ -87,7 +86,7 @@ public class PlanService {
                 .orElseThrow(() -> new CustomException(ErrorCode.PRODUCTION_PLAN_NOT_FOUND));
 
         List<ProductionPlanMaterial> planMaterials =
-                productionPlanMaterialRepository.findByPlanId(planId);
+                productionPlanMaterialRepository.findByPlanIdWithMaterial(planId);
 
         return PlanDetailResponse.of(plan, planMaterials);
     }
@@ -155,7 +154,6 @@ public class PlanService {
      *   - operatorId: 변경할 담당자 ID
      *   - plannedStartAt: 계획 시작 시각
      *   - plannedEndAt: 계획 종료 시각
-     *   - estimatedDurationHr: 예상 소요 시간
      *   - plannedQuantity: 계획 생산 수량
      *   - planSequence: 라인 내 생산 순서
      *   - planStatus: 생산계획 상태
@@ -163,10 +161,11 @@ public class PlanService {
      * [Process]
      * - planId로 생산계획을 조회한다.
      * - 생산계획이 없으면 PRODUCTION_PLAN_NOT_FOUND 예외를 발생시킨다.
-     * - 시작 시각이 종료 시각보다 늦거나 같으면 BAD_REQUEST 예외를 발생시킨다.
-     * - 예상 소요 시간이 음수이면 BAD_REQUEST 예외를 발생시킨다.
-     * - 계획 수량이 0 이하이면 BAD_REQUEST 예외를 발생시킨다.
-     * - Entity의 updatePlan 메서드를 통해 값을 변경한다.
+     * - 완료 또는 취소 상태의 생산계획이면 수정할 수 없도록 차단한다.
+     * - 요청값의 필수값, 기간, 수량, 순서를 검증한다.
+     * - 동일 라인에 겹치는 일정이 있는지 검증한다.
+     * - Entity의 updatePlan 메서드를 통해 수정 가능한 항목만 변경한다.
+     * - estimatedDurationHr는 사용자가 직접 수정하지 않는다.
      * - @Transactional에 의해 변경 감지로 DB에 반영된다.
      *
      * [Output]
@@ -178,20 +177,44 @@ public class PlanService {
         ProductionPlan plan = productionPlanRepository.findById(planId)
                 .orElseThrow(() -> new CustomException(ErrorCode.PRODUCTION_PLAN_NOT_FOUND));
 
+        validateEditablePlan(plan);
         validateUpdateRequest(request);
+        validateScheduleConflict(planId, request);
 
         plan.updatePlan(
                 request.getLineId(),
                 request.getOperatorId(),
                 request.getPlannedStartAt(),
                 request.getPlannedEndAt(),
-                request.getEstimatedDurationHr(),
                 request.getPlannedQuantity(),
                 request.getPlanSequence(),
                 request.getPlanStatus()
         );
 
         return PlanUpdateResponse.from(plan);
+    }
+
+    /**
+     * [기능]
+     * 수정 가능한 생산계획 상태인지 검증한다.
+     *
+     * [Input]
+     * - plan: 수정 대상 생산계획 Entity
+     *
+     * [Process]
+     * - 생산 완료(COMPLETED) 상태인지 확인한다.
+     * - 취소(CANCELLED) 상태인지 확인한다.
+     * - 완료 또는 취소 상태라면 수정 요청을 차단한다.
+     *
+     * [Output]
+     * - 없음
+     * - 수정 불가능한 상태이면 BAD_REQUEST 예외를 발생시킨다.
+     */
+    private void validateEditablePlan(ProductionPlan plan) {
+        if (plan.getPlanStatus() == PlanStatus.COMPLETED
+                || plan.getPlanStatus() == PlanStatus.CANCELLED) {
+            throw new CustomException(ErrorCode.BAD_REQUEST);
+        }
     }
 
     /**
@@ -204,9 +227,8 @@ public class PlanService {
      * [Process]
      * - 필수 값 누락 여부를 확인한다.
      * - 계획 시작 시각이 종료 시각보다 이전인지 확인한다.
-     * - 예상 소요 시간이 0 이상인지 확인한다.
      * - 계획 수량이 1 이상인지 확인한다.
-     * - 계획 순서가 0 이상인지 확인한다.
+     * - 라인 내 순서가 1 이상인지 확인한다.
      * - 계획 상태 값이 존재하는지 확인한다.
      *
      * [Output]
@@ -217,7 +239,6 @@ public class PlanService {
         if (request.getLineId() == null
                 || request.getPlannedStartAt() == null
                 || request.getPlannedEndAt() == null
-                || request.getEstimatedDurationHr() == null
                 || request.getPlannedQuantity() == null
                 || request.getPlanSequence() == null
                 || request.getPlanStatus() == null) {
@@ -228,15 +249,44 @@ public class PlanService {
             throw new CustomException(ErrorCode.BAD_REQUEST);
         }
 
-        if (request.getEstimatedDurationHr().compareTo(BigDecimal.ZERO) < 0) {
-            throw new CustomException(ErrorCode.BAD_REQUEST);
-        }
-
         if (request.getPlannedQuantity() <= 0) {
             throw new CustomException(ErrorCode.BAD_REQUEST);
         }
 
-        if (request.getPlanSequence() < 0) {
+        if (request.getPlanSequence() < 1) {
+            throw new CustomException(ErrorCode.BAD_REQUEST);
+        }
+    }
+
+    /**
+     * [기능]
+     * 동일 라인 내 생산계획 일정 충돌 여부를 검증한다.
+     *
+     * [Input]
+     * - planId: 현재 수정 중인 생산계획 ID
+     * - request: 수정 요청 DTO
+     *
+     * [Process]
+     * - 같은 lineId를 가진 다른 생산계획 중 시간이 겹치는 일정이 있는지 조회한다.
+     * - 현재 수정 중인 planId는 충돌 검증 대상에서 제외한다.
+     * - 기존 계획 시작 시간이 수정 종료 시각보다 이전이고,
+     *   기존 계획 종료 시간이 수정 시작 시각보다 이후이면 충돌로 판단한다.
+     *
+     * [Output]
+     * - 없음
+     * - 일정 충돌이 있으면 BAD_REQUEST 예외를 발생시킨다.
+     */
+    private void validateScheduleConflict(Long planId, PlanUpdateRequest request) {
+        boolean existsConflict =
+                productionPlanRepository
+                        .existsByLineIdAndPlanIdNotAndPlannedStartAtLessThanAndPlannedEndAtGreaterThan(
+                                request.getLineId(),
+                                planId,
+                                request.getPlannedEndAt(),
+                                request.getPlannedStartAt()
+                        );
+
+        if (existsConflict) {
             throw new CustomException(ErrorCode.BAD_REQUEST);
         }
     }

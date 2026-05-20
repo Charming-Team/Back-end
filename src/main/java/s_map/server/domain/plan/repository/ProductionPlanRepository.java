@@ -21,4 +21,11 @@ public interface ProductionPlanRepository extends JpaRepository<ProductionPlan, 
     List<ProductionPlan> findByLineIdOrderByPlannedStartAtAsc(Long lineId);
 
     List<ProductionPlan> findByProductIdOrderByPlannedStartAtAsc(Long productId);
+
+    boolean existsByLineIdAndPlanIdNotAndPlannedStartAtLessThanAndPlannedEndAtGreaterThan(
+            Long lineId,
+            Long planId,
+            LocalDateTime plannedEndAt,
+            LocalDateTime plannedStartAt
+    );
 }
