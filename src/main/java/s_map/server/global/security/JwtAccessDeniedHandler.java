@@ -25,9 +25,28 @@ public class JwtAccessDeniedHandler implements AccessDeniedHandler {
             HttpServletResponse response,
             AccessDeniedException accessDeniedException
     ) throws IOException {
-        response.setStatus(ErrorCode.FORBIDDEN.getHttpStatus().value());
+        ErrorCode errorCode = resolveErrorCode(request);
+        response.setStatus(errorCode.getHttpStatus().value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-        objectMapper.writeValue(response.getWriter(), BaseResponse.fail(ErrorCode.FORBIDDEN));
+        objectMapper.writeValue(response.getWriter(), BaseResponse.fail(errorCode));
+    }
+
+    private ErrorCode resolveErrorCode(HttpServletRequest request) {
+        if ("DELETE".equals(request.getMethod()) && isAdminUserDeletePath(request)) {
+            return ErrorCode.USER_DELETE_FORBIDDEN;
+        }
+
+        return ErrorCode.FORBIDDEN;
+    }
+
+    private boolean isAdminUserDeletePath(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        String contextPath = request.getContextPath();
+        if (contextPath != null && !contextPath.isBlank() && path.startsWith(contextPath)) {
+            path = path.substring(contextPath.length());
+        }
+
+        return path.matches("^/api/admin/users/\\d+$");
     }
 }
