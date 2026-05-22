@@ -181,15 +181,16 @@ public class PlanService {
         validateUpdateRequest(request);
         validateScheduleConflict(planId, request);
 
-        plan.updatePlan(
-                request.getLineId(),
-                request.getOperatorId(),
-                request.getPlannedStartAt(),
-                request.getPlannedEndAt(),
-                request.getPlannedQuantity(),
-                request.getPlanSequence(),
-                request.getPlanStatus()
-        );
+        // 바로 DB 반영하면 비교시 롤백을 못할 거 같으니 일단 보류
+//        plan.updatePlan(
+//                request.getLineId(),
+//                request.getOperatorId(),
+//                request.getPlannedStartAt(),
+//                request.getPlannedEndAt(),
+//                request.getPlannedQuantity(),
+//                request.getPlanSequence(),
+//                request.getPlanStatus()
+//        );
 
         return PlanUpdateResponse.from(plan);
     }
