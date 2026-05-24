@@ -16,6 +16,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.util.TestPropertyValues;
@@ -184,10 +186,21 @@ class ChatAnswerIntegrationTest {
                 .andExpect(MockMvcResultMatchers.jsonPath("$.message").value("챗봇 응답 시간이 초과되었습니다."));
     }
 
-    @Test
-    @DisplayName("FastAPI HTTP 500은 BaseResponse.fail로 변환한다")
-    void fastApiServerErrorReturnsBaseResponseFail() throws Exception {
-        fastApiMode.set(FastApiMode.HTTP_500);
+    @ParameterizedTest
+    @CsvSource({
+            "HTTP_400, 502, CHAT_FASTAPI_003, 챗봇 요청을 처리할 수 없습니다.",
+            "HTTP_403, 502, CHAT_FASTAPI_004, 챗봇 서버 요청에 실패했습니다.",
+            "HTTP_500, 502, CHAT_FASTAPI_006, 챗봇 서버 내부 오류가 발생했습니다.",
+            "HTTP_503, 503, CHAT_FASTAPI_005, 챗봇 서버를 사용할 수 없습니다."
+    })
+    @DisplayName("FastAPI HTTP 실패는 BaseResponse.fail로 변환한다")
+    void fastApiHttpErrorReturnsBaseResponseFail(
+            FastApiMode mode,
+            int expectedStatus,
+            String expectedCode,
+            String expectedMessage
+    ) throws Exception {
+        fastApiMode.set(mode);
         User user = saveUser(Role.EXECUTIVE, "executive@example.com");
         String accessToken = loginAndGetAccessToken(user);
 
@@ -199,10 +212,10 @@ class ChatAnswerIntegrationTest {
                                 "sessionId", 7,
                                 "messageId", 8
                         ))))
-                .andExpect(MockMvcResultMatchers.status().isBadGateway())
+                .andExpect(MockMvcResultMatchers.status().is(expectedStatus))
                 .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(false))
-                .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("CHAT_FASTAPI_006"))
-                .andExpect(MockMvcResultMatchers.jsonPath("$.message").value("챗봇 서버 내부 오류가 발생했습니다."));
+                .andExpect(MockMvcResultMatchers.jsonPath("$.code").value(expectedCode))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.message").value(expectedMessage));
     }
 
     private static HttpServer startFastApiServer() {
@@ -222,8 +235,20 @@ class ChatAnswerIntegrationTest {
                     writeResponse(exchange, 200, successResponse());
                     return;
                 }
+                if (fastApiMode.get() == FastApiMode.HTTP_400) {
+                    writeResponse(exchange, 400, "{\"detail\":\"bad request\"}");
+                    return;
+                }
+                if (fastApiMode.get() == FastApiMode.HTTP_403) {
+                    writeResponse(exchange, 403, "{\"detail\":\"forbidden\"}");
+                    return;
+                }
                 if (fastApiMode.get() == FastApiMode.HTTP_500) {
                     writeResponse(exchange, 500, "{\"detail\":\"internal error\"}");
+                    return;
+                }
+                if (fastApiMode.get() == FastApiMode.HTTP_503) {
+                    writeResponse(exchange, 503, "{\"detail\":\"unavailable\"}");
                     return;
                 }
                 if (fastApiMode.get() == FastApiMode.BLOCKED) {
@@ -406,6 +431,9 @@ class ChatAnswerIntegrationTest {
         SUCCESS,
         BLOCKED,
         TIMEOUT,
+        HTTP_400,
+        HTTP_403,
+        HTTP_503,
         HTTP_500
     }
 
