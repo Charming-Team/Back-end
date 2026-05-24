@@ -29,6 +29,9 @@ public enum ErrorCode {
     FORBIDDEN(HttpStatus.FORBIDDEN, "403", "접근 권한이 없습니다."),
     ADMIN_AUTH_REQUIRED(HttpStatus.FORBIDDEN, "403-001", "관리자만 로그인할 수 있습니다."),
     INACTIVE_ACCOUNT(HttpStatus.FORBIDDEN, "403-002", "사용할 수 없는 계정입니다."),
+    USER_DELETE_FORBIDDEN(HttpStatus.FORBIDDEN, "403-201", "사용자 삭제 권한이 없습니다."),
+    SELF_DELETE_NOT_ALLOWED(HttpStatus.FORBIDDEN, "403-202", "본인 계정은 삭제할 수 없습니다."),
+    ADMIN_DELETE_NOT_ALLOWED(HttpStatus.FORBIDDEN, "403-203", "시스템 관리자 계정은 삭제할 수 없습니다."),
 
     // 404 Not Found
     NOT_FOUND(HttpStatus.NOT_FOUND, "404", "요청한 리소스를 찾을 수 없습니다."),
@@ -37,6 +40,7 @@ public enum ErrorCode {
     PRODUCTION_PLAN_NOT_FOUND(HttpStatus.NOT_FOUND, "404-103", "생산계획 정보를 찾을 수 없습니다."),
     BOM_NOT_FOUND(HttpStatus.NOT_FOUND, "404-104", "BOM 정보를 찾을 수 없습니다."),
     PRODUCT_BOM_NOT_FOUND(HttpStatus.NOT_FOUND, "404-105", "해당 제품에 등록된 BOM 정보가 없습니다."),
+    USER_DELETE_NOT_ALLOWED(HttpStatus.NOT_FOUND, "404-201", "삭제할 수 없는 사용자 정보입니다."),
 
     // 405 Method Not Allowed
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "405", "지원하지 않는 HTTP 메서드입니다."),
@@ -47,9 +51,20 @@ public enum ErrorCode {
     DUPLICATE_MATERIAL_CODE(HttpStatus.CONFLICT, "409-101", "이미 사용 중인 자재 코드입니다."),
     DUPLICATE_BOM(HttpStatus.CONFLICT, "409-102", "이미 등록된 제품-자재 BOM 정보입니다."),
     CONCURRENT_INVENTORY_UPDATE(HttpStatus.CONFLICT, "409-103", "재고 정보가 동시에 수정되었습니다. 다시 조회 후 시도해주세요."),
+    USER_ALREADY_DELETED(HttpStatus.CONFLICT, "409-201", "이미 삭제된 사용자입니다."),
 
     // 500 Internal Server Error
-    INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "500", "서버 내부 오류가 발생했습니다.");
+    INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "500", "서버 내부 오류가 발생했습니다."),
+    USER_DELETE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "500-201", "사용자 삭제 처리에 실패했습니다. 잠시 후 다시 시도해주세요."),
+
+    // Chat FastAPI Gateway
+    CHAT_FASTAPI_CONNECTION_FAILED(HttpStatus.BAD_GATEWAY, "CHAT_FASTAPI_001", "챗봇 서버 연결에 실패했습니다."),
+    CHAT_FASTAPI_TIMEOUT(HttpStatus.GATEWAY_TIMEOUT, "CHAT_FASTAPI_002", "챗봇 응답 시간이 초과되었습니다."),
+    CHAT_FASTAPI_BAD_REQUEST(HttpStatus.BAD_GATEWAY, "CHAT_FASTAPI_003", "챗봇 요청을 처리할 수 없습니다."),
+    CHAT_FASTAPI_FORBIDDEN(HttpStatus.BAD_GATEWAY, "CHAT_FASTAPI_004", "챗봇 서버 요청에 실패했습니다."),
+    CHAT_FASTAPI_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "CHAT_FASTAPI_005", "챗봇 서버를 사용할 수 없습니다."),
+    CHAT_FASTAPI_INTERNAL_ERROR(HttpStatus.BAD_GATEWAY, "CHAT_FASTAPI_006", "챗봇 서버 내부 오류가 발생했습니다."),
+    CHAT_FASTAPI_INVALID_RESPONSE(HttpStatus.BAD_GATEWAY, "CHAT_FASTAPI_007", "챗봇 서버 응답을 처리할 수 없습니다.");
 
     private final HttpStatus httpStatus;
     private final String code;

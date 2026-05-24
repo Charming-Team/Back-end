@@ -283,6 +283,103 @@ class AuthSecurityIntegrationTest {
     }
 
     @Nested
+    @DisplayName("ADMIN 사용자 삭제")
+    class AdminUserDelete {
+
+        @Test
+        @DisplayName("ADMIN 토큰으로 일반 사용자를 삭제 처리할 수 있다")
+        void adminCanDeleteOperator() throws Exception {
+            User admin = saveUser(Role.ADMIN, "admin@example.com", PASSWORD);
+            User operator = saveUser(Role.OPERATOR, "operator@example.com", PASSWORD);
+            String adminAccessToken = loginAndGetAccessToken(admin);
+
+            mockMvc.perform(MockMvcRequestBuilders.delete("/api/admin/users/{userId}", operator.getId())
+                            .header(HttpHeaders.AUTHORIZATION, bearer(adminAccessToken)))
+                    .andExpect(MockMvcResultMatchers.status().isOk())
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(true))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("COMMON200"));
+
+            User deletedUser = userRepository.findById(operator.getId()).orElseThrow();
+            Assertions.assertEquals(UserStatus.WITHDRAWN, deletedUser.getStatus());
+        }
+
+        @Test
+        @DisplayName("삭제할 사용자가 없으면 404-201을 반환한다")
+        void missingUserCannotBeDeleted() throws Exception {
+            User admin = saveUser(Role.ADMIN, "admin@example.com", PASSWORD);
+            String adminAccessToken = loginAndGetAccessToken(admin);
+
+            mockMvc.perform(MockMvcRequestBuilders.delete("/api/admin/users/{userId}", 999_999L)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(adminAccessToken)))
+                    .andExpect(MockMvcResultMatchers.status().isNotFound())
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(false))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("404-201"))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.message").value("삭제할 수 없는 사용자 정보입니다."));
+        }
+
+        @Test
+        @DisplayName("이미 삭제된 사용자는 409-201을 반환한다")
+        void alreadyDeletedUserCannotBeDeletedAgain() throws Exception {
+            User admin = saveUser(Role.ADMIN, "admin@example.com", PASSWORD);
+            User operator = saveUser(Role.OPERATOR, "operator@example.com", PASSWORD);
+            operator.withdraw();
+            userRepository.save(operator);
+            String adminAccessToken = loginAndGetAccessToken(admin);
+
+            mockMvc.perform(MockMvcRequestBuilders.delete("/api/admin/users/{userId}", operator.getId())
+                            .header(HttpHeaders.AUTHORIZATION, bearer(adminAccessToken)))
+                    .andExpect(MockMvcResultMatchers.status().isConflict())
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(false))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("409-201"))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.message").value("이미 삭제된 사용자입니다."));
+        }
+
+        @Test
+        @DisplayName("시스템 관리자는 본인 계정을 삭제할 수 없다")
+        void adminCannotDeleteSelf() throws Exception {
+            User admin = saveUser(Role.ADMIN, "admin@example.com", PASSWORD);
+            String adminAccessToken = loginAndGetAccessToken(admin);
+
+            mockMvc.perform(MockMvcRequestBuilders.delete("/api/admin/users/{userId}", admin.getId())
+                            .header(HttpHeaders.AUTHORIZATION, bearer(adminAccessToken)))
+                    .andExpect(MockMvcResultMatchers.status().isForbidden())
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(false))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("403-202"))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.message").value("본인 계정은 삭제할 수 없습니다."));
+        }
+
+        @Test
+        @DisplayName("시스템 관리자 계정은 삭제할 수 없다")
+        void adminCannotDeleteAnotherAdmin() throws Exception {
+            User admin = saveUser(Role.ADMIN, "admin@example.com", PASSWORD);
+            User anotherAdmin = saveUser(Role.ADMIN, "another-admin@example.com", PASSWORD);
+            String adminAccessToken = loginAndGetAccessToken(admin);
+
+            mockMvc.perform(MockMvcRequestBuilders.delete("/api/admin/users/{userId}", anotherAdmin.getId())
+                            .header(HttpHeaders.AUTHORIZATION, bearer(adminAccessToken)))
+                    .andExpect(MockMvcResultMatchers.status().isForbidden())
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(false))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("403-203"))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.message").value("시스템 관리자 계정은 삭제할 수 없습니다."));
+        }
+
+        @Test
+        @DisplayName("삭제 권한이 없는 사용자는 403-201을 반환한다")
+        void nonAdminCannotDeleteUser() throws Exception {
+            User operator = saveUser(Role.OPERATOR, "operator@example.com", PASSWORD);
+            User executive = saveUser(Role.EXECUTIVE, "executive@example.com", PASSWORD);
+            String operatorAccessToken = loginAndGetAccessToken(operator);
+
+            mockMvc.perform(MockMvcRequestBuilders.delete("/api/admin/users/{userId}", executive.getId())
+                            .header(HttpHeaders.AUTHORIZATION, bearer(operatorAccessToken)))
+                    .andExpect(MockMvcResultMatchers.status().isForbidden())
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(false))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("403-201"))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.message").value("사용자 삭제 권한이 없습니다."));
+        }
+    }
+
+    @Nested
     @DisplayName("JWT 필터와 토큰 재발급")
     class Token {
 
