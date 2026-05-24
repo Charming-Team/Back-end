@@ -1,16 +1,21 @@
 package s_map.server.domain.chat.service;
 
+import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import s_map.server.domain.chat.dto.req.EvidenceLookupFilters;
 import s_map.server.domain.chat.dto.req.EvidenceLookupRequest;
 import s_map.server.domain.chat.dto.res.EvidenceItemResponse;
 import s_map.server.domain.material.dto.res.MaterialShortageResponse;
+import s_map.server.domain.material.entity.MaterialInventory;
+import s_map.server.domain.material.repository.MaterialInventoryRepository;
 import s_map.server.domain.material.service.MaterialService;
 import s_map.server.domain.user.entity.Role;
 
@@ -34,6 +39,7 @@ public class MaterialShortageEvidenceProvider implements EvidenceProvider {
     );
 
     private final MaterialService materialService;
+    private final MaterialInventoryRepository materialInventoryRepository;
 
     @Override
     public String intent() {
@@ -62,9 +68,33 @@ public class MaterialShortageEvidenceProvider implements EvidenceProvider {
 
         int limit = resolveLimit(filters);
         String targetMaterialCode = resolveMaterialTargetCode(filters);
-        return materialService.getMaterialShortages(limit, targetMaterialCode).stream()
-                .map(this::toMaterialShortageEvidence)
+        List<MaterialShortageResponse> shortages = materialService.getMaterialShortages(limit, targetMaterialCode);
+        Map<Long, MaterialInventory> inventoryMap = getInventoryMap(shortages);
+
+        return shortages.stream()
+                .map(shortage -> toMaterialShortageEvidence(
+                        shortage,
+                        inventoryMap.get(shortage.materialId())
+                ))
                 .toList();
+    }
+
+    private Map<Long, MaterialInventory> getInventoryMap(List<MaterialShortageResponse> shortages) {
+        if (shortages.isEmpty()) {
+            return Map.of();
+        }
+
+        List<Long> materialIds = shortages.stream()
+                .map(MaterialShortageResponse::materialId)
+                .distinct()
+                .toList();
+
+        return materialInventoryRepository.findByMaterialMaterialIdIn(materialIds)
+                .stream()
+                .collect(Collectors.toMap(
+                        inventory -> inventory.getMaterial().getMaterialId(),
+                        Function.identity()
+                ));
     }
 
     private boolean isRoleAllowed(String role, Set<Role> allowedRoles) {
@@ -123,15 +153,18 @@ public class MaterialShortageEvidenceProvider implements EvidenceProvider {
      * Output:
      * - result / EvidenceItemResponse / 챗봇 답변 생성에 사용할 근거 항목
      */
-    private EvidenceItemResponse toMaterialShortageEvidence(MaterialShortageResponse shortage) {
+    private EvidenceItemResponse toMaterialShortageEvidence(
+            MaterialShortageResponse shortage,
+            MaterialInventory inventory
+    ) {
         return new EvidenceItemResponse(
                 "MATERIAL",
                 buildMaterialTitle(shortage),
-                buildMaterialSummary(shortage),
+                buildMaterialSummary(shortage, inventory),
                 "/materials/inventory/%d?mode=read".formatted(shortage.materialId()),
                 "production_plan_materials",
                 shortage.planMaterialId(),
-                buildMaterialData(shortage),
+                buildMaterialData(shortage, inventory),
                 MATERIAL_ALLOWED_ROLE_NAMES
         );
     }
@@ -143,14 +176,17 @@ public class MaterialShortageEvidenceProvider implements EvidenceProvider {
         );
     }
 
-    private String buildMaterialSummary(MaterialShortageResponse shortage) {
-        String inventorySummary = shortage.inventoryRegistered()
+    private String buildMaterialSummary(
+            MaterialShortageResponse shortage,
+            MaterialInventory inventory
+    ) {
+        String inventorySummary = inventory != null
                 ? " 현재 가용 재고는 %s%s, 안전 재고는 %s%s, 재고 상태는 %s입니다.".formatted(
-                        shortage.availableInventoryQuantity(),
+                        inventory.getAvailableQuantity(),
                         shortage.unit(),
-                        shortage.safetyStockQuantity(),
+                        inventory.getSafetyStockQuantity(),
                         shortage.unit(),
-                        shortage.inventoryStatus()
+                        inventory.getInventoryStatus()
                 )
                 : " 현재 재고 현황은 등록되어 있지 않습니다.";
 
@@ -169,7 +205,10 @@ public class MaterialShortageEvidenceProvider implements EvidenceProvider {
                 );
     }
 
-    private Map<String, Object> buildMaterialData(MaterialShortageResponse shortage) {
+    private Map<String, Object> buildMaterialData(
+            MaterialShortageResponse shortage,
+            MaterialInventory inventory
+    ) {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("planMaterialId", shortage.planMaterialId());
         data.put("planId", shortage.planId());
@@ -183,15 +222,27 @@ public class MaterialShortageEvidenceProvider implements EvidenceProvider {
         data.put("consumedQuantity", shortage.consumedQuantity());
         data.put("shortageQuantity", shortage.shortageQuantity());
         data.put("materialPlanStatus", shortage.materialPlanStatus().name());
-        data.put("inventoryRegistered", shortage.inventoryRegistered());
-        data.put("currentInventoryQuantity", shortage.currentInventoryQuantity());
-        data.put("availableInventoryQuantity", shortage.availableInventoryQuantity());
-        data.put("reservedInventoryQuantity", shortage.reservedInventoryQuantity());
-        data.put("safetyStockQuantity", shortage.safetyStockQuantity());
-        data.put("expectedInboundAt", shortage.expectedInboundAt());
-        data.put("expectedInboundQuantity", shortage.expectedInboundQuantity());
-        data.put("inventoryStatus", shortage.inventoryStatus() != null
-                ? shortage.inventoryStatus().name()
+        data.put("inventoryRegistered", inventory != null);
+        data.put("currentInventoryQuantity", inventory != null
+                ? inventory.getCurrentQuantity()
+                : BigDecimal.ZERO);
+        data.put("availableInventoryQuantity", inventory != null
+                ? inventory.getAvailableQuantity()
+                : BigDecimal.ZERO);
+        data.put("reservedInventoryQuantity", inventory != null
+                ? inventory.getReservedQuantity()
+                : BigDecimal.ZERO);
+        data.put("safetyStockQuantity", inventory != null
+                ? inventory.getSafetyStockQuantity()
+                : BigDecimal.ZERO);
+        data.put("expectedInboundAt", inventory != null
+                ? inventory.getExpectedInboundAt()
+                : null);
+        data.put("expectedInboundQuantity", inventory != null
+                ? inventory.getExpectedInboundQuantity()
+                : null);
+        data.put("inventoryStatus", inventory != null && inventory.getInventoryStatus() != null
+                ? inventory.getInventoryStatus().name()
                 : null);
         return data;
     }

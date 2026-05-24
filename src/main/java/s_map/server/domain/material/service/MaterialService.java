@@ -359,10 +359,10 @@ public class MaterialService {
                 MaterialPlanStatus.PARTIAL_RESERVED
         );
 
-        List<ProductionPlanMaterial> shortages = productionPlanMaterialRepository
-                .findByMaterialPlanStatusInWithMaterial(shortageStatuses);
-
-        return toMaterialShortageResponses(shortages);
+        return productionPlanMaterialRepository.findByMaterialPlanStatusInWithMaterial(shortageStatuses)
+                .stream()
+                .map(MaterialShortageResponse::from)
+                .toList();
     }
 
     /**
@@ -394,34 +394,8 @@ public class MaterialService {
                         pageable
                 );
 
-        return toMaterialShortageResponses(shortages);
-    }
-
-    private List<MaterialShortageResponse> toMaterialShortageResponses(
-            List<ProductionPlanMaterial> planMaterials
-    ) {
-        if (planMaterials.isEmpty()) {
-            return List.of();
-        }
-
-        List<Long> materialIds = planMaterials.stream()
-                .map(planMaterial -> planMaterial.getMaterial().getMaterialId())
-                .distinct()
-                .toList();
-
-        Map<Long, MaterialInventory> inventoryMap = materialInventoryRepository
-                .findByMaterialMaterialIdIn(materialIds)
-                .stream()
-                .collect(Collectors.toMap(
-                        inventory -> inventory.getMaterial().getMaterialId(),
-                        Function.identity()
-                ));
-
-        return planMaterials.stream()
-                .map(planMaterial -> MaterialShortageResponse.from(
-                        planMaterial,
-                        inventoryMap.get(planMaterial.getMaterial().getMaterialId())
-                ))
+        return shortages.stream()
+                .map(MaterialShortageResponse::from)
                 .toList();
     }
 
