@@ -12,6 +12,7 @@ import s_map.server.domain.user.entity.Role;
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -154,19 +155,43 @@ public class AdminAuthService {
      */
     @Transactional
     public void deleteUser(Long userId, Long currentAdminId) {
+        try {
+            deleteUserInternal(userId, currentAdminId);
+        } catch (CustomException exception) {
+            throw exception;
+        } catch (DataAccessException exception) {
+            log.error(
+                    "[AdminAuthService] 사용자 삭제 처리 DB 오류 userId={}, adminId={}",
+                    userId,
+                    currentAdminId,
+                    exception
+            );
+            throw new CustomException(ErrorCode.USER_DELETE_FAILED);
+        } catch (RuntimeException exception) {
+            log.error(
+                    "[AdminAuthService] 사용자 삭제 처리 실패 userId={}, adminId={}",
+                    userId,
+                    currentAdminId,
+                    exception
+            );
+            throw new CustomException(ErrorCode.USER_DELETE_FAILED);
+        }
+    }
+
+    private void deleteUserInternal(Long userId, Long currentAdminId) {
         User currentAdmin = userRepository.findById(currentAdminId)
                 .orElseThrow(() -> {
                     log.warn(
                             "[AdminAuthService] 사용자 삭제 실패 reason=current_admin_not_found adminId={}",
                             currentAdminId
                     );
-                    return new CustomException(ErrorCode.NOT_FOUND);
+                    return new CustomException(ErrorCode.USER_DELETE_FORBIDDEN);
                 });
 
         User targetUser = userRepository.findById(userId)
                 .orElseThrow(() -> {
                     log.warn("[AdminAuthService] 사용자 삭제 실패 reason=user_not_found userId={}", userId);
-                    return new CustomException(ErrorCode.NOT_FOUND);
+                    return new CustomException(ErrorCode.USER_DELETE_NOT_ALLOWED);
                 });
 
         if (currentAdmin.getId().equals(targetUser.getId())) {
@@ -175,16 +200,7 @@ public class AdminAuthService {
                     currentAdmin.getId(),
                     currentAdmin.getEmail()
             );
-            throw new CustomException(ErrorCode.FORBIDDEN);
-        }
-
-        if (targetUser.getRole() == Role.ADMIN) {
-            log.warn(
-                    "[AdminAuthService] 사용자 삭제 실패 reason=admin_delete_not_allowed targetUserId={}, targetEmail={}",
-                    targetUser.getId(),
-                    targetUser.getEmail()
-            );
-            throw new CustomException(ErrorCode.FORBIDDEN);
+            throw new CustomException(ErrorCode.SELF_DELETE_NOT_ALLOWED);
         }
 
         if (targetUser.getStatus() == UserStatus.WITHDRAWN) {
@@ -193,10 +209,20 @@ public class AdminAuthService {
                     targetUser.getId(),
                     targetUser.getEmail()
             );
-            throw new CustomException(ErrorCode.CONFLICT);
+            throw new CustomException(ErrorCode.USER_ALREADY_DELETED);
+        }
+
+        if (targetUser.getRole() == Role.ADMIN) {
+            log.warn(
+                    "[AdminAuthService] 사용자 삭제 실패 reason=admin_delete_not_allowed targetUserId={}, targetEmail={}",
+                    targetUser.getId(),
+                    targetUser.getEmail()
+            );
+            throw new CustomException(ErrorCode.ADMIN_DELETE_NOT_ALLOWED);
         }
 
         targetUser.withdraw();
+        userRepository.saveAndFlush(targetUser);
 
         log.info(
                 "[AdminAuthService] 사용자 삭제 처리 완료 adminId={}, targetUserId={}, targetEmail={}, status={}",
