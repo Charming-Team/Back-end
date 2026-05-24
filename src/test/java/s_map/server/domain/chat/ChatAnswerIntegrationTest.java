@@ -106,6 +106,7 @@ class ChatAnswerIntegrationTest {
 
         CapturedRequest capturedRequest = onlyCapturedRequest();
         Assertions.assertEquals(INTERNAL_TOKEN, capturedRequest.internalToken());
+        Assertions.assertNull(capturedRequest.upgradeHeader());
 
         Map<String, Object> requestBody = readJsonMap(capturedRequest.body());
         Assertions.assertEquals(1, requestBody.get("sessionId"));
@@ -227,6 +228,7 @@ class ChatAnswerIntegrationTest {
                         exchange.getRequestMethod(),
                         exchange.getRequestURI().getPath(),
                         exchange.getRequestHeaders().getFirst("X-Internal-Token"),
+                        exchange.getRequestHeaders().getFirst("Upgrade"),
                         body
                 ));
 
@@ -441,6 +443,7 @@ class ChatAnswerIntegrationTest {
             String method,
             String path,
             String internalToken,
+            String upgradeHeader,
             String body
     ) {
     }
