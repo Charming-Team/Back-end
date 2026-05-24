@@ -25,6 +25,16 @@ public class ChatService {
     private final UserRepository userRepository;
     private final AtomicLong trackingIdSequence = new AtomicLong(System.currentTimeMillis());
 
+    /**
+     * 기능: JWT 인증 사용자 컨텍스트를 포함해 FastAPI 챗봇 답변 API를 호출한다.
+     *
+     * Input:
+     * - authUser / AuthUser / JWT에서 추출한 로그인 사용자 ID, 이메일, Role
+     * - request / ChatAnswerRequest / 사용자 질문과 요청 추적용 sessionId, messageId
+     *
+     * Output:
+     * - response / ChatAnswerResponse / FastAPI 챗봇 답변, 출처, 보안 결과, 모델 처리 결과
+     */
     public ChatAnswerResponse answer(AuthUser authUser, ChatAnswerRequest request) {
         if (authUser == null) {
             throw new CustomException(ErrorCode.UNAUTHORIZED);
@@ -49,12 +59,30 @@ public class ChatService {
         return fastApiChatClient.requestAnswer(fastApiRequest);
     }
 
+    /**
+     * 기능: 프론트가 전달한 sessionId를 사용하거나 없으면 임시 추적용 ID를 생성한다.
+     *
+     * Input:
+     * - request / ChatAnswerRequest / 챗봇 답변 요청 값
+     *
+     * Output:
+     * - result / Long / FastAPI에 전달할 요청 추적용 sessionId
+     */
     private Long resolveSessionId(ChatAnswerRequest request) {
         return request.sessionId() != null
                 ? request.sessionId()
                 : trackingIdSequence.incrementAndGet();
     }
 
+    /**
+     * 기능: 프론트가 전달한 messageId를 사용하거나 없으면 임시 추적용 ID를 생성한다.
+     *
+     * Input:
+     * - request / ChatAnswerRequest / 챗봇 답변 요청 값
+     *
+     * Output:
+     * - result / Long / FastAPI에 전달할 요청 추적용 messageId
+     */
     private Long resolveMessageId(ChatAnswerRequest request) {
         return request.messageId() != null
                 ? request.messageId()

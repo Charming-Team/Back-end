@@ -79,6 +79,15 @@ public class MaterialShortageEvidenceProvider implements EvidenceProvider {
                 .toList();
     }
 
+    /**
+     * 기능: 자재 부족 Evidence에만 사용할 자재 재고 정보를 조회해 materialId 기준으로 매핑한다.
+     *
+     * Input:
+     * - shortages / List<MaterialShortageResponse> / 생산계획별 부족 자재 응답 목록
+     *
+     * Output:
+     * - result / Map<Long, MaterialInventory> / 자재 ID별 재고 정보
+     */
     private Map<Long, MaterialInventory> getInventoryMap(List<MaterialShortageResponse> shortages) {
         if (shortages.isEmpty()) {
             return Map.of();
