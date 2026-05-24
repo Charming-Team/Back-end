@@ -35,6 +35,7 @@ public class FastApiChatClient {
         Duration timeout = Duration.ofSeconds(properties.getTimeoutSeconds());
         HttpRequest httpRequest = buildRequest(request, timeout);
         HttpClient httpClient = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
                 .connectTimeout(timeout)
                 .build();
 
@@ -63,6 +64,7 @@ public class FastApiChatClient {
     private HttpRequest buildRequest(FastApiChatAnswerRequest request, Duration timeout) {
         try {
             return HttpRequest.newBuilder(resolveAnswerUri())
+                    .version(HttpClient.Version.HTTP_1_1)
                     .timeout(timeout)
                     .header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
                     .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
