@@ -1,6 +1,7 @@
 package s_map.server.domain.chat.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -27,7 +28,13 @@ public class ChatController {
 
     @Operation(
             summary = "챗봇 답변 요청",
-            description = "JWT 인증 사용자 컨텍스트를 포함해 FastAPI AI 챗봇 답변 API를 호출합니다."
+            description = """
+                    프론트는 FastAPI를 직접 호출하지 않고 이 Spring API를 호출합니다.
+                    Authorization 헤더에는 로그인 후 발급받은 Access Token을 Bearer 형식으로 전달해야 합니다.
+                    sessionId, messageId는 현재 채팅 저장용이 아니라 요청 추적용 값입니다.
+                    FastAPI가 securityResult.status=BLOCKED_UNAUTHORIZED를 반환해도 HTTP 실패로 바꾸지 않고 정상 챗봇 답변으로 내려갑니다.
+                    """,
+            security = @SecurityRequirement(name = "bearerAuth")
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "챗봇 답변 요청 성공"),
