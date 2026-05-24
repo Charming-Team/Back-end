@@ -1,11 +1,14 @@
 package s_map.server.domain.material.dto.res;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import s_map.server.domain.material.entity.InventoryStatus;
 import s_map.server.domain.material.entity.Material;
+import s_map.server.domain.material.entity.MaterialInventory;
 import s_map.server.domain.material.entity.MaterialPlanStatus;
 import s_map.server.domain.material.entity.ProductionPlanMaterial;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 @Schema(description = "부족 자재 목록 응답")
 public record MaterialShortageResponse(
@@ -43,10 +46,41 @@ public record MaterialShortageResponse(
         BigDecimal shortageQuantity,
 
         @Schema(description = "생산계획별 자재 상태", example = "SHORTAGE", allowableValues = {"READY", "PARTIAL_RESERVED", "SHORTAGE", "CONSUMED", "CANCELLED"})
-        MaterialPlanStatus materialPlanStatus
+        MaterialPlanStatus materialPlanStatus,
+
+        @Schema(description = "재고 정보 등록 여부", example = "true")
+        boolean inventoryRegistered,
+
+        @Schema(description = "현재 보유 중인 전체 재고량", example = "120.0000")
+        BigDecimal currentInventoryQuantity,
+
+        @Schema(description = "실제 생산에 사용 가능한 재고량", example = "30.0000")
+        BigDecimal availableInventoryQuantity,
+
+        @Schema(description = "생산계획에 이미 예약된 전체 재고량", example = "90.0000")
+        BigDecimal reservedInventoryQuantity,
+
+        @Schema(description = "안전 재고 수량", example = "50.0000")
+        BigDecimal safetyStockQuantity,
+
+        @Schema(description = "입고 예정 일시", example = "2026-05-20T09:00:00")
+        LocalDateTime expectedInboundAt,
+
+        @Schema(description = "입고 예정 수량", example = "50.0000")
+        BigDecimal expectedInboundQuantity,
+
+        @Schema(description = "재고 상태", example = "LOW", allowableValues = {"NORMAL", "LOW", "SHORTAGE", "INBOUND_WAITING"})
+        InventoryStatus inventoryStatus
 ) {
 
     public static MaterialShortageResponse from(ProductionPlanMaterial planMaterial) {
+        return from(planMaterial, null);
+    }
+
+    public static MaterialShortageResponse from(
+            ProductionPlanMaterial planMaterial,
+            MaterialInventory inventory
+    ) {
         Material material = planMaterial.getMaterial();
 
         return new MaterialShortageResponse(
@@ -61,7 +95,15 @@ public record MaterialShortageResponse(
                 planMaterial.getReservedQuantity(),
                 planMaterial.getConsumedQuantity(),
                 planMaterial.getShortageQuantity(),
-                planMaterial.getMaterialPlanStatus()
+                planMaterial.getMaterialPlanStatus(),
+                inventory != null,
+                inventory != null ? inventory.getCurrentQuantity() : BigDecimal.ZERO,
+                inventory != null ? inventory.getAvailableQuantity() : BigDecimal.ZERO,
+                inventory != null ? inventory.getReservedQuantity() : BigDecimal.ZERO,
+                inventory != null ? inventory.getSafetyStockQuantity() : BigDecimal.ZERO,
+                inventory != null ? inventory.getExpectedInboundAt() : null,
+                inventory != null ? inventory.getExpectedInboundQuantity() : null,
+                inventory != null ? inventory.getInventoryStatus() : null
         );
     }
 }

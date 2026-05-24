@@ -16,8 +16,10 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 import s_map.server.domain.material.entity.Material;
+import s_map.server.domain.material.entity.MaterialInventory;
 import s_map.server.domain.material.entity.MaterialPlanStatus;
 import s_map.server.domain.material.entity.ProductionPlanMaterial;
+import s_map.server.domain.material.repository.MaterialInventoryRepository;
 import s_map.server.domain.material.repository.MaterialRepository;
 import s_map.server.domain.material.repository.ProductionPlanMaterialRepository;
 
@@ -39,11 +41,15 @@ class ChatEvidenceIntegrationTest {
     private MaterialRepository materialRepository;
 
     @Autowired
+    private MaterialInventoryRepository materialInventoryRepository;
+
+    @Autowired
     private ProductionPlanMaterialRepository productionPlanMaterialRepository;
 
     @BeforeEach
     void setUp() {
         productionPlanMaterialRepository.deleteAll();
+        materialInventoryRepository.deleteAll();
         materialRepository.deleteAll();
     }
 
@@ -64,6 +70,12 @@ class ChatEvidenceIntegrationTest {
                 .consumedQuantity(BigDecimal.ZERO)
                 .shortageQuantity(new BigDecimal("60.0000"))
                 .materialPlanStatus(MaterialPlanStatus.SHORTAGE)
+                .build());
+        materialInventoryRepository.save(MaterialInventory.builder()
+                .material(material)
+                .currentQuantity(new BigDecimal("120.0000"))
+                .reservedQuantity(new BigDecimal("90.0000"))
+                .safetyStockQuantity(new BigDecimal("50.0000"))
                 .build());
 
         mockMvc.perform(MockMvcRequestBuilders.post("/internal/chat/evidence")
@@ -95,6 +107,10 @@ class ChatEvidenceIntegrationTest {
                 .andExpect(MockMvcResultMatchers.jsonPath("$.data.items[0].data.planId").value(1001))
                 .andExpect(MockMvcResultMatchers.jsonPath("$.data.items[0].data.materialCode").value("RM-AL-001"))
                 .andExpect(MockMvcResultMatchers.jsonPath("$.data.items[0].data.materialPlanStatus").value("SHORTAGE"))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.data.items[0].data.inventoryRegistered").value(true))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.data.items[0].data.availableInventoryQuantity").value(30.0))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.data.items[0].data.safetyStockQuantity").value(50.0))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.data.items[0].data.inventoryStatus").value("LOW"))
                 .andExpect(MockMvcResultMatchers.jsonPath("$.data.items[0].allowedRoles[0]").value("OPERATOR"))
                 .andExpect(MockMvcResultMatchers.jsonPath("$.data.items[0].allowedRoles[1]").value("EXECUTIVE"))
                 .andExpect(MockMvcResultMatchers.jsonPath("$.data.items[0].allowedRoles[2]").value("MANUFACTURING_MANAGER"));

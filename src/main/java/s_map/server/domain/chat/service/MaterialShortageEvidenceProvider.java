@@ -144,7 +144,17 @@ public class MaterialShortageEvidenceProvider implements EvidenceProvider {
     }
 
     private String buildMaterialSummary(MaterialShortageResponse shortage) {
-        return "생산계획 %d에서 %s %s 부족 상태입니다. 필요 수량 %s%s, 예약 수량 %s%s, 부족 수량 %s%s입니다."
+        String inventorySummary = shortage.inventoryRegistered()
+                ? " 현재 가용 재고는 %s%s, 안전 재고는 %s%s, 재고 상태는 %s입니다.".formatted(
+                        shortage.availableInventoryQuantity(),
+                        shortage.unit(),
+                        shortage.safetyStockQuantity(),
+                        shortage.unit(),
+                        shortage.inventoryStatus()
+                )
+                : " 현재 재고 현황은 등록되어 있지 않습니다.";
+
+        return "생산계획 %d에서 %s %s 부족 상태입니다. 필요 수량 %s%s, 예약 수량 %s%s, 부족 수량 %s%s입니다.%s"
                 .formatted(
                         shortage.planId(),
                         shortage.materialCode(),
@@ -154,7 +164,8 @@ public class MaterialShortageEvidenceProvider implements EvidenceProvider {
                         shortage.reservedQuantity(),
                         shortage.unit(),
                         shortage.shortageQuantity(),
-                        shortage.unit()
+                        shortage.unit(),
+                        inventorySummary
                 );
     }
 
@@ -172,6 +183,16 @@ public class MaterialShortageEvidenceProvider implements EvidenceProvider {
         data.put("consumedQuantity", shortage.consumedQuantity());
         data.put("shortageQuantity", shortage.shortageQuantity());
         data.put("materialPlanStatus", shortage.materialPlanStatus().name());
+        data.put("inventoryRegistered", shortage.inventoryRegistered());
+        data.put("currentInventoryQuantity", shortage.currentInventoryQuantity());
+        data.put("availableInventoryQuantity", shortage.availableInventoryQuantity());
+        data.put("reservedInventoryQuantity", shortage.reservedInventoryQuantity());
+        data.put("safetyStockQuantity", shortage.safetyStockQuantity());
+        data.put("expectedInboundAt", shortage.expectedInboundAt());
+        data.put("expectedInboundQuantity", shortage.expectedInboundQuantity());
+        data.put("inventoryStatus", shortage.inventoryStatus() != null
+                ? shortage.inventoryStatus().name()
+                : null);
         return data;
     }
 }
