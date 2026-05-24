@@ -3,6 +3,7 @@ package s_map.server.domain.chat.service;
 import java.time.OffsetDateTime;
 import java.util.concurrent.atomic.AtomicLong;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import s_map.server.domain.chat.client.FastApiChatClient;
@@ -18,6 +19,7 @@ import s_map.server.global.security.AuthUser;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 @Transactional(readOnly = true)
 public class ChatService {
 
@@ -37,15 +39,21 @@ public class ChatService {
      */
     public ChatAnswerResponse answer(AuthUser authUser, ChatAnswerRequest request) {
         if (authUser == null) {
+            log.warn("[ChatService] 챗봇 답변 요청 실패 reason=unauthenticated");
             throw new CustomException(ErrorCode.UNAUTHORIZED);
         }
 
         User user = userRepository.findById(authUser.id())
-                .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND));
+                .orElseThrow(() -> {
+                    log.warn("[ChatService] 챗봇 답변 요청 실패 reason=user_not_found userId={}", authUser.id());
+                    return new CustomException(ErrorCode.NOT_FOUND);
+                });
 
+        Long sessionId = resolveSessionId(request);
+        Long messageId = resolveMessageId(request);
         FastApiChatAnswerRequest fastApiRequest = new FastApiChatAnswerRequest(
-                resolveSessionId(request),
-                resolveMessageId(request),
+                sessionId,
+                messageId,
                 new FastApiChatUserContext(
                         user.getId(),
                         user.getRole().name(),
@@ -56,7 +64,25 @@ public class ChatService {
                 OffsetDateTime.now()
         );
 
-        return fastApiChatClient.requestAnswer(fastApiRequest);
+        log.info(
+                "[ChatService] 챗봇 답변 요청 전달 userId={}, role={}, sessionId={}, messageId={}",
+                user.getId(),
+                user.getRole(),
+                sessionId,
+                messageId
+        );
+        ChatAnswerResponse response = fastApiChatClient.requestAnswer(fastApiRequest);
+        log.info(
+                "[ChatService] 챗봇 답변 수신 userId={}, sessionId={}, messageId={}, intent={}, securityStatus={}, evidenceCount={}",
+                user.getId(),
+                response.sessionId(),
+                response.messageId(),
+                response.intent(),
+                response.securityResult() != null ? response.securityResult().status() : null,
+                response.modelResult() != null ? response.modelResult().evidenceCount() : null
+        );
+
+        return response;
     }
 
     /**

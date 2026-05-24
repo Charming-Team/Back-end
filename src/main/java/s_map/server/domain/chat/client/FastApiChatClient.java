@@ -39,24 +39,54 @@ public class FastApiChatClient {
                 .connectTimeout(timeout)
                 .build();
 
+        log.info(
+                "[FastApiChatClient] FastAPI 챗봇 요청 시작 uri={}, sessionId={}, messageId={}, userId={}",
+                httpRequest.uri(),
+                request.sessionId(),
+                request.messageId(),
+                request.user().userId()
+        );
         try {
             HttpResponse<String> response = httpClient.send(
                     httpRequest,
                     HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8)
             );
             if (isSuccessful(response.statusCode())) {
+                log.info(
+                        "[FastApiChatClient] FastAPI 챗봇 응답 성공 status={}, uri={}, sessionId={}, messageId={}",
+                        response.statusCode(),
+                        httpRequest.uri(),
+                        request.sessionId(),
+                        request.messageId()
+                );
                 return parseResponse(response.body());
             }
-            throw mapFailedResponse(response.statusCode(), response.body());
+            throw mapFailedResponse(response.statusCode(), response.body(), request);
         } catch (HttpTimeoutException exception) {
-            log.warn("[FastApiChatClient] FastAPI 챗봇 응답 timeout uri={}", httpRequest.uri());
+            log.warn(
+                    "[FastApiChatClient] FastAPI 챗봇 응답 timeout uri={}, sessionId={}, messageId={}",
+                    httpRequest.uri(),
+                    request.sessionId(),
+                    request.messageId()
+            );
             throw new CustomException(ErrorCode.CHAT_FASTAPI_TIMEOUT);
         } catch (IOException exception) {
-            log.warn("[FastApiChatClient] FastAPI 챗봇 연결 실패 uri={}", httpRequest.uri(), exception);
+            log.warn(
+                    "[FastApiChatClient] FastAPI 챗봇 연결 실패 uri={}, sessionId={}, messageId={}",
+                    httpRequest.uri(),
+                    request.sessionId(),
+                    request.messageId(),
+                    exception
+            );
             throw new CustomException(ErrorCode.CHAT_FASTAPI_CONNECTION_FAILED);
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
-            log.warn("[FastApiChatClient] FastAPI 챗봇 호출 중 interrupt uri={}", httpRequest.uri());
+            log.warn(
+                    "[FastApiChatClient] FastAPI 챗봇 호출 중 interrupt uri={}, sessionId={}, messageId={}",
+                    httpRequest.uri(),
+                    request.sessionId(),
+                    request.messageId()
+            );
             throw new CustomException(ErrorCode.CHAT_FASTAPI_CONNECTION_FAILED);
         }
     }
@@ -97,11 +127,18 @@ public class FastApiChatClient {
         }
     }
 
-    private CustomException mapFailedResponse(int statusCode, String body) {
+    private CustomException mapFailedResponse(
+            int statusCode,
+            String body,
+            FastApiChatAnswerRequest request
+    ) {
         HttpStatus status = HttpStatus.resolve(statusCode);
         log.warn(
-                "[FastApiChatClient] FastAPI 챗봇 HTTP 실패 status={} body={}",
+                "[FastApiChatClient] FastAPI 챗봇 HTTP 실패 status={}, sessionId={}, messageId={}, userId={}, body={}",
                 statusCode,
+                request.sessionId(),
+                request.messageId(),
+                request.user().userId(),
                 abbreviate(body)
         );
 

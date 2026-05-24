@@ -18,9 +18,11 @@ import s_map.server.domain.material.entity.MaterialPlanStatus;
 
 import s_map.server.global.error.CustomException;
 import s_map.server.global.error.ErrorCode;
+import s_map.server.global.security.AuthUser;
 
 import java.math.BigDecimal;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -39,6 +41,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 @Transactional(readOnly = true)
 public class MaterialService {
 
@@ -66,9 +69,9 @@ public class MaterialService {
      * - result / MaterialDetailResponse / 등록된 자재 상세 정보
      */
     @Transactional
-    public MaterialDetailResponse createMaterial(MaterialCreateRequest request) {
+    public MaterialDetailResponse createMaterial(MaterialCreateRequest request, AuthUser actor) {
         String materialCode = normalizeMaterialCode(request.materialCode());
-        validateDuplicateMaterialCode(materialCode);
+        validateDuplicateMaterialCode(materialCode, actor);
 
         Material material = Material.builder()
                 .materialCode(materialCode)
@@ -82,9 +85,24 @@ public class MaterialService {
         try {
             savedMaterial = materialRepository.saveAndFlush(material);
         } catch (DataIntegrityViolationException exception) {
+            log.warn(
+                    "[MaterialService] 자재 등록 실패 reason=duplicate_material_code materialCode={}, actorUserId={}, actorEmail={}, actorRole={}",
+                    materialCode,
+                    actorUserId(actor),
+                    actorEmail(actor),
+                    actorRole(actor)
+            );
             throw new CustomException(ErrorCode.DUPLICATE_MATERIAL_CODE);
         }
 
+        log.info(
+                "[MaterialService] 자재 등록 성공 materialId={}, materialCode={}, actorUserId={}, actorEmail={}, actorRole={}",
+                savedMaterial.getMaterialId(),
+                savedMaterial.getMaterialCode(),
+                actorUserId(actor),
+                actorEmail(actor),
+                actorRole(actor)
+        );
         return MaterialDetailResponse.from(savedMaterial, null);
     }
 
@@ -184,8 +202,12 @@ public class MaterialService {
      * - result / MaterialDetailResponse / 수정된 자재 상세 정보 및 재고 현황
      */
     @Transactional
-    public MaterialDetailResponse updateMaterial(Long materialId, MaterialUpdateRequest request) {
-        Material material = getMaterialEntity(materialId);
+    public MaterialDetailResponse updateMaterial(
+            Long materialId,
+            MaterialUpdateRequest request,
+            AuthUser actor
+    ) {
+        Material material = getMaterialEntity(materialId, "자재 정보 수정", actor);
 
         material.update(
                 request.materialName(),
@@ -198,6 +220,14 @@ public class MaterialService {
                 .findByMaterialMaterialId(materialId)
                 .orElse(null);
 
+        log.info(
+                "[MaterialService] 자재 정보 수정 성공 materialId={}, materialCode={}, actorUserId={}, actorEmail={}, actorRole={}",
+                material.getMaterialId(),
+                material.getMaterialCode(),
+                actorUserId(actor),
+                actorEmail(actor),
+                actorRole(actor)
+        );
         return MaterialDetailResponse.from(material, inventory);
     }
 
@@ -254,7 +284,29 @@ public class MaterialService {
      */
     private Material getMaterialEntity(Long materialId) {
         return materialRepository.findById(materialId)
-                .orElseThrow(() -> new CustomException(ErrorCode.MATERIAL_NOT_FOUND));
+                .orElseThrow(() -> {
+                    log.warn("[MaterialService] 자재 조회 실패 reason=material_not_found materialId={}", materialId);
+                    return new CustomException(ErrorCode.MATERIAL_NOT_FOUND);
+                });
+    }
+
+    private Material getMaterialEntity(
+            Long materialId,
+            String action,
+            AuthUser actor
+    ) {
+        return materialRepository.findById(materialId)
+                .orElseThrow(() -> {
+                    log.warn(
+                            "[MaterialService] {} 실패 reason=material_not_found materialId={}, actorUserId={}, actorEmail={}, actorRole={}",
+                            action,
+                            materialId,
+                            actorUserId(actor),
+                            actorEmail(actor),
+                            actorRole(actor)
+                    );
+                    return new CustomException(ErrorCode.MATERIAL_NOT_FOUND);
+                });
     }
 
     /**
@@ -266,8 +318,15 @@ public class MaterialService {
      * Output:
      * - result / void / 반환값 없음, 중복 시 예외 발생
      */
-    private void validateDuplicateMaterialCode(String materialCode) {
+    private void validateDuplicateMaterialCode(String materialCode, AuthUser actor) {
         if (materialRepository.existsByMaterialCode(materialCode)) {
+            log.warn(
+                    "[MaterialService] 자재 등록 실패 reason=duplicate_material_code materialCode={}, actorUserId={}, actorEmail={}, actorRole={}",
+                    materialCode,
+                    actorUserId(actor),
+                    actorEmail(actor),
+                    actorRole(actor)
+            );
             throw new CustomException(ErrorCode.DUPLICATE_MATERIAL_CODE);
         }
     }
@@ -289,45 +348,73 @@ public class MaterialService {
     @Transactional
     public MaterialDetailResponse updateMaterialInventory(
             Long materialId,
-            MaterialInventoryUpdateRequest request
+            MaterialInventoryUpdateRequest request,
+            AuthUser actor
     ) {
-        Material material = getMaterialEntity(materialId);
+        Material material = getMaterialEntity(materialId, "자재 재고 수정", actor);
 
         MaterialInventory inventory = materialInventoryRepository
                 .findByMaterialMaterialId(materialId)
-                .map(existingInventory -> {
-                    validateInventoryQuantities(
-                            request.currentQuantity(),
-                            existingInventory.getReservedQuantity()
-                    );
-                    existingInventory.updateInventory(
-                            request.currentQuantity(),
-                            request.safetyStockQuantity(),
-                            request.expectedInboundAt(),
-                            request.expectedInboundQuantity()
-                    );
+                .orElse(null);
+        boolean created = inventory == null;
 
-                    return existingInventory;
-                })
-                .orElseGet(() -> materialInventoryRepository.save(
-                        MaterialInventory.builder()
-                                .material(material)
-                                .currentQuantity(request.currentQuantity())
-                                .reservedQuantity(BigDecimal.ZERO)
-                                .safetyStockQuantity(request.safetyStockQuantity())
-                                .expectedInboundAt(request.expectedInboundAt())
-                                .expectedInboundQuantity(request.expectedInboundQuantity())
-                                .build()
-                ));
+        if (created) {
+            inventory = materialInventoryRepository.save(MaterialInventory.builder()
+                    .material(material)
+                    .currentQuantity(request.currentQuantity())
+                    .reservedQuantity(BigDecimal.ZERO)
+                    .safetyStockQuantity(request.safetyStockQuantity())
+                    .expectedInboundAt(request.expectedInboundAt())
+                    .expectedInboundQuantity(request.expectedInboundQuantity())
+                    .build());
+        } else {
+            validateInventoryQuantities(
+                    request.currentQuantity(),
+                    inventory.getReservedQuantity(),
+                    materialId,
+                    actor
+            );
+            inventory.updateInventory(
+                    request.currentQuantity(),
+                    request.safetyStockQuantity(),
+                    request.expectedInboundAt(),
+                    request.expectedInboundQuantity()
+            );
+        }
+
+        log.info(
+                "[MaterialService] 자재 재고 {} 성공 materialId={}, materialCode={}, currentQuantity={}, safetyStockQuantity={}, expectedInboundAt={}, expectedInboundQuantity={}, actorUserId={}, actorEmail={}, actorRole={}",
+                created ? "등록" : "수정",
+                material.getMaterialId(),
+                material.getMaterialCode(),
+                request.currentQuantity(),
+                request.safetyStockQuantity(),
+                request.expectedInboundAt(),
+                request.expectedInboundQuantity(),
+                actorUserId(actor),
+                actorEmail(actor),
+                actorRole(actor)
+        );
 
         return MaterialDetailResponse.from(material, inventory);
     }
 
     private void validateInventoryQuantities(
             BigDecimal currentQuantity,
-            BigDecimal reservedQuantity
+            BigDecimal reservedQuantity,
+            Long materialId,
+            AuthUser actor
     ) {
         if (reservedQuantity.compareTo(currentQuantity) > 0) {
+            log.warn(
+                    "[MaterialService] 자재 재고 수정 실패 reason=reserved_exceeds_current materialId={}, currentQuantity={}, reservedQuantity={}, actorUserId={}, actorEmail={}, actorRole={}",
+                    materialId,
+                    currentQuantity,
+                    reservedQuantity,
+                    actorUserId(actor),
+                    actorEmail(actor),
+                    actorRole(actor)
+            );
             throw new CustomException(ErrorCode.INVALID_INVENTORY_QUANTITY);
         }
     }
@@ -359,10 +446,13 @@ public class MaterialService {
                 MaterialPlanStatus.PARTIAL_RESERVED
         );
 
-        return productionPlanMaterialRepository.findByMaterialPlanStatusInWithMaterial(shortageStatuses)
+        List<MaterialShortageResponse> shortages = productionPlanMaterialRepository.findByMaterialPlanStatusInWithMaterial(shortageStatuses)
                 .stream()
                 .map(MaterialShortageResponse::from)
                 .toList();
+
+        log.info("[MaterialService] 부족 자재 목록 조회 완료 count={}", shortages.size());
+        return shortages;
     }
 
     /**
@@ -394,9 +484,17 @@ public class MaterialService {
                         pageable
                 );
 
-        return shortages.stream()
+        List<MaterialShortageResponse> responses = shortages.stream()
                 .map(MaterialShortageResponse::from)
                 .toList();
+
+        log.info(
+                "[MaterialService] 제한 부족 자재 조회 완료 limit={}, materialCode={}, count={}",
+                limit,
+                normalizedMaterialCode,
+                responses.size()
+        );
+        return responses;
     }
 
     private String normalizeMaterialCode(String materialCode) {
@@ -404,5 +502,17 @@ public class MaterialService {
             return null;
         }
         return materialCode.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private Long actorUserId(AuthUser actor) {
+        return actor != null ? actor.id() : null;
+    }
+
+    private String actorEmail(AuthUser actor) {
+        return actor != null ? actor.email() : null;
+    }
+
+    private Object actorRole(AuthUser actor) {
+        return actor != null ? actor.role() : null;
     }
 }
