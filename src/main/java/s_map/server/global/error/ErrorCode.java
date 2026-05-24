@@ -55,7 +55,16 @@ public enum ErrorCode {
 
     // 500 Internal Server Error
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "500", "서버 내부 오류가 발생했습니다."),
-    USER_DELETE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "500-201", "사용자 삭제 처리에 실패했습니다. 잠시 후 다시 시도해주세요.");
+    USER_DELETE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "500-201", "사용자 삭제 처리에 실패했습니다. 잠시 후 다시 시도해주세요."),
+
+    // Chat FastAPI Gateway
+    CHAT_FASTAPI_CONNECTION_FAILED(HttpStatus.BAD_GATEWAY, "CHAT_FASTAPI_001", "챗봇 서버 연결에 실패했습니다."),
+    CHAT_FASTAPI_TIMEOUT(HttpStatus.GATEWAY_TIMEOUT, "CHAT_FASTAPI_002", "챗봇 응답 시간이 초과되었습니다."),
+    CHAT_FASTAPI_BAD_REQUEST(HttpStatus.BAD_GATEWAY, "CHAT_FASTAPI_003", "챗봇 요청을 처리할 수 없습니다."),
+    CHAT_FASTAPI_FORBIDDEN(HttpStatus.BAD_GATEWAY, "CHAT_FASTAPI_004", "챗봇 서버 요청에 실패했습니다."),
+    CHAT_FASTAPI_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "CHAT_FASTAPI_005", "챗봇 서버를 사용할 수 없습니다."),
+    CHAT_FASTAPI_INTERNAL_ERROR(HttpStatus.BAD_GATEWAY, "CHAT_FASTAPI_006", "챗봇 서버 내부 오류가 발생했습니다."),
+    CHAT_FASTAPI_INVALID_RESPONSE(HttpStatus.BAD_GATEWAY, "CHAT_FASTAPI_007", "챗봇 서버 응답을 처리할 수 없습니다.");
 
     private final HttpStatus httpStatus;
     private final String code;
