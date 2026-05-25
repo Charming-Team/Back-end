@@ -48,6 +48,14 @@ public class ChatService {
                     log.warn("[ChatService] 챗봇 답변 요청 실패 reason=user_not_found userId={}", authUser.id());
                     return new CustomException(ErrorCode.NOT_FOUND);
                 });
+        if (!user.isActive()) {
+            log.warn(
+                    "[ChatService] 챗봇 답변 요청 실패 reason=inactive_user userId={}, status={}",
+                    user.getId(),
+                    user.getStatus()
+            );
+            throw new CustomException(ErrorCode.INACTIVE_ACCOUNT);
+        }
 
         Long sessionId = resolveSessionId(request);
         Long messageId = resolveMessageId(request);

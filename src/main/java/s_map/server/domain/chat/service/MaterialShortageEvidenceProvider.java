@@ -19,6 +19,8 @@ import s_map.server.domain.material.entity.MaterialInventory;
 import s_map.server.domain.material.repository.MaterialInventoryRepository;
 import s_map.server.domain.material.service.MaterialService;
 import s_map.server.domain.user.entity.Role;
+import s_map.server.domain.user.entity.User;
+import s_map.server.domain.user.repository.UserRepository;
 
 @Component
 @RequiredArgsConstructor
@@ -42,6 +44,7 @@ public class MaterialShortageEvidenceProvider implements EvidenceProvider {
 
     private final MaterialService materialService;
     private final MaterialInventoryRepository materialInventoryRepository;
+    private final UserRepository userRepository;
 
     @Override
     public String intent() {
@@ -60,11 +63,36 @@ public class MaterialShortageEvidenceProvider implements EvidenceProvider {
     @Override
     public List<EvidenceItemResponse> getEvidence(EvidenceLookupRequest request) {
         EvidenceLookupFilters filters = request.filters();
-        if (!isRoleAllowed(request.user().role(), MATERIAL_ALLOWED_ROLE_SET)) {
+        User user = userRepository.findById(request.user().userId())
+                .orElse(null);
+        if (user == null) {
             log.warn(
-                    "[MaterialShortageEvidenceProvider] Evidence 조회 스킵 reason=role_not_allowed userId={}, role={}, sessionId={}, messageId={}",
+                    "[MaterialShortageEvidenceProvider] Evidence 조회 스킵 reason=user_not_found userId={}, requestedRole={}, sessionId={}, messageId={}",
                     request.user().userId(),
                     request.user().role(),
+                    request.sessionId(),
+                    request.messageId()
+            );
+            return List.of();
+        }
+
+        if (!user.isActive()) {
+            log.warn(
+                    "[MaterialShortageEvidenceProvider] Evidence 조회 스킵 reason=inactive_user userId={}, role={}, status={}, sessionId={}, messageId={}",
+                    user.getId(),
+                    user.getRole(),
+                    user.getStatus(),
+                    request.sessionId(),
+                    request.messageId()
+            );
+            return List.of();
+        }
+
+        if (!MATERIAL_ALLOWED_ROLE_SET.contains(user.getRole())) {
+            log.warn(
+                    "[MaterialShortageEvidenceProvider] Evidence 조회 스킵 reason=role_not_allowed userId={}, role={}, sessionId={}, messageId={}",
+                    user.getId(),
+                    user.getRole(),
                     request.sessionId(),
                     request.messageId()
             );
@@ -130,19 +158,6 @@ public class MaterialShortageEvidenceProvider implements EvidenceProvider {
                         inventory -> inventory.getMaterial().getMaterialId(),
                         Function.identity()
                 ));
-    }
-
-    private boolean isRoleAllowed(String role, Set<Role> allowedRoles) {
-        if (role == null || role.isBlank()) {
-            return false;
-        }
-
-        try {
-            Role requestRole = Role.valueOf(role.trim().toUpperCase(Locale.ROOT));
-            return allowedRoles.contains(requestRole);
-        } catch (IllegalArgumentException exception) {
-            return false;
-        }
     }
 
     private boolean hasUnsupportedMaterialTarget(EvidenceLookupFilters filters) {

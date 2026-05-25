@@ -10,6 +10,7 @@ import java.net.http.HttpResponse;
 import java.net.http.HttpTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
@@ -59,7 +60,9 @@ public class FastApiChatClient {
                         request.sessionId(),
                         request.messageId()
                 );
-                return parseResponse(response.body());
+                ChatAnswerResponse chatAnswerResponse = parseResponse(response.body());
+                validateTrackingIds(request, chatAnswerResponse);
+                return chatAnswerResponse;
             }
             throw mapFailedResponse(response.statusCode(), response.body(), request);
         } catch (HttpTimeoutException exception) {
@@ -125,6 +128,25 @@ public class FastApiChatClient {
             log.warn("[FastApiChatClient] FastAPI 챗봇 응답 역직렬화 실패", exception);
             throw new CustomException(ErrorCode.CHAT_FASTAPI_INVALID_RESPONSE);
         }
+    }
+
+    private void validateTrackingIds(
+            FastApiChatAnswerRequest request,
+            ChatAnswerResponse response
+    ) {
+        if (Objects.equals(request.sessionId(), response.sessionId())
+                && Objects.equals(request.messageId(), response.messageId())) {
+            return;
+        }
+
+        log.warn(
+                "[FastApiChatClient] FastAPI 챗봇 응답 추적 ID 불일치 requestSessionId={}, responseSessionId={}, requestMessageId={}, responseMessageId={}",
+                request.sessionId(),
+                response.sessionId(),
+                request.messageId(),
+                response.messageId()
+        );
+        throw new CustomException(ErrorCode.CHAT_FASTAPI_INVALID_RESPONSE);
     }
 
     private CustomException mapFailedResponse(
