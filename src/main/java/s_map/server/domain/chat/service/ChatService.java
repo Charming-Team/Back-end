@@ -42,6 +42,9 @@ public class ChatService {
 
         User user = userRepository.findById(authUser.id())
                 .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND));
+        if (!user.isActive()) {
+            throw new CustomException(ErrorCode.INACTIVE_ACCOUNT);
+        }
 
         FastApiChatAnswerRequest fastApiRequest = new FastApiChatAnswerRequest(
                 resolveSessionId(request),
