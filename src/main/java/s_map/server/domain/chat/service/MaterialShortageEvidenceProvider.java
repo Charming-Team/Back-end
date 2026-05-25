@@ -9,6 +9,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import s_map.server.domain.chat.dto.req.EvidenceLookupFilters;
 import s_map.server.domain.chat.dto.req.EvidenceLookupRequest;
@@ -23,6 +24,7 @@ import s_map.server.domain.user.repository.UserRepository;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class MaterialShortageEvidenceProvider implements EvidenceProvider {
 
     private static final int DEFAULT_LIMIT = 5;
@@ -63,11 +65,48 @@ public class MaterialShortageEvidenceProvider implements EvidenceProvider {
         EvidenceLookupFilters filters = request.filters();
         User user = userRepository.findById(request.user().userId())
                 .orElse(null);
-        if (user == null || !user.isActive() || !MATERIAL_ALLOWED_ROLE_SET.contains(user.getRole())) {
+        if (user == null) {
+            log.warn(
+                    "[MaterialShortageEvidenceProvider] Evidence 조회 스킵 reason=user_not_found userId={}, requestedRole={}, sessionId={}, messageId={}",
+                    request.user().userId(),
+                    request.user().role(),
+                    request.sessionId(),
+                    request.messageId()
+            );
+            return List.of();
+        }
+
+        if (!user.isActive()) {
+            log.warn(
+                    "[MaterialShortageEvidenceProvider] Evidence 조회 스킵 reason=inactive_user userId={}, role={}, status={}, sessionId={}, messageId={}",
+                    user.getId(),
+                    user.getRole(),
+                    user.getStatus(),
+                    request.sessionId(),
+                    request.messageId()
+            );
+            return List.of();
+        }
+
+        if (!MATERIAL_ALLOWED_ROLE_SET.contains(user.getRole())) {
+            log.warn(
+                    "[MaterialShortageEvidenceProvider] Evidence 조회 스킵 reason=role_not_allowed userId={}, role={}, sessionId={}, messageId={}",
+                    user.getId(),
+                    user.getRole(),
+                    request.sessionId(),
+                    request.messageId()
+            );
             return List.of();
         }
 
         if (hasUnsupportedMaterialTarget(filters)) {
+            log.warn(
+                    "[MaterialShortageEvidenceProvider] Evidence 조회 스킵 reason=unsupported_target targetType={}, targetCode={}, sessionId={}, messageId={}",
+                    filters.targetType(),
+                    filters.targetCode(),
+                    request.sessionId(),
+                    request.messageId()
+            );
             return List.of();
         }
 
@@ -75,6 +114,16 @@ public class MaterialShortageEvidenceProvider implements EvidenceProvider {
         String targetMaterialCode = resolveMaterialTargetCode(filters);
         List<MaterialShortageResponse> shortages = materialService.getMaterialShortages(limit, targetMaterialCode);
         Map<Long, MaterialInventory> inventoryMap = getInventoryMap(shortages);
+        log.info(
+                "[MaterialShortageEvidenceProvider] 부족 자재 Evidence 생성 완료 sessionId={}, messageId={}, userId={}, limit={}, targetMaterialCode={}, shortageCount={}, inventoryCount={}",
+                request.sessionId(),
+                request.messageId(),
+                request.user().userId(),
+                limit,
+                targetMaterialCode,
+                shortages.size(),
+                inventoryMap.size()
+        );
 
         return shortages.stream()
                 .map(shortage -> toMaterialShortageEvidence(
