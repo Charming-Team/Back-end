@@ -1,6 +1,7 @@
 package s_map.server.domain.order.service;
 
 import lombok.RequiredArgsConstructor;
+import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -24,6 +25,7 @@ import s_map.server.global.error.ErrorCode;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.lang.reflect.Method;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -31,6 +33,9 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -42,6 +47,11 @@ public class OrderService {
     private static final int DEFAULT_PAGE = 0;
     private static final int DEFAULT_SIZE = 10;
     private static final int MAX_SIZE = 100;
+    private static final Set<String> CONCURRENT_ORDER_CONSTRAINT_NAMES = Set.of(
+            "uk_customer_orders_order_no",
+            "customer_orders_order_no_key",
+            "uk_production_plans_line_sequence"
+    );
 
     private final CustomerOrderRepository customerOrderRepository;
     private final ProductionPlanRepository productionPlanRepository;
@@ -94,7 +104,11 @@ public class OrderService {
         try {
             return createOrderInternal(request);
         } catch (DataIntegrityViolationException exception) {
-            throw new CustomException(ErrorCode.CONCURRENT_ORDER_CREATION);
+            if (isConcurrentOrderCreation(exception)) {
+                throw new CustomException(ErrorCode.CONCURRENT_ORDER_CREATION);
+            }
+
+            throw exception;
         }
     }
 
@@ -352,6 +366,57 @@ public class OrderService {
         } catch (NumberFormatException exception) {
             return 0;
         }
+    }
+
+    private boolean isConcurrentOrderCreation(DataIntegrityViolationException exception) {
+        return findConstraintName(exception)
+                .map(constraintName -> constraintName.toLowerCase(Locale.ROOT))
+                .filter(CONCURRENT_ORDER_CONSTRAINT_NAMES::contains)
+                .isPresent();
+    }
+
+    private Optional<String> findConstraintName(Throwable throwable) {
+        Throwable current = throwable;
+
+        while (current != null) {
+            if (current instanceof ConstraintViolationException constraintViolationException
+                    && constraintViolationException.getConstraintName() != null) {
+                return Optional.of(constraintViolationException.getConstraintName());
+            }
+
+            Optional<String> postgresConstraintName = findPostgresConstraintName(current);
+            if (postgresConstraintName.isPresent()) {
+                return postgresConstraintName;
+            }
+
+            current = current.getCause();
+        }
+
+        return Optional.empty();
+    }
+
+    private Optional<String> findPostgresConstraintName(Throwable throwable) {
+        if (!"org.postgresql.util.PSQLException".equals(throwable.getClass().getName())) {
+            return Optional.empty();
+        }
+
+        try {
+            Method getServerErrorMessage = throwable.getClass().getMethod("getServerErrorMessage");
+            Object serverErrorMessage = getServerErrorMessage.invoke(throwable);
+            if (serverErrorMessage == null) {
+                return Optional.empty();
+            }
+
+            Method getConstraint = serverErrorMessage.getClass().getMethod("getConstraint");
+            Object constraint = getConstraint.invoke(serverErrorMessage);
+            if (constraint instanceof String constraintName && !constraintName.isBlank()) {
+                return Optional.of(constraintName);
+            }
+        } catch (ReflectiveOperationException exception) {
+            return Optional.empty();
+        }
+
+        return Optional.empty();
     }
 
     private void validateDueDateRange(LocalDate dueDateFrom, LocalDate dueDateTo) {
