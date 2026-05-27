@@ -27,6 +27,7 @@ import s_map.server.global.error.CustomException;
 import s_map.server.global.error.ErrorCode;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -242,8 +243,8 @@ class OrderServiceTest {
             }
 
             @Override
-            public OffsetDateTime getLastPlannedEndAt() {
-                return lastPlannedEndAt;
+            public Instant getLastPlannedEndAt() {
+                return lastPlannedEndAt == null ? null : lastPlannedEndAt.toInstant();
             }
 
             @Override
