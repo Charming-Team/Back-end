@@ -19,7 +19,13 @@ import s_map.server.domain.order.entity.ProductionPlan;
 import s_map.server.domain.order.repository.CustomerOrderRepository;
 import s_map.server.domain.order.repository.LineAssignmentCandidateProjection;
 import s_map.server.domain.order.repository.OrderNoSequenceRepository;
+import s_map.server.domain.order.repository.OrderQueryRepository;
+import s_map.server.domain.order.repository.ProductQueryRepository;
 import s_map.server.domain.order.repository.ProductionPlanRepository;
+import s_map.server.domain.user.entity.Role;
+import s_map.server.domain.user.entity.User;
+import s_map.server.domain.user.entity.UserStatus;
+import s_map.server.domain.user.repository.UserRepository;
 import s_map.server.global.error.CustomException;
 import s_map.server.global.error.ErrorCode;
 
@@ -54,10 +60,12 @@ public class OrderService {
     );
 
     private final CustomerOrderRepository customerOrderRepository;
+    private final OrderQueryRepository orderQueryRepository;
+    private final ProductQueryRepository productQueryRepository;
     private final ProductionPlanRepository productionPlanRepository;
     private final OrderNoSequenceRepository orderNoSequenceRepository;
+    private final UserRepository userRepository;
 
-    @Transactional
     public Page<OrderListResponse> getOrders(
             int page,
             int size,
@@ -69,11 +77,10 @@ public class OrderService {
             LocalDate dueDateTo
     ) {
         validateDueDateRange(dueDateFrom, dueDateTo);
-        refreshOrderStatusSnapshot();
 
         Pageable pageable = createPageable(page, size);
 
-        return customerOrderRepository.findOrderSummaries(
+        return orderQueryRepository.findOrderSummaries(
                         normalize(keyword),
                         status != null ? status.name() : null,
                         normalize(customerName),
@@ -85,11 +92,8 @@ public class OrderService {
                 .map(OrderListResponse::from);
     }
 
-    @Transactional
     public OrderDetailResponse getOrder(Long orderId) {
-        refreshOrderStatusSnapshot();
-
-        return customerOrderRepository.findOrderDetail(orderId)
+        return orderQueryRepository.findOrderDetail(orderId)
                 .map(OrderDetailResponse::from)
                 .orElseThrow(() -> new CustomException(ErrorCode.ORDER_NOT_FOUND));
     }
@@ -121,13 +125,9 @@ public class OrderService {
         OffsetDateTime desiredStartAt = resolveDesiredStartAt(request);
         validateOrderCreateRequest(request, desiredStartAt);
 
-        if (!customerOrderRepository.existsProductById(request.productId())) {
-            throw new CustomException(ErrorCode.PRODUCT_NOT_FOUND);
-        }
-
-        Long operatorId = resolveOperatorId(request);
-        String productName = customerOrderRepository.findProductNameById(request.productId())
+        String productName = productQueryRepository.findProductNameById(request.productId())
                 .orElseThrow(() -> new CustomException(ErrorCode.PRODUCT_NOT_FOUND));
+        Long operatorId = resolveOperatorId(request);
 
         LineAssignment assignment = assignBestLine(
                 request.productId(),
@@ -194,20 +194,20 @@ public class OrderService {
         }
     }
 
-    private void refreshOrderStatusSnapshot() {
-        productionPlanRepository.refreshActivePlanStatuses();
-        customerOrderRepository.refreshActiveOrderStatuses();
-    }
-
     private Long resolveOperatorId(OrderCreateRequest request) {
         if (request.operatorId() != null) {
-            if (!customerOrderRepository.existsActiveOperatorById(request.operatorId())) {
+            if (!userRepository.existsByIdAndStatusAndRole(request.operatorId(), UserStatus.ACTIVE, Role.OPERATOR)) {
                 throw new CustomException(ErrorCode.OPERATOR_NOT_FOUND);
             }
             return request.operatorId();
         }
 
-        return customerOrderRepository.findActiveOperatorIdByName(request.operatorName().trim())
+        return userRepository.findFirstByNameAndStatusAndRoleOrderByIdAsc(
+                        request.operatorName().trim(),
+                        UserStatus.ACTIVE,
+                        Role.OPERATOR
+                )
+                .map(User::getId)
                 .orElseThrow(() -> new CustomException(ErrorCode.OPERATOR_NOT_FOUND));
     }
 

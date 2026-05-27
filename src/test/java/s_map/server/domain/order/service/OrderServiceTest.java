@@ -4,7 +4,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -17,8 +16,13 @@ import s_map.server.domain.order.entity.ProductionPlan;
 import s_map.server.domain.order.repository.CustomerOrderRepository;
 import s_map.server.domain.order.repository.LineAssignmentCandidateProjection;
 import s_map.server.domain.order.repository.OrderNoSequenceRepository;
+import s_map.server.domain.order.repository.OrderQueryRepository;
 import s_map.server.domain.order.repository.OrderSummaryProjection;
+import s_map.server.domain.order.repository.ProductQueryRepository;
 import s_map.server.domain.order.repository.ProductionPlanRepository;
+import s_map.server.domain.user.entity.Role;
+import s_map.server.domain.user.entity.UserStatus;
+import s_map.server.domain.user.repository.UserRepository;
 import s_map.server.global.error.CustomException;
 import s_map.server.global.error.ErrorCode;
 
@@ -35,7 +39,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -49,10 +52,19 @@ class OrderServiceTest {
     private CustomerOrderRepository customerOrderRepository;
 
     @Mock
+    private OrderQueryRepository orderQueryRepository;
+
+    @Mock
+    private ProductQueryRepository productQueryRepository;
+
+    @Mock
     private ProductionPlanRepository productionPlanRepository;
 
     @Mock
     private OrderNoSequenceRepository orderNoSequenceRepository;
+
+    @Mock
+    private UserRepository userRepository;
 
     @InjectMocks
     private OrderService orderService;
@@ -64,9 +76,8 @@ class OrderServiceTest {
         LocalDate dueDate = desiredStartAt.plusDays(5).toLocalDate();
         OrderCreateRequest request = createRequest(dueDate, desiredStartAt, 3L);
 
-        when(customerOrderRepository.existsProductById(1L)).thenReturn(true);
-        when(customerOrderRepository.existsActiveOperatorById(3L)).thenReturn(true);
-        when(customerOrderRepository.findProductNameById(1L)).thenReturn(Optional.of("ABS-Black"));
+        when(productQueryRepository.findProductNameById(1L)).thenReturn(Optional.of("ABS-Black"));
+        when(userRepository.existsByIdAndStatusAndRole(3L, UserStatus.ACTIVE, Role.OPERATOR)).thenReturn(true);
         when(productionPlanRepository.lockAssignableLineIds(1L)).thenReturn(List.of(10L, 20L));
         when(productionPlanRepository.findAssignmentCandidates(1L)).thenReturn(List.of(
                 candidate(10L, "느린 라인", 100, null, 1, null, 2),
@@ -116,9 +127,8 @@ class OrderServiceTest {
         OffsetDateTime desiredStartAt = OffsetDateTime.now(ZoneOffset.UTC).plusDays(1);
         OrderCreateRequest request = createRequest(desiredStartAt.plusDays(1).toLocalDate(), desiredStartAt, 3L);
 
-        when(customerOrderRepository.existsProductById(1L)).thenReturn(true);
-        when(customerOrderRepository.existsActiveOperatorById(3L)).thenReturn(true);
-        when(customerOrderRepository.findProductNameById(1L)).thenReturn(Optional.of("ABS-Black"));
+        when(productQueryRepository.findProductNameById(1L)).thenReturn(Optional.of("ABS-Black"));
+        when(userRepository.existsByIdAndStatusAndRole(3L, UserStatus.ACTIVE, Role.OPERATOR)).thenReturn(true);
         when(productionPlanRepository.lockAssignableLineIds(1L)).thenReturn(List.of(10L));
         when(productionPlanRepository.findAssignmentCandidates(1L)).thenReturn(List.of(
                 candidate(10L, "느린 라인", 100, null, 1, null, 1)
@@ -139,8 +149,8 @@ class OrderServiceTest {
         OffsetDateTime desiredStartAt = OffsetDateTime.now(ZoneOffset.UTC).plusDays(1);
         OrderCreateRequest request = createRequest(desiredStartAt.plusDays(5).toLocalDate(), desiredStartAt, 3L);
 
-        when(customerOrderRepository.existsProductById(1L)).thenReturn(true);
-        when(customerOrderRepository.existsActiveOperatorById(3L)).thenReturn(false);
+        when(productQueryRepository.findProductNameById(1L)).thenReturn(Optional.of("ABS-Black"));
+        when(userRepository.existsByIdAndStatusAndRole(3L, UserStatus.ACTIVE, Role.OPERATOR)).thenReturn(false);
 
         assertThatThrownBy(() -> orderService.createOrder(request))
                 .isInstanceOf(CustomException.class)
@@ -153,9 +163,9 @@ class OrderServiceTest {
     }
 
     @Test
-    @DisplayName("주문 목록 조회 전에 생산계획과 주문 상태를 갱신한다")
-    void getOrdersRefreshesStatusesBeforeQuery() {
-        when(customerOrderRepository.findOrderSummaries(
+    @DisplayName("주문 목록 조회는 상태 갱신 UPDATE 없이 projection 쿼리로 조회한다")
+    void getOrdersQueriesProjectionWithoutStatusRefresh() {
+        when(orderQueryRepository.findOrderSummaries(
                 eq(null),
                 eq(null),
                 eq(null),
@@ -167,10 +177,7 @@ class OrderServiceTest {
 
         var response = orderService.getOrders(0, 10, null, null, null, null, null, null);
 
-        InOrder inOrder = inOrder(productionPlanRepository, customerOrderRepository);
-        inOrder.verify(productionPlanRepository).refreshActivePlanStatuses();
-        inOrder.verify(customerOrderRepository).refreshActiveOrderStatuses();
-        inOrder.verify(customerOrderRepository).findOrderSummaries(
+        verify(orderQueryRepository).findOrderSummaries(
                 eq(null),
                 eq(null),
                 eq(null),
