@@ -71,7 +71,8 @@ spring:
     activate:
       on-profile: test
   datasource:
-    url: jdbc:h2:mem:s_map-test;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
+    url: >-
+      jdbc:h2:mem:s_map-test;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1;INIT=CREATE DOMAIN IF NOT EXISTS role_enum AS VARCHAR(30)\;CREATE DOMAIN IF NOT EXISTS user_status_enum AS VARCHAR(30)\;CREATE DOMAIN IF NOT EXISTS order_status_enum AS VARCHAR(30)\;CREATE DOMAIN IF NOT EXISTS plan_status_enum AS VARCHAR(30)\;CREATE DOMAIN IF NOT EXISTS inventory_status_enum AS VARCHAR(30)\;CREATE DOMAIN IF NOT EXISTS material_plan_status_enum AS VARCHAR(30)
     driver-class-name: org.h2.Driver
     username: sa
     password:
