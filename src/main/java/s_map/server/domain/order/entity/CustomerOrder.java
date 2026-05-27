@@ -7,7 +7,9 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -21,7 +23,17 @@ import java.time.LocalDate;
 
 @Getter
 @Entity
-@Table(name = "customer_orders")
+@Table(
+        name = "customer_orders",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_customer_orders_order_no", columnNames = "order_no")
+        },
+        indexes = {
+                @Index(name = "idx_customer_orders_due_status", columnList = "due_date, order_status"),
+                @Index(name = "idx_customer_orders_product_id", columnList = "product_id"),
+                @Index(name = "idx_customer_orders_customer_name", columnList = "customer_name")
+        }
+)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class CustomerOrder extends BaseEntity {
 
@@ -30,7 +42,7 @@ public class CustomerOrder extends BaseEntity {
     @Column(name = "order_id")
     private Long orderId;
 
-    @Column(name = "order_no", nullable = false, unique = true, length = 50)
+    @Column(name = "order_no", nullable = false, length = 50)
     private String orderNo;
 
     @Column(name = "product_id", nullable = false)

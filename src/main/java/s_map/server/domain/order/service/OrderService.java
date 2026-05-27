@@ -1,6 +1,10 @@
 package s_map.server.domain.order.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import s_map.server.domain.order.dto.req.OrderCreateRequest;
@@ -8,6 +12,7 @@ import s_map.server.domain.order.dto.res.OrderCreateResponse;
 import s_map.server.domain.order.dto.res.OrderDetailResponse;
 import s_map.server.domain.order.dto.res.OrderListResponse;
 import s_map.server.domain.order.entity.CustomerOrder;
+import s_map.server.domain.order.entity.OrderStatus;
 import s_map.server.domain.order.entity.ProductionPlan;
 import s_map.server.domain.order.repository.CustomerOrderRepository;
 import s_map.server.domain.order.repository.LineAssignmentCandidateProjection;
@@ -20,6 +25,7 @@ import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.List;
@@ -30,15 +36,38 @@ import java.util.List;
 public class OrderService {
 
     private static final DateTimeFormatter ORDER_NO_DATE_FORMATTER = DateTimeFormatter.ofPattern("yyMMdd");
+    private static final ZoneId DEFAULT_PRODUCTION_ZONE = ZoneId.of("Asia/Seoul");
+    private static final int DEFAULT_PAGE = 0;
+    private static final int DEFAULT_SIZE = 10;
+    private static final int MAX_SIZE = 100;
 
     private final CustomerOrderRepository customerOrderRepository;
     private final ProductionPlanRepository productionPlanRepository;
 
-    public List<OrderListResponse> getOrders() {
-        return customerOrderRepository.findAllOrderSummaries()
-                .stream()
-                .map(OrderListResponse::from)
-                .toList();
+    public Page<OrderListResponse> getOrders(
+            int page,
+            int size,
+            String keyword,
+            OrderStatus status,
+            String customerName,
+            Long productId,
+            LocalDate dueDateFrom,
+            LocalDate dueDateTo
+    ) {
+        validateDueDateRange(dueDateFrom, dueDateTo);
+
+        Pageable pageable = createPageable(page, size);
+
+        return customerOrderRepository.findOrderSummaries(
+                        normalize(keyword),
+                        status != null ? status.name() : null,
+                        normalize(customerName),
+                        productId,
+                        dueDateFrom,
+                        dueDateTo,
+                        pageable
+                )
+                .map(OrderListResponse::from);
     }
 
     public OrderDetailResponse getOrder(Long orderId) {
@@ -49,7 +78,16 @@ public class OrderService {
 
     @Transactional
     public OrderCreateResponse createOrder(OrderCreateRequest request) {
-        validateOrderCreateRequest(request);
+        try {
+            return createOrderInternal(request);
+        } catch (DataIntegrityViolationException exception) {
+            throw new CustomException(ErrorCode.CONCURRENT_ORDER_CREATION);
+        }
+    }
+
+    private OrderCreateResponse createOrderInternal(OrderCreateRequest request) {
+        OffsetDateTime desiredStartAt = resolveDesiredStartAt(request);
+        validateOrderCreateRequest(request, desiredStartAt);
 
         if (!customerOrderRepository.existsProductById(request.productId())) {
             throw new CustomException(ErrorCode.PRODUCT_NOT_FOUND);
@@ -62,8 +100,10 @@ public class OrderService {
         LineAssignment assignment = assignBestLine(
                 request.productId(),
                 request.orderQuantity(),
-                request.desiredStartAt()
+                desiredStartAt
         );
+
+        validatePlannedEndAt(assignment.plannedEndAt(), request.dueDate());
 
         String orderNo = generateOrderNo();
 
@@ -78,7 +118,7 @@ public class OrderService {
                 request.latePenaltyAmount()
         );
 
-        CustomerOrder savedOrder = customerOrderRepository.save(order);
+        CustomerOrder savedOrder = customerOrderRepository.saveAndFlush(order);
 
         ProductionPlan plan = ProductionPlan.create(
                 savedOrder.getOrderId(),
@@ -92,7 +132,7 @@ public class OrderService {
                 assignment.planSequence()
         );
 
-        ProductionPlan savedPlan = productionPlanRepository.save(plan);
+        ProductionPlan savedPlan = productionPlanRepository.saveAndFlush(plan);
 
         return OrderCreateResponse.from(
                 savedOrder,
@@ -102,14 +142,15 @@ public class OrderService {
         );
     }
 
-    private void validateOrderCreateRequest(OrderCreateRequest request) {
+    private void validateOrderCreateRequest(OrderCreateRequest request, OffsetDateTime desiredStartAt) {
         LocalDate today = LocalDate.now();
 
         if (request.dueDate().isBefore(today)) {
             throw new CustomException(ErrorCode.INVALID_ORDER_DATE);
         }
 
-        if (request.desiredStartAt().toLocalDate().isAfter(request.dueDate())) {
+        if (desiredStartAt.toLocalDate().isBefore(today)
+                || desiredStartAt.toLocalDate().isAfter(request.dueDate())) {
             throw new CustomException(ErrorCode.INVALID_ORDER_DATE);
         }
 
@@ -138,6 +179,11 @@ public class OrderService {
             Integer orderQuantity,
             OffsetDateTime desiredStartAt
     ) {
+        List<Long> lockedLineIds = productionPlanRepository.lockAssignableLineIds(productId);
+        if (lockedLineIds.isEmpty()) {
+            throw new CustomException(ErrorCode.AVAILABLE_PRODUCTION_LINE_NOT_FOUND);
+        }
+
         List<LineAssignmentCandidateProjection> candidates =
                 productionPlanRepository.findAssignmentCandidates(productId);
 
@@ -203,6 +249,26 @@ public class OrderService {
         return desiredStartAt;
     }
 
+    private OffsetDateTime resolveDesiredStartAt(OrderCreateRequest request) {
+        if (request.desiredStartAt() != null) {
+            return request.desiredStartAt();
+        }
+
+        if (request.productionStartDate() != null) {
+            return request.productionStartDate()
+                    .atStartOfDay(DEFAULT_PRODUCTION_ZONE)
+                    .toOffsetDateTime();
+        }
+
+        throw new CustomException(ErrorCode.INVALID_ORDER_DATE);
+    }
+
+    private void validatePlannedEndAt(OffsetDateTime plannedEndAt, LocalDate dueDate) {
+        if (plannedEndAt.toLocalDate().isAfter(dueDate)) {
+            throw new CustomException(ErrorCode.ORDER_SCHEDULE_EXCEEDS_DUE_DATE);
+        }
+    }
+
     private BigDecimal calculateEstimatedDurationHr(
             Integer orderQuantity,
             Integer capacityPerDay,
@@ -259,6 +325,27 @@ public class OrderService {
         } catch (NumberFormatException e) {
             return 0;
         }
+    }
+
+    private void validateDueDateRange(LocalDate dueDateFrom, LocalDate dueDateTo) {
+        if (dueDateFrom != null && dueDateTo != null && dueDateFrom.isAfter(dueDateTo)) {
+            throw new CustomException(ErrorCode.INVALID_ORDER_DATE);
+        }
+    }
+
+    private Pageable createPageable(int page, int size) {
+        int safePage = Math.max(page, DEFAULT_PAGE);
+        int safeSize = size <= 0 ? DEFAULT_SIZE : Math.min(size, MAX_SIZE);
+
+        return PageRequest.of(safePage, safeSize);
+    }
+
+    private String normalize(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+
+        return value.trim();
     }
 
     private record LineAssignment(

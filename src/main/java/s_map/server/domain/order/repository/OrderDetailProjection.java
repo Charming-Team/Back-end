@@ -2,6 +2,7 @@ package s_map.server.domain.order.repository;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 
 public interface OrderDetailProjection {
@@ -26,6 +27,7 @@ public interface OrderDetailProjection {
 
     String getOrderStatus();
 
+    Integer getPriorityRank();
     Integer getPlanSequence();
     OffsetDateTime getPlannedStartAt();
     OffsetDateTime getPlannedEndAt();
@@ -34,6 +36,6 @@ public interface OrderDetailProjection {
     String getLineNames();
     String getOperatorNames();
 
-    OffsetDateTime getCreatedAt();
-    OffsetDateTime getUpdatedAt();
+    LocalDateTime getCreatedAt();
+    LocalDateTime getUpdatedAt();
 }

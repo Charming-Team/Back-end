@@ -19,6 +19,7 @@ public enum ErrorCode {
     INVALID_INVENTORY_RELEASE_QUANTITY(HttpStatus.BAD_REQUEST, "400-104", "해제할 예약 수량은 현재 예약 재고보다 클 수 없습니다."),
     INVALID_ORDER_DATE(HttpStatus.BAD_REQUEST, "400-301", "주문 일정 조건이 올바르지 않습니다."),
     INVALID_ORDER_OPERATOR(HttpStatus.BAD_REQUEST, "400-302", "생산 담당자 정보가 올바르지 않습니다."),
+    ORDER_SCHEDULE_EXCEEDS_DUE_DATE(HttpStatus.BAD_REQUEST, "400-303", "생산계획 종료일은 납기일을 초과할 수 없습니다."),
 
     // 401 Unauthorized
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "401", "인증이 필요합니다."),
@@ -58,6 +59,7 @@ public enum ErrorCode {
     DUPLICATE_BOM(HttpStatus.CONFLICT, "409-102", "이미 등록된 제품-자재 BOM 정보입니다."),
     CONCURRENT_INVENTORY_UPDATE(HttpStatus.CONFLICT, "409-103", "재고 정보가 동시에 수정되었습니다. 다시 조회 후 시도해주세요."),
     USER_ALREADY_DELETED(HttpStatus.CONFLICT, "409-201", "이미 삭제된 사용자입니다."),
+    CONCURRENT_ORDER_CREATION(HttpStatus.CONFLICT, "409-301", "주문 또는 생산계획이 동시에 생성되었습니다. 다시 조회 후 시도해주세요."),
 
     // 500 Internal Server Error
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "500", "서버 내부 오류가 발생했습니다."),

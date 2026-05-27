@@ -1,11 +1,13 @@
 package s_map.server.domain.order.repository;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import s_map.server.domain.order.entity.CustomerOrder;
 
-import java.util.List;
+import java.time.LocalDate;
 import java.util.Optional;
 
 public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Long> {
@@ -25,11 +27,43 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
                     FROM customer_orders co
                     JOIN products p
                         ON p.product_id = co.product_id
+                    WHERE (:keyword IS NULL
+                           OR LOWER(co.order_no) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                           OR LOWER(co.customer_name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                           OR LOWER(p.product_name) LIKE LOWER(CONCAT('%', :keyword, '%')))
+                      AND (:status IS NULL OR CAST(co.order_status AS varchar) = :status)
+                      AND (:customerName IS NULL OR co.customer_name = :customerName)
+                      AND (:productId IS NULL OR co.product_id = :productId)
+                      AND (:dueDateFrom IS NULL OR co.due_date >= :dueDateFrom)
+                      AND (:dueDateTo IS NULL OR co.due_date <= :dueDateTo)
                     ORDER BY co.order_id DESC
+                    """,
+            countQuery = """
+                    SELECT COUNT(*)
+                    FROM customer_orders co
+                    JOIN products p
+                        ON p.product_id = co.product_id
+                    WHERE (:keyword IS NULL
+                           OR LOWER(co.order_no) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                           OR LOWER(co.customer_name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                           OR LOWER(p.product_name) LIKE LOWER(CONCAT('%', :keyword, '%')))
+                      AND (:status IS NULL OR CAST(co.order_status AS varchar) = :status)
+                      AND (:customerName IS NULL OR co.customer_name = :customerName)
+                      AND (:productId IS NULL OR co.product_id = :productId)
+                      AND (:dueDateFrom IS NULL OR co.due_date >= :dueDateFrom)
+                      AND (:dueDateTo IS NULL OR co.due_date <= :dueDateTo)
                     """,
             nativeQuery = true
     )
-    List<OrderSummaryProjection> findAllOrderSummaries();
+    Page<OrderSummaryProjection> findOrderSummaries(
+            @Param("keyword") String keyword,
+            @Param("status") String status,
+            @Param("customerName") String customerName,
+            @Param("productId") Long productId,
+            @Param("dueDateFrom") LocalDate dueDateFrom,
+            @Param("dueDateTo") LocalDate dueDateTo,
+            Pageable pageable
+    );
 
     @Query(
             value = """
@@ -49,6 +83,21 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
                         co.contract_amount AS "contractAmount",
                         co.late_penalty_amount AS "latePenaltyAmount",
                         CAST(co.order_status AS varchar) AS "orderStatus",
+                        CASE
+                            WHEN CAST(co.order_status AS varchar) IN ('COMPLETED', 'CANCELLED') THEN NULL
+                            ELSE (
+                                SELECT COUNT(*) + 1
+                                FROM customer_orders priority_co
+                                WHERE CAST(priority_co.order_status AS varchar) NOT IN ('COMPLETED', 'CANCELLED')
+                                  AND (
+                                        priority_co.due_date < co.due_date
+                                        OR (
+                                            priority_co.due_date = co.due_date
+                                            AND priority_co.order_id < co.order_id
+                                        )
+                                      )
+                            )
+                        END AS "priorityRank",
                         MIN(pp.plan_sequence) AS "planSequence",
                         MIN(pp.planned_start_at) AS "plannedStartAt",
                         MAX(pp.planned_end_at) AS "plannedEndAt",
@@ -62,6 +111,7 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
                         ON p.product_id = co.product_id
                     LEFT JOIN production_plans pp
                         ON pp.order_id = co.order_id
+                       AND CAST(pp.plan_status AS varchar) <> 'CANCELLED'
                     LEFT JOIN production_lines pl
                         ON pl.line_id = pp.line_id
                     LEFT JOIN users u
@@ -130,7 +180,8 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
                         SELECT 1
                         FROM users u
                         WHERE u.id = :operatorId
-                          AND u.status = CAST('ACTIVE' AS user_status_enum)
+                          AND u.status = 'ACTIVE'
+                          AND u.role = 'OPERATOR'
                     )
                     """,
             nativeQuery = true
@@ -142,7 +193,8 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
                     SELECT u.id
                     FROM users u
                     WHERE u.name = :operatorName
-                      AND u.status = CAST('ACTIVE' AS user_status_enum)
+                      AND u.status = 'ACTIVE'
+                      AND u.role = 'OPERATOR'
                     ORDER BY u.id ASC
                     LIMIT 1
                     """,
