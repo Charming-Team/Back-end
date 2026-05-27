@@ -7,13 +7,13 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 import s_map.server.global.common.BaseEntity;
 
 import java.math.BigDecimal;
@@ -21,7 +21,19 @@ import java.time.OffsetDateTime;
 
 @Getter
 @Entity
-@Table(name = "production_plans")
+@Table(
+        name = "production_plans",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_production_plans_line_sequence",
+                        columnNames = {"line_id", "plan_sequence"}
+                )
+        },
+        indexes = {
+                @Index(name = "idx_production_plans_line_status_end", columnList = "line_id, plan_status, planned_end_at"),
+                @Index(name = "idx_production_plans_order_id", columnList = "order_id")
+        }
+)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ProductionPlan extends BaseEntity {
 
@@ -58,8 +70,7 @@ public class ProductionPlan extends BaseEntity {
     private Integer planSequence;
 
     @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
-    @Column(name = "plan_status", nullable = false, columnDefinition = "plan_status_enum")
+    @Column(name = "plan_status", nullable = false, length = 30)
     private PlanStatus planStatus;
 
     @Builder

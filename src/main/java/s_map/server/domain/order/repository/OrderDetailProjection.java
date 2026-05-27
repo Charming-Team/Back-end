@@ -26,6 +26,7 @@ public interface OrderDetailProjection {
 
     String getOrderStatus();
 
+    Integer getPriorityRank();
     Integer getPlanSequence();
     Instant getPlannedStartAt();
     Instant getPlannedEndAt();

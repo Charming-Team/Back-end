@@ -7,13 +7,13 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 import s_map.server.global.common.BaseEntity;
 
 import java.math.BigDecimal;
@@ -21,7 +21,17 @@ import java.time.LocalDate;
 
 @Getter
 @Entity
-@Table(name = "customer_orders")
+@Table(
+        name = "customer_orders",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_customer_orders_order_no", columnNames = "order_no")
+        },
+        indexes = {
+                @Index(name = "idx_customer_orders_due_status", columnList = "due_date, order_status"),
+                @Index(name = "idx_customer_orders_product_id", columnList = "product_id"),
+                @Index(name = "idx_customer_orders_customer_name", columnList = "customer_name")
+        }
+)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class CustomerOrder extends BaseEntity {
 
@@ -30,7 +40,7 @@ public class CustomerOrder extends BaseEntity {
     @Column(name = "order_id")
     private Long orderId;
 
-    @Column(name = "order_no", nullable = false, unique = true, length = 50)
+    @Column(name = "order_no", nullable = false, length = 50)
     private String orderNo;
 
     @Column(name = "product_id", nullable = false)
@@ -58,8 +68,7 @@ public class CustomerOrder extends BaseEntity {
     private BigDecimal latePenaltyAmount;
 
     @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
-    @Column(name = "order_status", nullable = false, columnDefinition = "order_status_enum")
+    @Column(name = "order_status", nullable = false, length = 30)
     private OrderStatus orderStatus;
 
     @Builder
