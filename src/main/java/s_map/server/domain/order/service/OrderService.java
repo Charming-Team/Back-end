@@ -100,7 +100,7 @@ public class OrderService {
     }
 
     public OrderNoPreviewResponse getNextOrderNoPreview() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(DEFAULT_PRODUCTION_ZONE);
         int latestPersistedSequence = findLatestPersistedOrderNoSequence(today);
         int latestIssuedSequence = orderNoSequenceRepository.findLastSequence(today)
                 .orElse(0);
@@ -146,6 +146,7 @@ public class OrderService {
                 request.orderQuantity(),
                 request.customerName().trim(),
                 request.customerContactName().trim(),
+                LocalDate.now(DEFAULT_PRODUCTION_ZONE),
                 request.dueDate(),
                 request.contractAmount(),
                 request.latePenaltyAmount()
@@ -176,9 +177,14 @@ public class OrderService {
     }
 
     private void validateOrderCreateRequest(OrderCreateRequest request, OffsetDateTime desiredStartAt) {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(DEFAULT_PRODUCTION_ZONE);
 
         if (request.dueDate().isBefore(today)) {
+            throw new CustomException(ErrorCode.INVALID_ORDER_DATE);
+        }
+
+        if (request.desiredStartAt() != null
+                && desiredStartAt.isBefore(OffsetDateTime.now(DEFAULT_PRODUCTION_ZONE))) {
             throw new CustomException(ErrorCode.INVALID_ORDER_DATE);
         }
 
@@ -350,7 +356,7 @@ public class OrderService {
     }
 
     private String generateOrderNo() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(DEFAULT_PRODUCTION_ZONE);
         int initialSequence = findLatestPersistedOrderNoSequence(today) + 1;
         int nextSequence = orderNoSequenceRepository.nextSequence(today, initialSequence);
 

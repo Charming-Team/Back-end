@@ -30,6 +30,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -48,6 +49,7 @@ import static org.mockito.Mockito.when;
 class OrderServiceTest {
 
     private static final DateTimeFormatter ORDER_NO_DATE_FORMATTER = DateTimeFormatter.ofPattern("yyMMdd");
+    private static final ZoneId DEFAULT_PRODUCTION_ZONE = ZoneId.of("Asia/Seoul");
 
     @Mock
     private CustomerOrderRepository customerOrderRepository;
@@ -108,7 +110,7 @@ class OrderServiceTest {
         ProductionPlan savedPlan = planCaptor.getValue();
 
         assertThat(savedOrder.getOrderNo())
-                .isEqualTo("PO-" + LocalDate.now().format(ORDER_NO_DATE_FORMATTER) + "-007");
+                .isEqualTo("PO-" + LocalDate.now(DEFAULT_PRODUCTION_ZONE).format(ORDER_NO_DATE_FORMATTER) + "-007");
         assertThat(savedOrder.getCustomerName()).isEqualTo("A사");
         assertThat(savedOrder.getOrderQuantity()).isEqualTo(1000);
         assertThat(savedPlan.getOrderId()).isEqualTo(101L);
@@ -158,6 +160,23 @@ class OrderServiceTest {
                 .extracting(exception -> ((CustomException) exception).getErrorCode())
                 .isEqualTo(ErrorCode.OPERATOR_NOT_FOUND);
 
+        verify(productionPlanRepository, never()).lockAssignableLineIds(any());
+        verify(customerOrderRepository, never()).saveAndFlush(any(CustomerOrder.class));
+        verify(productionPlanRepository, never()).saveAndFlush(any(ProductionPlan.class));
+    }
+
+    @Test
+    @DisplayName("희망 생산 시작일시가 과거이면 주문 등록을 거절한다")
+    void createOrderFailsWhenDesiredStartAtIsPast() {
+        OffsetDateTime desiredStartAt = OffsetDateTime.now(ZoneOffset.UTC).minusHours(1);
+        OrderCreateRequest request = createRequest(LocalDate.now(DEFAULT_PRODUCTION_ZONE).plusDays(5), desiredStartAt, 3L);
+
+        assertThatThrownBy(() -> orderService.createOrder(request))
+                .isInstanceOf(CustomException.class)
+                .extracting(exception -> ((CustomException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_ORDER_DATE);
+
+        verify(productQueryRepository, never()).findProductNameById(any());
         verify(productionPlanRepository, never()).lockAssignableLineIds(any());
         verify(customerOrderRepository, never()).saveAndFlush(any(CustomerOrder.class));
         verify(productionPlanRepository, never()).saveAndFlush(any(ProductionPlan.class));
@@ -293,7 +312,7 @@ class OrderServiceTest {
 
             @Override
             public LocalDate getDueDate() {
-                return LocalDate.now().plusDays(7);
+                return LocalDate.now(DEFAULT_PRODUCTION_ZONE).plusDays(7);
             }
 
             @Override

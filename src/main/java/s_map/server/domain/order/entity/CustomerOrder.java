@@ -104,6 +104,7 @@ public class CustomerOrder extends BaseEntity {
             Integer orderQuantity,
             String customerName,
             String customerContactName,
+            LocalDate orderDate,
             LocalDate dueDate,
             BigDecimal contractAmount,
             BigDecimal latePenaltyAmount
@@ -114,7 +115,7 @@ public class CustomerOrder extends BaseEntity {
                 .orderQuantity(orderQuantity)
                 .customerName(customerName)
                 .customerContactName(customerContactName)
-                .orderDate(LocalDate.now())
+                .orderDate(orderDate)
                 .dueDate(dueDate)
                 .contractAmount(contractAmount)
                 .latePenaltyAmount(latePenaltyAmount)
