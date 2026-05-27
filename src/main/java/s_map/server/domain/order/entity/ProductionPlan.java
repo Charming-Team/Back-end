@@ -14,6 +14,7 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.ColumnTransformer;
 import s_map.server.global.common.BaseEntity;
 
 import java.math.BigDecimal;
@@ -70,7 +71,8 @@ public class ProductionPlan extends BaseEntity {
     private Integer planSequence;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "plan_status", nullable = false, length = 30)
+    @ColumnTransformer(write = "?::plan_status_enum")
+    @Column(name = "plan_status", nullable = false, columnDefinition = "plan_status_enum")
     private PlanStatus planStatus;
 
     @Builder

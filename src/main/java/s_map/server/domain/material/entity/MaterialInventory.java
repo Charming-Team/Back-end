@@ -19,7 +19,8 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import s_map.server.global.common.BaseEntity;
+import org.hibernate.annotations.ColumnTransformer;
+import s_map.server.global.common.LastModifiedEntity;
 import s_map.server.global.error.CustomException;
 import s_map.server.global.error.ErrorCode;
 
@@ -32,7 +33,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "material_inventories")
-public class MaterialInventory extends BaseEntity {
+public class MaterialInventory extends LastModifiedEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -62,7 +63,8 @@ public class MaterialInventory extends BaseEntity {
     private BigDecimal expectedInboundQuantity;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "inventory_status", nullable = false, length = 30)
+    @ColumnTransformer(write = "?::inventory_status_enum")
+    @Column(name = "inventory_status", nullable = false, columnDefinition = "inventory_status_enum")
     private InventoryStatus inventoryStatus;
 
     @Version
