@@ -14,6 +14,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import s_map.server.global.security.AuthUser;
 
 import java.util.List;
 
@@ -47,9 +49,10 @@ public class BomController {
     })
     @PostMapping
     public BaseResponse<BomResponse> createBom(
+            @AuthenticationPrincipal AuthUser authUser,
             @Valid @RequestBody BomCreateRequest request
     ) {
-        return BaseResponse.success(bomService.createBom(request));
+        return BaseResponse.success(bomService.createBom(request, authUser));
     }
 
     @Operation(
@@ -101,10 +104,11 @@ public class BomController {
     })
     @PutMapping("/{bomId}")
     public BaseResponse<BomResponse> updateBom(
+            @AuthenticationPrincipal AuthUser authUser,
             @Parameter(description = "BOM ID", example = "1")
             @PathVariable Long bomId,
             @Valid @RequestBody BomUpdateRequest request
     ) {
-        return BaseResponse.success(bomService.updateBom(bomId, request));
+        return BaseResponse.success(bomService.updateBom(bomId, request, authUser));
     }
 }

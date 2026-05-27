@@ -19,6 +19,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.data.domain.Page;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -27,6 +28,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import s_map.server.global.security.AuthUser;
 
 import java.util.List;
 
@@ -51,9 +53,10 @@ public class MaterialController {
     })
     @PostMapping
     public BaseResponse<MaterialDetailResponse> createMaterial(
+            @AuthenticationPrincipal AuthUser authUser,
             @Valid @RequestBody MaterialCreateRequest request
     ) {
-        return BaseResponse.success(materialService.createMaterial(request));
+        return BaseResponse.success(materialService.createMaterial(request, authUser));
     }
 
     @Operation(
@@ -120,11 +123,12 @@ public class MaterialController {
     })
     @PutMapping("/{materialId}")
     public BaseResponse<MaterialDetailResponse> updateMaterial(
+            @AuthenticationPrincipal AuthUser authUser,
             @Parameter(description = "자재 ID", example = "1")
             @PathVariable Long materialId,
             @Valid @RequestBody MaterialUpdateRequest request
     ) {
-        return BaseResponse.success(materialService.updateMaterial(materialId, request));
+        return BaseResponse.success(materialService.updateMaterial(materialId, request, authUser));
     }
 
     @Operation(
@@ -163,10 +167,11 @@ public class MaterialController {
     })
     @PutMapping("/{materialId}/inventory")
     public BaseResponse<MaterialDetailResponse> updateMaterialInventory(
+            @AuthenticationPrincipal AuthUser authUser,
             @Parameter(description = "자재 ID", example = "1")
             @PathVariable Long materialId,
             @Valid @RequestBody MaterialInventoryUpdateRequest request
     ) {
-        return BaseResponse.success(materialService.updateMaterialInventory(materialId, request));
+        return BaseResponse.success(materialService.updateMaterialInventory(materialId, request, authUser));
     }
 }

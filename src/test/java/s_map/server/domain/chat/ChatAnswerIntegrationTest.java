@@ -46,6 +46,7 @@ class ChatAnswerIntegrationTest {
 
     private static final String PASSWORD = "password1234!";
     private static final String INTERNAL_TOKEN = "test-chat-answer-token";
+    private static final ObjectMapper FAST_API_OBJECT_MAPPER = new ObjectMapper();
     private static final HttpServer FAST_API_SERVER = startFastApiServer();
     private static final AtomicReference<FastApiMode> fastApiMode = new AtomicReference<>(FastApiMode.SUCCESS);
     private static final List<CapturedRequest> capturedRequests = new CopyOnWriteArrayList<>();
@@ -145,6 +146,30 @@ class ChatAnswerIntegrationTest {
     }
 
     @Test
+    @DisplayName("토큰 발급 후 비활성화된 사용자는 챗봇 답변 API를 호출할 수 없다")
+    void answerBlocksInactiveUserBeforeCallingFastApi() throws Exception {
+        User user = saveUser(Role.MANUFACTURING_MANAGER, "inactive-manager@example.com");
+        String accessToken = loginAndGetAccessToken(user);
+        user.suspend();
+        userRepository.saveAndFlush(user);
+
+        mockMvc.perform(MockMvcRequestBuilders.post("/api/v1/chat/answer")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "question", "오늘 자재 부족 알려줘",
+                                "sessionId", 10,
+                                "messageId", 24
+                        ))))
+                .andExpect(MockMvcResultMatchers.status().isForbidden())
+                .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(false))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("403-002"))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.message").value("사용할 수 없는 계정입니다."));
+
+        Assertions.assertTrue(capturedRequests.isEmpty());
+    }
+
+    @Test
     @DisplayName("FastAPI의 BLOCKED_UNAUTHORIZED 응답은 HTTP 실패가 아니라 정상 챗봇 응답으로 내려간다")
     void blockedUnauthorizedSecurityResultIsSuccessfulChatResponse() throws Exception {
         fastApiMode.set(FastApiMode.BLOCKED);
@@ -219,6 +244,27 @@ class ChatAnswerIntegrationTest {
                 .andExpect(MockMvcResultMatchers.jsonPath("$.message").value(expectedMessage));
     }
 
+    @Test
+    @DisplayName("FastAPI 응답 추적 ID가 요청과 다르면 잘못된 챗봇 응답으로 처리한다")
+    void mismatchedFastApiTrackingIdsReturnInvalidResponse() throws Exception {
+        fastApiMode.set(FastApiMode.MISMATCHED_TRACKING_ID);
+        User user = saveUser(Role.MANUFACTURING_MANAGER, "mismatch-manager@example.com");
+        String accessToken = loginAndGetAccessToken(user);
+
+        mockMvc.perform(MockMvcRequestBuilders.post("/api/v1/chat/answer")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "question", "라인 병목 알려줘",
+                                "sessionId", 7,
+                                "messageId", 8
+                        ))))
+                .andExpect(MockMvcResultMatchers.status().isBadGateway())
+                .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(false))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("CHAT_FASTAPI_007"))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.message").value("챗봇 서버 응답을 처리할 수 없습니다."));
+    }
+
     private static HttpServer startFastApiServer() {
         try {
             HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
@@ -234,7 +280,7 @@ class ChatAnswerIntegrationTest {
 
                 if (fastApiMode.get() == FastApiMode.TIMEOUT) {
                     sleepPastClientTimeout();
-                    writeResponse(exchange, 200, successResponse());
+                    writeResponse(exchange, 200, successResponse(body));
                     return;
                 }
                 if (fastApiMode.get() == FastApiMode.HTTP_400) {
@@ -254,10 +300,15 @@ class ChatAnswerIntegrationTest {
                     return;
                 }
                 if (fastApiMode.get() == FastApiMode.BLOCKED) {
-                    writeResponse(exchange, 200, blockedResponse());
+                    writeResponse(exchange, 200, blockedResponse(body));
                     return;
                 }
-                writeResponse(exchange, 200, successResponse());
+                if (fastApiMode.get() == FastApiMode.MISMATCHED_TRACKING_ID) {
+                    CapturedIds ids = capturedIds(body);
+                    writeResponse(exchange, 200, successResponse(ids.sessionId() + 1, ids.messageId() + 1));
+                    return;
+                }
+                writeResponse(exchange, 200, successResponse(body));
             });
             server.setExecutor(Executors.newCachedThreadPool());
             server.start();
@@ -287,11 +338,19 @@ class ChatAnswerIntegrationTest {
         }
     }
 
-    private static String successResponse() {
+    private static String successResponse(String requestBody) throws IOException {
+        CapturedIds ids = capturedIds(requestBody);
+        return successResponse(ids.sessionId(), ids.messageId());
+    }
+
+    private static String successResponse(
+            long sessionId,
+            long messageId
+    ) {
         return """
                 {
-                  "sessionId": 1,
-                  "messageId": 1,
+                  "sessionId": %d,
+                  "messageId": %d,
                   "intent": "LINE_BOTTLENECK",
                   "answer": "LINE-ABS-01 병목은 검사 공정 대기시간 증가가 주된 원인입니다.",
                   "basisTime": "2026-05-24T15:30:00+09:00",
@@ -337,14 +396,15 @@ class ChatAnswerIntegrationTest {
                     "llmGenerationSkippedReason": null
                   }
                 }
-                """;
+                """.formatted(sessionId, messageId);
     }
 
-    private static String blockedResponse() {
+    private static String blockedResponse(String requestBody) throws IOException {
+        CapturedIds ids = capturedIds(requestBody);
         return """
                 {
-                  "sessionId": 2,
-                  "messageId": 3,
+                  "sessionId": %d,
+                  "messageId": %d,
                   "intent": "FINANCIAL_QUERY",
                   "answer": "요청하신 정보는 현재 권한으로 조회할 수 없습니다.",
                   "basisTime": "2026-05-24T15:30:00+09:00",
@@ -368,7 +428,19 @@ class ChatAnswerIntegrationTest {
                     "llmGenerationSkippedReason": "SECURITY_BLOCKED"
                   }
                 }
-                """;
+                """.formatted(ids.sessionId(), ids.messageId());
+    }
+
+    private static CapturedIds capturedIds(String requestBody) throws IOException {
+        Map<String, Object> body = FAST_API_OBJECT_MAPPER.readValue(
+                requestBody,
+                new TypeReference<>() {
+                }
+        );
+        return new CapturedIds(
+                ((Number) body.get("sessionId")).longValue(),
+                ((Number) body.get("messageId")).longValue()
+        );
     }
 
     private User saveUser(Role role, String email) {
@@ -436,7 +508,14 @@ class ChatAnswerIntegrationTest {
         HTTP_400,
         HTTP_403,
         HTTP_503,
-        HTTP_500
+        HTTP_500,
+        MISMATCHED_TRACKING_ID
+    }
+
+    record CapturedIds(
+            long sessionId,
+            long messageId
+    ) {
     }
 
     record CapturedRequest(

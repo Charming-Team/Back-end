@@ -6,6 +6,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import s_map.server.domain.chat.dto.req.EvidenceLookupRequest;
@@ -13,6 +14,7 @@ import s_map.server.domain.chat.dto.res.EvidenceItemResponse;
 import s_map.server.domain.chat.dto.res.EvidenceLookupResponse;
 
 @Service
+@Slf4j
 @Transactional(readOnly = true)
 public class ChatEvidenceService {
 
@@ -45,11 +47,41 @@ public class ChatEvidenceService {
     public EvidenceLookupResponse lookup(EvidenceLookupRequest request) {
         String intent = normalizeIntent(request.intent());
         EvidenceProvider evidenceProvider = evidenceProviders.get(intent);
+        log.info(
+                "[ChatEvidenceService] Evidence 조회 요청 intent={}, sessionId={}, messageId={}, userId={}, role={}",
+                intent,
+                request.sessionId(),
+                request.messageId(),
+                request.user().userId(),
+                request.user().role()
+        );
+
         List<EvidenceItemResponse> items = evidenceProvider == null
-                ? List.of()
+                ? handleUnsupportedIntent(intent, request)
                 : evidenceProvider.getEvidence(request);
 
+        log.info(
+                "[ChatEvidenceService] Evidence 조회 완료 intent={}, sessionId={}, messageId={}, itemCount={}",
+                intent,
+                request.sessionId(),
+                request.messageId(),
+                items.size()
+        );
         return new EvidenceLookupResponse(intent, OffsetDateTime.now(), items);
+    }
+
+    private List<EvidenceItemResponse> handleUnsupportedIntent(
+            String intent,
+            EvidenceLookupRequest request
+    ) {
+        log.warn(
+                "[ChatEvidenceService] Evidence 조회 스킵 reason=unsupported_intent intent={}, sessionId={}, messageId={}, userId={}",
+                intent,
+                request.sessionId(),
+                request.messageId(),
+                request.user().userId()
+        );
+        return List.of();
     }
 
     private String normalizeIntent(String intent) {
