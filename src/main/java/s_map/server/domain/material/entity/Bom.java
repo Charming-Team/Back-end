@@ -16,7 +16,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import s_map.server.global.common.BaseEntity;
+import s_map.server.global.common.LastModifiedEntity;
 
 import java.math.BigDecimal;
 
@@ -34,7 +34,7 @@ import java.math.BigDecimal;
                 )
         }
 )
-public class Bom extends BaseEntity {
+public class Bom extends LastModifiedEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
