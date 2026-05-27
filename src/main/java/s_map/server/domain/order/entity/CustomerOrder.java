@@ -14,8 +14,6 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 import s_map.server.global.common.BaseEntity;
 
 import java.math.BigDecimal;
@@ -70,8 +68,7 @@ public class CustomerOrder extends BaseEntity {
     private BigDecimal latePenaltyAmount;
 
     @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
-    @Column(name = "order_status", nullable = false, columnDefinition = "order_status_enum")
+    @Column(name = "order_status", nullable = false, length = 30)
     private OrderStatus orderStatus;
 
     @Builder

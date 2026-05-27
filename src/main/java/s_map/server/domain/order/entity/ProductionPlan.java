@@ -14,8 +14,6 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 import s_map.server.global.common.BaseEntity;
 
 import java.math.BigDecimal;
@@ -72,8 +70,7 @@ public class ProductionPlan extends BaseEntity {
     private Integer planSequence;
 
     @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
-    @Column(name = "plan_status", nullable = false, columnDefinition = "plan_status_enum")
+    @Column(name = "plan_status", nullable = false, length = 30)
     private PlanStatus planStatus;
 
     @Builder

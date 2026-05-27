@@ -16,6 +16,7 @@ import s_map.server.domain.order.entity.OrderStatus;
 import s_map.server.domain.order.entity.ProductionPlan;
 import s_map.server.domain.order.repository.CustomerOrderRepository;
 import s_map.server.domain.order.repository.LineAssignmentCandidateProjection;
+import s_map.server.domain.order.repository.OrderNoSequenceRepository;
 import s_map.server.domain.order.repository.ProductionPlanRepository;
 import s_map.server.global.error.CustomException;
 import s_map.server.global.error.ErrorCode;
@@ -43,6 +44,7 @@ public class OrderService {
 
     private final CustomerOrderRepository customerOrderRepository;
     private final ProductionPlanRepository productionPlanRepository;
+    private final OrderNoSequenceRepository orderNoSequenceRepository;
 
     public Page<OrderListResponse> getOrders(
             int page,
@@ -304,27 +306,11 @@ public class OrderService {
     }
 
     private String generateOrderNo() {
-        String prefix = "PO-" + LocalDate.now().format(ORDER_NO_DATE_FORMATTER) + "-";
-
-        int nextSequence = customerOrderRepository.findLatestOrderNoByPrefix(prefix)
-                .map(this::extractOrderNoSequence)
-                .orElse(0) + 1;
+        LocalDate today = LocalDate.now();
+        String prefix = "PO-" + today.format(ORDER_NO_DATE_FORMATTER) + "-";
+        int nextSequence = orderNoSequenceRepository.nextSequence(today);
 
         return prefix + String.format("%03d", nextSequence);
-    }
-
-    private int extractOrderNoSequence(String orderNo) {
-        int lastDashIndex = orderNo.lastIndexOf('-');
-
-        if (lastDashIndex < 0 || lastDashIndex == orderNo.length() - 1) {
-            return 0;
-        }
-
-        try {
-            return Integer.parseInt(orderNo.substring(lastDashIndex + 1));
-        } catch (NumberFormatException e) {
-            return 0;
-        }
     }
 
     private void validateDueDateRange(LocalDate dueDateFrom, LocalDate dueDateTo) {

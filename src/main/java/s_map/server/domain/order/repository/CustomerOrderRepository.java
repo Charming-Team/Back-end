@@ -142,18 +142,6 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
 
     @Query(
             value = """
-                    SELECT co.order_no
-                    FROM customer_orders co
-                    WHERE co.order_no LIKE CONCAT(:prefix, '%')
-                    ORDER BY co.order_no DESC
-                    LIMIT 1
-                    """,
-            nativeQuery = true
-    )
-    Optional<String> findLatestOrderNoByPrefix(@Param("prefix") String prefix);
-
-    @Query(
-            value = """
                     SELECT EXISTS (
                         SELECT 1
                         FROM products p
