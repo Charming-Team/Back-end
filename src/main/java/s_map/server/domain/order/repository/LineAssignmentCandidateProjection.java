@@ -1,7 +1,7 @@
 package s_map.server.domain.order.repository;
 
 import java.math.BigDecimal;
-import java.time.OffsetDateTime;
+import java.time.Instant;
 
 public interface LineAssignmentCandidateProjection {
     Long getLineId();
@@ -9,6 +9,6 @@ public interface LineAssignmentCandidateProjection {
     Integer getCapacityPerDay();
     BigDecimal getStandardProductionTimeHr();
     Integer getPriorityRank();
-    OffsetDateTime getLastPlannedEndAt();
+    Instant getLastPlannedEndAt();
     Integer getLastPlanSequence();
 }

@@ -33,6 +33,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.lang.reflect.Method;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
@@ -245,7 +246,7 @@ public class OrderService {
     ) {
         OffsetDateTime plannedStartAt = resolvePlannedStartAt(
                 desiredStartAt,
-                candidate.getLastPlannedEndAt()
+                toOffsetDateTime(candidate.getLastPlannedEndAt())
         );
 
         BigDecimal estimatedDurationHr = calculateEstimatedDurationHr(
@@ -269,6 +270,14 @@ public class OrderService {
                 estimatedDurationHr,
                 lastSequence + 1
         );
+    }
+
+    private OffsetDateTime toOffsetDateTime(Instant instant) {
+        if (instant == null) {
+            return null;
+        }
+
+        return instant.atZone(DEFAULT_PRODUCTION_ZONE).toOffsetDateTime();
     }
 
     private OffsetDateTime resolvePlannedStartAt(
