@@ -1,9 +1,8 @@
 package s_map.server.domain.order.repository;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
 
 public interface OrderDetailProjection {
     Long getOrderId();
@@ -29,13 +28,13 @@ public interface OrderDetailProjection {
 
     Integer getPriorityRank();
     Integer getPlanSequence();
-    OffsetDateTime getPlannedStartAt();
-    OffsetDateTime getPlannedEndAt();
+    Instant getPlannedStartAt();
+    Instant getPlannedEndAt();
     BigDecimal getEstimatedDurationHr();
 
     String getLineNames();
     String getOperatorNames();
 
-    LocalDateTime getCreatedAt();
-    LocalDateTime getUpdatedAt();
+    Instant getCreatedAt();
+    Instant getUpdatedAt();
 }
