@@ -57,6 +57,7 @@ public class OrderService {
     private final ProductionPlanRepository productionPlanRepository;
     private final OrderNoSequenceRepository orderNoSequenceRepository;
 
+    @Transactional
     public Page<OrderListResponse> getOrders(
             int page,
             int size,
@@ -68,6 +69,7 @@ public class OrderService {
             LocalDate dueDateTo
     ) {
         validateDueDateRange(dueDateFrom, dueDateTo);
+        refreshOrderStatusSnapshot();
 
         Pageable pageable = createPageable(page, size);
 
@@ -83,7 +85,10 @@ public class OrderService {
                 .map(OrderListResponse::from);
     }
 
+    @Transactional
     public OrderDetailResponse getOrder(Long orderId) {
+        refreshOrderStatusSnapshot();
+
         return customerOrderRepository.findOrderDetail(orderId)
                 .map(OrderDetailResponse::from)
                 .orElseThrow(() -> new CustomException(ErrorCode.ORDER_NOT_FOUND));
@@ -187,6 +192,11 @@ public class OrderService {
         if (!hasOperatorId && !hasOperatorName) {
             throw new CustomException(ErrorCode.INVALID_ORDER_OPERATOR);
         }
+    }
+
+    private void refreshOrderStatusSnapshot() {
+        productionPlanRepository.refreshActivePlanStatuses();
+        customerOrderRepository.refreshActiveOrderStatuses();
     }
 
     private Long resolveOperatorId(OrderCreateRequest request) {

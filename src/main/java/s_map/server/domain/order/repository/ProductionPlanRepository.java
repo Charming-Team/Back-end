@@ -1,6 +1,7 @@
 package s_map.server.domain.order.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import s_map.server.domain.order.entity.ProductionPlan;
@@ -8,6 +9,28 @@ import s_map.server.domain.order.entity.ProductionPlan;
 import java.util.List;
 
 public interface ProductionPlanRepository extends JpaRepository<ProductionPlan, Long> {
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(
+            value = """
+                    UPDATE production_plans pp
+                    SET
+                        plan_status = CASE
+                            WHEN pp.planned_end_at < CURRENT_TIMESTAMP THEN 'DELAYED'
+                            WHEN pp.planned_start_at <= CURRENT_TIMESTAMP THEN 'IN_PROGRESS'
+                            ELSE 'SCHEDULED'
+                        END,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE CAST(pp.plan_status AS varchar) NOT IN ('COMPLETED', 'CANCELLED')
+                      AND CAST(pp.plan_status AS varchar) <> CASE
+                            WHEN pp.planned_end_at < CURRENT_TIMESTAMP THEN 'DELAYED'
+                            WHEN pp.planned_start_at <= CURRENT_TIMESTAMP THEN 'IN_PROGRESS'
+                            ELSE 'SCHEDULED'
+                        END
+                    """,
+            nativeQuery = true
+    )
+    int refreshActivePlanStatuses();
 
     @Query(
             value = """

@@ -3,6 +3,7 @@ package s_map.server.domain.order.repository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import s_map.server.domain.order.entity.CustomerOrder;
@@ -11,6 +12,47 @@ import java.time.LocalDate;
 import java.util.Optional;
 
 public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Long> {
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(
+            value = """
+                    WITH next_statuses AS (
+                        SELECT
+                            co.order_id,
+                            CASE
+                                WHEN co.due_date < CURRENT_DATE THEN 'DELAYED'
+                                WHEN COALESCE(MAX(
+                                        CASE
+                                            WHEN CAST(pp.plan_status AS varchar) = 'DELAYED' THEN 1
+                                            ELSE 0
+                                        END
+                                     ), 0) = 1 THEN 'DELAYED'
+                                WHEN COALESCE(MAX(
+                                        CASE
+                                            WHEN CAST(pp.plan_status AS varchar) = 'IN_PROGRESS' THEN 1
+                                            ELSE 0
+                                        END
+                                     ), 0) = 1 THEN 'IN_PROGRESS'
+                                ELSE 'WAITING'
+                            END AS next_order_status
+                        FROM customer_orders co
+                        LEFT JOIN production_plans pp
+                            ON pp.order_id = co.order_id
+                           AND CAST(pp.plan_status AS varchar) <> 'CANCELLED'
+                        WHERE CAST(co.order_status AS varchar) NOT IN ('COMPLETED', 'CANCELLED')
+                        GROUP BY co.order_id, co.due_date
+                    )
+                    UPDATE customer_orders co
+                    SET
+                        order_status = ns.next_order_status,
+                        updated_at = CURRENT_TIMESTAMP
+                    FROM next_statuses ns
+                    WHERE co.order_id = ns.order_id
+                      AND CAST(co.order_status AS varchar) <> ns.next_order_status
+                    """,
+            nativeQuery = true
+    )
+    int refreshActiveOrderStatuses();
 
     @Query(
             value = """
