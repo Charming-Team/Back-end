@@ -12,6 +12,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
 import s_map.server.domain.order.dto.req.OrderCreateRequest;
 import s_map.server.domain.order.entity.CustomerOrder;
+import s_map.server.domain.order.entity.OrderStatus;
 import s_map.server.domain.order.entity.ProductionPlan;
 import s_map.server.domain.order.repository.CustomerOrderRepository;
 import s_map.server.domain.order.repository.LineAssignmentCandidateProjection;
@@ -39,6 +40,8 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -183,11 +186,63 @@ class OrderServiceTest {
     }
 
     @Test
-    @DisplayName("주문 목록 조회는 상태 갱신 UPDATE 없이 projection 쿼리로 조회한다")
-    void getOrdersQueriesProjectionWithoutStatusRefresh() {
+    @DisplayName("상태 필터가 없으면 경량 목록 쿼리와 단순 count 쿼리로 조회한다")
+    void getOrdersWithoutStatusUsesPagedStatusQueryAndSimpleCount() {
+        when(orderQueryRepository.findOrderSummariesWithoutStatusFilter(
+                eq(null),
+                eq(null),
+                eq(null),
+                eq(null),
+                eq(null),
+                eq(10),
+                eq(0L)
+        )).thenReturn(List.of(summaryProjection()));
+        when(orderQueryRepository.countOrderSummariesWithoutStatusFilter(
+                eq(null),
+                eq(null),
+                eq(null),
+                eq(null),
+                eq(null)
+        )).thenReturn(1L);
+
+        var response = orderService.getOrders(0, 10, null, null, null, null, null, null);
+
+        verify(orderQueryRepository).findOrderSummariesWithoutStatusFilter(
+                eq(null),
+                eq(null),
+                eq(null),
+                eq(null),
+                eq(null),
+                eq(10),
+                eq(0L)
+        );
+        verify(orderQueryRepository).countOrderSummariesWithoutStatusFilter(
+                eq(null),
+                eq(null),
+                eq(null),
+                eq(null),
+                eq(null)
+        );
+        verify(orderQueryRepository, never()).findOrderSummaries(
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(Pageable.class)
+        );
+        assertThat(response.getContent()).hasSize(1);
+        assertThat(response.getContent().getFirst().orderStatusLabel()).isEqualTo("진행 중");
+        assertThat(response.getTotalElements()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("상태 필터가 있으면 상태 계산 포함 목록 쿼리로 조회한다")
+    void getOrdersWithStatusUsesStatusFilterQuery() {
         when(orderQueryRepository.findOrderSummaries(
                 eq(null),
-                eq(null),
+                eq("IN_PROGRESS"),
                 eq(null),
                 eq(null),
                 eq(null),
@@ -195,16 +250,32 @@ class OrderServiceTest {
                 any(Pageable.class)
         )).thenReturn(new PageImpl<>(List.of(summaryProjection())));
 
-        var response = orderService.getOrders(0, 10, null, null, null, null, null, null);
+        var response = orderService.getOrders(0, 10, null, OrderStatus.IN_PROGRESS, null, null, null, null);
 
         verify(orderQueryRepository).findOrderSummaries(
                 eq(null),
-                eq(null),
+                eq("IN_PROGRESS"),
                 eq(null),
                 eq(null),
                 eq(null),
                 eq(null),
                 any(Pageable.class)
+        );
+        verify(orderQueryRepository, never()).findOrderSummariesWithoutStatusFilter(
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                anyInt(),
+                anyLong()
+        );
+        verify(orderQueryRepository, never()).countOrderSummariesWithoutStatusFilter(
+                any(),
+                any(),
+                any(),
+                any(),
+                any()
         );
         assertThat(response.getContent()).hasSize(1);
         assertThat(response.getContent().getFirst().orderStatusLabel()).isEqualTo("진행 중");

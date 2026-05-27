@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import s_map.server.domain.order.entity.CustomerOrder;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 public interface OrderQueryRepository extends Repository<CustomerOrder, Long> {
@@ -159,6 +160,127 @@ public interface OrderQueryRepository extends Repository<CustomerOrder, Long> {
             @Param("dueDateFrom") LocalDate dueDateFrom,
             @Param("dueDateTo") LocalDate dueDateTo,
             Pageable pageable
+    );
+
+    @Query(
+            value = """
+                    WITH filtered_orders AS (
+                        SELECT
+                            co.order_id,
+                            co.order_no,
+                            co.customer_name,
+                            co.product_id,
+                            p.product_code,
+                            p.product_name,
+                            co.order_quantity,
+                            co.due_date,
+                            CAST(co.order_status AS varchar) AS stored_order_status
+                        FROM customer_orders co
+                        JOIN products p
+                            ON p.product_id = co.product_id
+                        WHERE (:keyword IS NULL
+                               OR LOWER(co.order_no) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                               OR LOWER(co.customer_name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                               OR LOWER(p.product_name) LIKE LOWER(CONCAT('%', :keyword, '%')))
+                          AND (:customerName IS NULL OR co.customer_name = :customerName)
+                          AND (:productId IS NULL OR co.product_id = :productId)
+                          AND (:dueDateFrom IS NULL OR co.due_date >= :dueDateFrom)
+                          AND (:dueDateTo IS NULL OR co.due_date <= :dueDateTo)
+                    ),
+                    paged_orders AS (
+                        SELECT *
+                        FROM filtered_orders
+                        ORDER BY order_id DESC
+                        LIMIT :limit
+                        OFFSET :offset
+                    ),
+                    order_statuses AS (
+                        SELECT
+                            po.order_id,
+                            CASE
+                                WHEN po.stored_order_status IN ('COMPLETED', 'CANCELLED') THEN po.stored_order_status
+                                WHEN po.due_date < CURRENT_DATE THEN 'DELAYED'
+                                WHEN COALESCE(MAX(
+                                        CASE
+                                            WHEN pp.plan_id IS NOT NULL
+                                             AND CAST(pp.plan_status AS varchar) NOT IN ('COMPLETED', 'CANCELLED')
+                                             AND (
+                                                    CAST(pp.plan_status AS varchar) = 'DELAYED'
+                                                    OR pp.planned_end_at < CURRENT_TIMESTAMP
+                                                 )
+                                            THEN 1
+                                            ELSE 0
+                                        END
+                                     ), 0) = 1 THEN 'DELAYED'
+                                WHEN COALESCE(MAX(
+                                        CASE
+                                            WHEN pp.plan_id IS NOT NULL
+                                             AND CAST(pp.plan_status AS varchar) NOT IN ('COMPLETED', 'CANCELLED')
+                                             AND (
+                                                    CAST(pp.plan_status AS varchar) = 'IN_PROGRESS'
+                                                    OR pp.planned_start_at <= CURRENT_TIMESTAMP
+                                                 )
+                                            THEN 1
+                                            ELSE 0
+                                        END
+                                     ), 0) = 1 THEN 'IN_PROGRESS'
+                                ELSE 'WAITING'
+                            END AS order_status
+                        FROM paged_orders po
+                        LEFT JOIN production_plans pp
+                            ON pp.order_id = po.order_id
+                        GROUP BY po.order_id, po.stored_order_status, po.due_date
+                    )
+                    SELECT
+                        po.order_id AS "orderId",
+                        po.order_no AS "orderNo",
+                        po.customer_name AS "customerName",
+                        po.product_id AS "productId",
+                        po.product_code AS "productCode",
+                        po.product_name AS "productName",
+                        po.order_quantity AS "orderQuantity",
+                        po.due_date AS "dueDate",
+                        os.order_status AS "orderStatus"
+                    FROM paged_orders po
+                    JOIN order_statuses os
+                        ON os.order_id = po.order_id
+                    ORDER BY po.order_id DESC
+                    """,
+            nativeQuery = true
+    )
+    List<OrderSummaryProjection> findOrderSummariesWithoutStatusFilter(
+            @Param("keyword") String keyword,
+            @Param("customerName") String customerName,
+            @Param("productId") Long productId,
+            @Param("dueDateFrom") LocalDate dueDateFrom,
+            @Param("dueDateTo") LocalDate dueDateTo,
+            @Param("limit") int limit,
+            @Param("offset") long offset
+    );
+
+    @Query(
+            value = """
+                    SELECT COUNT(*)
+                    FROM customer_orders co
+                    JOIN products p
+                        ON p.product_id = co.product_id
+                    WHERE (:keyword IS NULL
+                           OR LOWER(co.order_no) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                           OR LOWER(co.customer_name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                           OR LOWER(p.product_name) LIKE LOWER(CONCAT('%', :keyword, '%')))
+                      AND (:customerName IS NULL OR co.customer_name = :customerName)
+                      AND (:productId IS NULL OR co.product_id = :productId)
+                      AND (:dueDateFrom IS NULL OR co.due_date >= :dueDateFrom)
+                      AND (:dueDateTo IS NULL OR co.due_date <= :dueDateTo)
+                    """,
+            nativeQuery = true
+    )
+    long countOrderSummariesWithoutStatusFilter(
+            @Param("keyword") String keyword,
+            @Param("customerName") String customerName,
+            @Param("productId") Long productId,
+            @Param("dueDateFrom") LocalDate dueDateFrom,
+            @Param("dueDateTo") LocalDate dueDateTo
     );
 
     @Query(

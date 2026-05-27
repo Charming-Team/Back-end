@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -80,11 +81,38 @@ public class OrderService {
         validateDueDateRange(dueDateFrom, dueDateTo);
 
         Pageable pageable = createPageable(page, size);
+        String normalizedKeyword = normalize(keyword);
+        String normalizedCustomerName = normalize(customerName);
+
+        if (status == null) {
+            List<OrderListResponse> content = orderQueryRepository.findOrderSummariesWithoutStatusFilter(
+                            normalizedKeyword,
+                            normalizedCustomerName,
+                            productId,
+                            dueDateFrom,
+                            dueDateTo,
+                            pageable.getPageSize(),
+                            pageable.getOffset()
+                    )
+                    .stream()
+                    .map(OrderListResponse::from)
+                    .toList();
+
+            long total = orderQueryRepository.countOrderSummariesWithoutStatusFilter(
+                    normalizedKeyword,
+                    normalizedCustomerName,
+                    productId,
+                    dueDateFrom,
+                    dueDateTo
+            );
+
+            return new PageImpl<>(content, pageable, total);
+        }
 
         return orderQueryRepository.findOrderSummaries(
-                        normalize(keyword),
-                        status != null ? status.name() : null,
-                        normalize(customerName),
+                        normalizedKeyword,
+                        status.name(),
+                        normalizedCustomerName,
                         productId,
                         dueDateFrom,
                         dueDateTo,
