@@ -17,6 +17,8 @@ public enum ErrorCode {
     INVALID_INVENTORY_OPERATION_QUANTITY(HttpStatus.BAD_REQUEST, "400-102", "재고 처리 수량은 0보다 커야 합니다."),
     INSUFFICIENT_AVAILABLE_INVENTORY(HttpStatus.BAD_REQUEST, "400-103", "예약 가능한 재고 수량이 부족합니다."),
     INVALID_INVENTORY_RELEASE_QUANTITY(HttpStatus.BAD_REQUEST, "400-104", "해제할 예약 수량은 현재 예약 재고보다 클 수 없습니다."),
+    INVALID_ORDER_DATE(HttpStatus.BAD_REQUEST, "400-301", "주문 일정 조건이 올바르지 않습니다."),
+    INVALID_ORDER_OPERATOR(HttpStatus.BAD_REQUEST, "400-302", "생산 담당자 정보가 올바르지 않습니다."),
 
     // 401 Unauthorized
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "401", "인증이 필요합니다."),
@@ -41,6 +43,10 @@ public enum ErrorCode {
     BOM_NOT_FOUND(HttpStatus.NOT_FOUND, "404-104", "BOM 정보를 찾을 수 없습니다."),
     PRODUCT_BOM_NOT_FOUND(HttpStatus.NOT_FOUND, "404-105", "해당 제품에 등록된 BOM 정보가 없습니다."),
     USER_DELETE_NOT_ALLOWED(HttpStatus.NOT_FOUND, "404-201", "삭제할 수 없는 사용자 정보입니다."),
+    ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "404-301", "주문 정보를 찾을 수 없습니다."),
+    PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "404-302", "제품 정보를 찾을 수 없습니다."),
+    OPERATOR_NOT_FOUND(HttpStatus.NOT_FOUND, "404-303", "생산 담당자 정보를 찾을 수 없습니다."),
+    AVAILABLE_PRODUCTION_LINE_NOT_FOUND(HttpStatus.NOT_FOUND, "404-304", "생산 가능한 라인을 찾을 수 없습니다."),
 
     // 405 Method Not Allowed
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "405", "지원하지 않는 HTTP 메서드입니다."),
