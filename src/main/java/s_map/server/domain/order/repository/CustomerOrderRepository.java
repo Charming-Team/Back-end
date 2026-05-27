@@ -1,0 +1,152 @@
+package s_map.server.domain.order.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import s_map.server.domain.order.entity.CustomerOrder;
+
+import java.util.List;
+import java.util.Optional;
+
+public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Long> {
+
+    @Query(
+            value = """
+                    SELECT
+                        co.order_id AS "orderId",
+                        co.order_no AS "orderNo",
+                        co.customer_name AS "customerName",
+                        co.product_id AS "productId",
+                        p.product_code AS "productCode",
+                        p.product_name AS "productName",
+                        co.order_quantity AS "orderQuantity",
+                        co.due_date AS "dueDate",
+                        CAST(co.order_status AS varchar) AS "orderStatus"
+                    FROM customer_orders co
+                    JOIN products p
+                        ON p.product_id = co.product_id
+                    ORDER BY co.order_id DESC
+                    """,
+            nativeQuery = true
+    )
+    List<OrderSummaryProjection> findAllOrderSummaries();
+
+    @Query(
+            value = """
+                    SELECT
+                        co.order_id AS "orderId",
+                        co.order_no AS "orderNo",
+                        co.product_id AS "productId",
+                        p.product_code AS "productCode",
+                        p.product_name AS "productName",
+                        p.product_category AS "productCategory",
+                        p.unit AS "productUnit",
+                        co.order_quantity AS "orderQuantity",
+                        co.customer_name AS "customerName",
+                        co.customer_contact_name AS "customerContactName",
+                        co.order_date AS "orderDate",
+                        co.due_date AS "dueDate",
+                        co.contract_amount AS "contractAmount",
+                        co.late_penalty_amount AS "latePenaltyAmount",
+                        CAST(co.order_status AS varchar) AS "orderStatus",
+                        MIN(pp.plan_sequence) AS "planSequence",
+                        MIN(pp.planned_start_at) AS "plannedStartAt",
+                        MAX(pp.planned_end_at) AS "plannedEndAt",
+                        SUM(pp.estimated_duration_hr) AS "estimatedDurationHr",
+                        STRING_AGG(DISTINCT pl.line_name, ', ') AS "lineNames",
+                        STRING_AGG(DISTINCT u.name, ', ') AS "operatorNames",
+                        co.created_at AS "createdAt",
+                        co.updated_at AS "updatedAt"
+                    FROM customer_orders co
+                    JOIN products p
+                        ON p.product_id = co.product_id
+                    LEFT JOIN production_plans pp
+                        ON pp.order_id = co.order_id
+                    LEFT JOIN production_lines pl
+                        ON pl.line_id = pp.line_id
+                    LEFT JOIN users u
+                        ON u.id = pp.operator_id
+                    WHERE co.order_id = :orderId
+                    GROUP BY
+                        co.order_id,
+                        co.order_no,
+                        co.product_id,
+                        p.product_code,
+                        p.product_name,
+                        p.product_category,
+                        p.unit,
+                        co.order_quantity,
+                        co.customer_name,
+                        co.customer_contact_name,
+                        co.order_date,
+                        co.due_date,
+                        co.contract_amount,
+                        co.late_penalty_amount,
+                        co.order_status,
+                        co.created_at,
+                        co.updated_at
+                    """,
+            nativeQuery = true
+    )
+    Optional<OrderDetailProjection> findOrderDetail(@Param("orderId") Long orderId);
+
+    @Query(
+            value = """
+                    SELECT co.order_no
+                    FROM customer_orders co
+                    WHERE co.order_no LIKE CONCAT(:prefix, '%')
+                    ORDER BY co.order_no DESC
+                    LIMIT 1
+                    """,
+            nativeQuery = true
+    )
+    Optional<String> findLatestOrderNoByPrefix(@Param("prefix") String prefix);
+
+    @Query(
+            value = """
+                    SELECT EXISTS (
+                        SELECT 1
+                        FROM products p
+                        WHERE p.product_id = :productId
+                    )
+                    """,
+            nativeQuery = true
+    )
+    boolean existsProductById(@Param("productId") Long productId);
+
+    @Query(
+            value = """
+                    SELECT p.product_name
+                    FROM products p
+                    WHERE p.product_id = :productId
+                    """,
+            nativeQuery = true
+    )
+    Optional<String> findProductNameById(@Param("productId") Long productId);
+
+    @Query(
+            value = """
+                    SELECT EXISTS (
+                        SELECT 1
+                        FROM users u
+                        WHERE u.id = :operatorId
+                          AND u.status = CAST('ACTIVE' AS user_status_enum)
+                    )
+                    """,
+            nativeQuery = true
+    )
+    boolean existsActiveOperatorById(@Param("operatorId") Long operatorId);
+
+    @Query(
+            value = """
+                    SELECT u.id
+                    FROM users u
+                    WHERE u.name = :operatorName
+                      AND u.status = CAST('ACTIVE' AS user_status_enum)
+                    ORDER BY u.id ASC
+                    LIMIT 1
+                    """,
+            nativeQuery = true
+    )
+    Optional<Long> findActiveOperatorIdByName(@Param("operatorName") String operatorName);
+}
