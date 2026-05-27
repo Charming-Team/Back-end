@@ -7,6 +7,8 @@ import s_map.server.domain.order.repository.OrderDetailProjection;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.Instant;
+import java.time.ZoneId;
 
 @Schema(description = "주문 상세 응답")
 public record OrderDetailResponse(
@@ -47,33 +49,41 @@ public record OrderDetailResponse(
         OffsetDateTime updatedAt
 ) {
     public static OrderDetailResponse from(OrderDetailProjection projection) {
-        OrderStatus status = OrderStatus.valueOf(projection.getOrderStatus());
+    OrderStatus status = OrderStatus.valueOf(projection.getOrderStatus());
 
-        return new OrderDetailResponse(
-                projection.getOrderId(),
-                projection.getOrderNo(),
-                projection.getProductId(),
-                projection.getProductCode(),
-                projection.getProductName(),
-                projection.getProductCategory(),
-                projection.getProductUnit(),
-                projection.getOrderQuantity(),
-                projection.getCustomerName(),
-                projection.getCustomerContactName(),
-                projection.getOrderDate(),
-                projection.getDueDate(),
-                projection.getContractAmount(),
-                projection.getLatePenaltyAmount(),
-                status,
-                status.getLabel(),
-                projection.getPlanSequence(),
-                projection.getPlannedStartAt(),
-                projection.getPlannedEndAt(),
-                projection.getEstimatedDurationHr(),
-                projection.getLineNames(),
-                projection.getOperatorNames(),
-                projection.getCreatedAt(),
-                projection.getUpdatedAt()
-        );
+    return new OrderDetailResponse(
+            projection.getOrderId(),
+            projection.getOrderNo(),
+            projection.getProductId(),
+            projection.getProductCode(),
+            projection.getProductName(),
+            projection.getProductCategory(),
+            projection.getProductUnit(),
+            projection.getOrderQuantity(),
+            projection.getCustomerName(),
+            projection.getCustomerContactName(),
+            projection.getOrderDate(),
+            projection.getDueDate(),
+            projection.getContractAmount(),
+            projection.getLatePenaltyAmount(),
+            status,
+            status.getLabel(),
+            projection.getPlanSequence(),
+            toKst(projection.getPlannedStartAt()),
+            toKst(projection.getPlannedEndAt()),
+            projection.getEstimatedDurationHr(),
+            projection.getLineNames(),
+            projection.getOperatorNames(),
+            toKst(projection.getCreatedAt()),
+            toKst(projection.getUpdatedAt())
+    );
+}
+
+private static OffsetDateTime toKst(Instant instant) {
+    if (instant == null) {
+        return null;
     }
+
+    return instant.atZone(ZoneId.of("Asia/Seoul")).toOffsetDateTime();
+}
 }
