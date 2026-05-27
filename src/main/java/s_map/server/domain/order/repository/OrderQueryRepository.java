@@ -285,46 +285,7 @@ public interface OrderQueryRepository extends Repository<CustomerOrder, Long> {
 
     @Query(
             value = """
-                    WITH order_statuses AS (
-                        SELECT
-                            co.order_id,
-                            co.due_date,
-                            CASE
-                                WHEN CAST(co.order_status AS varchar) IN ('COMPLETED', 'CANCELLED')
-                                    THEN CAST(co.order_status AS varchar)
-                                WHEN co.due_date < CURRENT_DATE THEN 'DELAYED'
-                                WHEN COALESCE(MAX(
-                                        CASE
-                                            WHEN pp.plan_id IS NOT NULL
-                                             AND CAST(pp.plan_status AS varchar) NOT IN ('COMPLETED', 'CANCELLED')
-                                             AND (
-                                                    CAST(pp.plan_status AS varchar) = 'DELAYED'
-                                                    OR pp.planned_end_at < CURRENT_TIMESTAMP
-                                                 )
-                                            THEN 1
-                                            ELSE 0
-                                        END
-                                     ), 0) = 1 THEN 'DELAYED'
-                                WHEN COALESCE(MAX(
-                                        CASE
-                                            WHEN pp.plan_id IS NOT NULL
-                                             AND CAST(pp.plan_status AS varchar) NOT IN ('COMPLETED', 'CANCELLED')
-                                             AND (
-                                                    CAST(pp.plan_status AS varchar) = 'IN_PROGRESS'
-                                                    OR pp.planned_start_at <= CURRENT_TIMESTAMP
-                                                 )
-                                            THEN 1
-                                            ELSE 0
-                                        END
-                                     ), 0) = 1 THEN 'IN_PROGRESS'
-                                ELSE 'WAITING'
-                            END AS order_status
-                        FROM customer_orders co
-                        LEFT JOIN production_plans pp
-                            ON pp.order_id = co.order_id
-                        GROUP BY co.order_id, co.due_date, co.order_status
-                    ),
-                    selected_order AS (
+ㅁ                    WITH selected_order_base AS (
                         SELECT
                             co.order_id,
                             co.order_no,
@@ -340,15 +301,82 @@ public interface OrderQueryRepository extends Repository<CustomerOrder, Long> {
                             co.due_date,
                             co.contract_amount,
                             co.late_penalty_amount,
-                            os.order_status,
+                            CAST(co.order_status AS varchar) AS stored_order_status,
                             co.created_at,
                             co.updated_at
                         FROM customer_orders co
                         JOIN products p
                             ON p.product_id = co.product_id
-                        JOIN order_statuses os
-                            ON os.order_id = co.order_id
                         WHERE co.order_id = :orderId
+                    ),
+                    selected_order AS (
+                        SELECT
+                            sob.order_id,
+                            sob.order_no,
+                            sob.product_id,
+                            sob.product_code,
+                            sob.product_name,
+                            sob.product_category,
+                            sob.product_unit,
+                            sob.order_quantity,
+                            sob.customer_name,
+                            sob.customer_contact_name,
+                            sob.order_date,
+                            sob.due_date,
+                            sob.contract_amount,
+                            sob.late_penalty_amount,
+                            CASE
+                                WHEN sob.stored_order_status IN ('COMPLETED', 'CANCELLED') THEN sob.stored_order_status
+                                WHEN sob.due_date < CURRENT_DATE THEN 'DELAYED'
+                                WHEN COALESCE(MAX(
+                                        CASE
+                                            WHEN status_pp.plan_id IS NOT NULL
+                                             AND CAST(status_pp.plan_status AS varchar) NOT IN ('COMPLETED', 'CANCELLED')
+                                             AND (
+                                                    CAST(status_pp.plan_status AS varchar) = 'DELAYED'
+                                                    OR status_pp.planned_end_at < CURRENT_TIMESTAMP
+                                                 )
+                                            THEN 1
+                                            ELSE 0
+                                        END
+                                     ), 0) = 1 THEN 'DELAYED'
+                                WHEN COALESCE(MAX(
+                                        CASE
+                                            WHEN status_pp.plan_id IS NOT NULL
+                                             AND CAST(status_pp.plan_status AS varchar) NOT IN ('COMPLETED', 'CANCELLED')
+                                             AND (
+                                                    CAST(status_pp.plan_status AS varchar) = 'IN_PROGRESS'
+                                                    OR status_pp.planned_start_at <= CURRENT_TIMESTAMP
+                                                 )
+                                            THEN 1
+                                            ELSE 0
+                                        END
+                                     ), 0) = 1 THEN 'IN_PROGRESS'
+                                ELSE 'WAITING'
+                            END AS order_status,
+                            sob.created_at,
+                            sob.updated_at
+                        FROM selected_order_base sob
+                        LEFT JOIN production_plans status_pp
+                            ON status_pp.order_id = sob.order_id
+                        GROUP BY
+                            sob.order_id,
+                            sob.order_no,
+                            sob.product_id,
+                            sob.product_code,
+                            sob.product_name,
+                            sob.product_category,
+                            sob.product_unit,
+                            sob.order_quantity,
+                            sob.customer_name,
+                            sob.customer_contact_name,
+                            sob.order_date,
+                            sob.due_date,
+                            sob.contract_amount,
+                            sob.late_penalty_amount,
+                            sob.stored_order_status,
+                            sob.created_at,
+                            sob.updated_at
                     )
                     SELECT
                         so.order_id AS "orderId",
@@ -370,13 +398,58 @@ public interface OrderQueryRepository extends Repository<CustomerOrder, Long> {
                             WHEN so.order_status IN ('COMPLETED', 'CANCELLED') THEN NULL
                             ELSE (
                                 SELECT COUNT(*) + 1
-                                FROM order_statuses priority_os
-                                JOIN customer_orders priority_co
-                                    ON priority_co.order_id = priority_os.order_id
-                                WHERE priority_os.order_status NOT IN ('COMPLETED', 'CANCELLED')
+                                FROM (
+                                    SELECT
+                                        priority_co.order_id,
+                                        priority_co.due_date,
+                                        CASE
+                                            WHEN CAST(priority_co.order_status AS varchar) IN ('COMPLETED', 'CANCELLED')
+                                                THEN CAST(priority_co.order_status AS varchar)
+                                            WHEN priority_co.due_date < CURRENT_DATE THEN 'DELAYED'
+                                            WHEN COALESCE(MAX(
+                                                    CASE
+                                                        WHEN priority_pp.plan_id IS NOT NULL
+                                                         AND CAST(priority_pp.plan_status AS varchar) NOT IN ('COMPLETED', 'CANCELLED')
+                                                         AND (
+                                                                CAST(priority_pp.plan_status AS varchar) = 'DELAYED'
+                                                                OR priority_pp.planned_end_at < CURRENT_TIMESTAMP
+                                                             )
+                                                        THEN 1
+                                                        ELSE 0
+                                                    END
+                                                 ), 0) = 1 THEN 'DELAYED'
+                                            WHEN COALESCE(MAX(
+                                                    CASE
+                                                        WHEN priority_pp.plan_id IS NOT NULL
+                                                         AND CAST(priority_pp.plan_status AS varchar) NOT IN ('COMPLETED', 'CANCELLED')
+                                                         AND (
+                                                                CAST(priority_pp.plan_status AS varchar) = 'IN_PROGRESS'
+                                                                OR priority_pp.planned_start_at <= CURRENT_TIMESTAMP
+                                                             )
+                                                        THEN 1
+                                                        ELSE 0
+                                                    END
+                                                 ), 0) = 1 THEN 'IN_PROGRESS'
+                                            ELSE 'WAITING'
+                                        END AS order_status
+                                    FROM customer_orders priority_co
+                                    LEFT JOIN production_plans priority_pp
+                                        ON priority_pp.order_id = priority_co.order_id
+                                    WHERE CAST(priority_co.order_status AS varchar) NOT IN ('COMPLETED', 'CANCELLED')
+                                      AND (
+                                            so.order_status <> 'DELAYED'
+                                            OR priority_co.due_date < so.due_date
+                                            OR (
+                                                priority_co.due_date = so.due_date
+                                                AND priority_co.order_id < so.order_id
+                                            )
+                                          )
+                                    GROUP BY priority_co.order_id, priority_co.due_date, priority_co.order_status
+                                ) priority_orders
+                                WHERE priority_orders.order_status NOT IN ('COMPLETED', 'CANCELLED')
                                   AND (
                                         CASE
-                                            WHEN priority_os.order_status = 'DELAYED' THEN 0
+                                            WHEN priority_orders.order_status = 'DELAYED' THEN 0
                                             ELSE 1
                                         END
                                         <
@@ -386,7 +459,7 @@ public interface OrderQueryRepository extends Repository<CustomerOrder, Long> {
                                         END
                                         OR (
                                             CASE
-                                                WHEN priority_os.order_status = 'DELAYED' THEN 0
+                                                WHEN priority_orders.order_status = 'DELAYED' THEN 0
                                                 ELSE 1
                                             END
                                             =
@@ -395,10 +468,10 @@ public interface OrderQueryRepository extends Repository<CustomerOrder, Long> {
                                                 ELSE 1
                                             END
                                             AND (
-                                                priority_co.due_date < so.due_date
+                                                priority_orders.due_date < so.due_date
                                                 OR (
-                                                    priority_co.due_date = so.due_date
-                                                    AND priority_co.order_id < so.order_id
+                                                    priority_orders.due_date = so.due_date
+                                                    AND priority_orders.order_id < so.order_id
                                                 )
                                             )
                                         )
