@@ -18,6 +18,7 @@ import s_map.server.domain.order.dto.req.OrderCreateRequest;
 import s_map.server.domain.order.dto.res.OrderCreateResponse;
 import s_map.server.domain.order.dto.res.OrderDetailResponse;
 import s_map.server.domain.order.dto.res.OrderListResponse;
+import s_map.server.domain.order.dto.res.OrderNoPreviewResponse;
 import s_map.server.domain.order.entity.OrderStatus;
 import s_map.server.domain.order.service.OrderService;
 import s_map.server.global.common.BaseResponse;
@@ -70,6 +71,15 @@ public class OrderController {
     }
 
     @Operation(
+            summary = "다음 주문번호 미리보기",
+            description = "주문 등록 모달에서 읽기 전용으로 표시할 다음 주문번호를 조회합니다. 실제 주문번호는 저장 시점에 확정됩니다."
+    )
+    @GetMapping("/next-order-no")
+    public BaseResponse<OrderNoPreviewResponse> getNextOrderNo() {
+        return BaseResponse.success(orderService.getNextOrderNoPreview());
+    }
+
+    @Operation(
             summary = "주문 상세 조회",
             description = "주문 ID로 주문 상세 정보와 연결된 생산계획 정보를 조회합니다."
     )
@@ -83,7 +93,7 @@ public class OrderController {
 
     @Operation(
             summary = "주문 등록",
-            description = "신규 주문을 등록하고 생산 가능한 라인 중 가장 빨리 종료 가능한 라인의 마지막 순서로 생산계획을 자동 생성합니다."
+            description = "신규 주문을 등록하고 생산 가능한 라인 중 가장 빨리 종료 가능한 라인의 마지막 순서로 생산계획을 자동 생성합니다. 주문번호는 요청으로 받지 않고 저장 시점에 서버가 최종 발급합니다."
     )
     @PostMapping
     public BaseResponse<OrderCreateResponse> createOrder(

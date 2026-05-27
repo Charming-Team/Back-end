@@ -6,6 +6,7 @@ import org.springframework.data.repository.query.Param;
 import s_map.server.domain.order.entity.OrderNoSequence;
 
 import java.time.LocalDate;
+import java.util.Optional;
 
 public interface OrderNoSequenceRepository extends JpaRepository<OrderNoSequence, LocalDate> {
 
@@ -19,17 +20,30 @@ public interface OrderNoSequenceRepository extends JpaRepository<OrderNoSequence
                     )
                     VALUES (
                         :sequenceDate,
-                        1,
+                        :initialSequence,
                         CURRENT_TIMESTAMP,
                         CURRENT_TIMESTAMP
                     )
                     ON CONFLICT (sequence_date)
                     DO UPDATE SET
-                        last_sequence = order_no_sequences.last_sequence + 1,
+                        last_sequence = GREATEST(order_no_sequences.last_sequence + 1, :initialSequence),
                         updated_at = CURRENT_TIMESTAMP
                     RETURNING last_sequence
                     """,
             nativeQuery = true
     )
-    int nextSequence(@Param("sequenceDate") LocalDate sequenceDate);
+    int nextSequence(
+            @Param("sequenceDate") LocalDate sequenceDate,
+            @Param("initialSequence") int initialSequence
+    );
+
+    @Query(
+            value = """
+                    SELECT ons.last_sequence
+                    FROM order_no_sequences ons
+                    WHERE ons.sequence_date = :sequenceDate
+                    """,
+            nativeQuery = true
+    )
+    Optional<Integer> findLastSequence(@Param("sequenceDate") LocalDate sequenceDate);
 }

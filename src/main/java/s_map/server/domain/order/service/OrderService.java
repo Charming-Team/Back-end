@@ -11,6 +11,7 @@ import s_map.server.domain.order.dto.req.OrderCreateRequest;
 import s_map.server.domain.order.dto.res.OrderCreateResponse;
 import s_map.server.domain.order.dto.res.OrderDetailResponse;
 import s_map.server.domain.order.dto.res.OrderListResponse;
+import s_map.server.domain.order.dto.res.OrderNoPreviewResponse;
 import s_map.server.domain.order.entity.CustomerOrder;
 import s_map.server.domain.order.entity.OrderStatus;
 import s_map.server.domain.order.entity.ProductionPlan;
@@ -76,6 +77,16 @@ public class OrderService {
         return customerOrderRepository.findOrderDetail(orderId)
                 .map(OrderDetailResponse::from)
                 .orElseThrow(() -> new CustomException(ErrorCode.ORDER_NOT_FOUND));
+    }
+
+    public OrderNoPreviewResponse getNextOrderNoPreview() {
+        LocalDate today = LocalDate.now();
+        int latestPersistedSequence = findLatestPersistedOrderNoSequence(today);
+        int latestIssuedSequence = orderNoSequenceRepository.findLastSequence(today)
+                .orElse(0);
+        int previewSequence = Math.max(latestPersistedSequence, latestIssuedSequence) + 1;
+
+        return OrderNoPreviewResponse.preview(formatOrderNo(today, previewSequence));
     }
 
     @Transactional
@@ -307,10 +318,40 @@ public class OrderService {
 
     private String generateOrderNo() {
         LocalDate today = LocalDate.now();
-        String prefix = "PO-" + today.format(ORDER_NO_DATE_FORMATTER) + "-";
-        int nextSequence = orderNoSequenceRepository.nextSequence(today);
+        int initialSequence = findLatestPersistedOrderNoSequence(today) + 1;
+        int nextSequence = orderNoSequenceRepository.nextSequence(today, initialSequence);
 
-        return prefix + String.format("%03d", nextSequence);
+        return formatOrderNo(today, nextSequence);
+    }
+
+    private int findLatestPersistedOrderNoSequence(LocalDate date) {
+        String prefix = createOrderNoPrefix(date);
+
+        return customerOrderRepository.findLatestOrderNoByPrefix(prefix)
+                .map(this::extractOrderNoSequence)
+                .orElse(0);
+    }
+
+    private String createOrderNoPrefix(LocalDate date) {
+        return "PO-" + date.format(ORDER_NO_DATE_FORMATTER) + "-";
+    }
+
+    private String formatOrderNo(LocalDate date, int sequence) {
+        return createOrderNoPrefix(date) + String.format("%03d", sequence);
+    }
+
+    private int extractOrderNoSequence(String orderNo) {
+        int sequenceIndex = orderNo.lastIndexOf('-') + 1;
+
+        if (sequenceIndex <= 0 || sequenceIndex >= orderNo.length()) {
+            return 0;
+        }
+
+        try {
+            return Integer.parseInt(orderNo.substring(sequenceIndex));
+        } catch (NumberFormatException exception) {
+            return 0;
+        }
     }
 
     private void validateDueDateRange(LocalDate dueDateFrom, LocalDate dueDateTo) {
