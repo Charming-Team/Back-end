@@ -5,9 +5,50 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import s_map.server.domain.order.entity.ProductionPlan;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 
 public interface ProductionPlanRepository extends JpaRepository<ProductionPlan, Long> {
+
+    List<ProductionPlan> findAllByOrderByPlannedStartAtAsc();
+
+    List<ProductionPlan> findByPlannedStartAtLessThanAndPlannedEndAtGreaterThanOrderByPlannedStartAtAsc(
+            OffsetDateTime endExclusive,
+            OffsetDateTime startInclusive
+    );
+
+    boolean existsByLineIdAndPlanIdNotAndPlannedStartAtLessThanAndPlannedEndAtGreaterThan(
+            Long lineId,
+            Long planId,
+            OffsetDateTime plannedEndAt,
+            OffsetDateTime plannedStartAt
+    );
+
+    @Query(
+            value = """
+                    SELECT EXISTS (
+                        SELECT 1
+                        FROM product_line_capabilities plc
+                        JOIN production_lines pl
+                            ON pl.line_id = plc.line_id
+                        WHERE plc.line_id = :lineId
+                          AND plc.product_id = :productId
+                          AND pl.is_active = true
+                          AND (
+                                (plc.capacity_per_day IS NOT NULL AND plc.capacity_per_day > 0)
+                                OR (
+                                    plc.standard_production_time_hr IS NOT NULL
+                                    AND plc.standard_production_time_hr > 0
+                                )
+                              )
+                    )
+                    """,
+            nativeQuery = true
+    )
+    boolean existsActiveLineCapability(
+            @Param("lineId") Long lineId,
+            @Param("productId") Long productId
+    );
 
     @Query(
             value = """
