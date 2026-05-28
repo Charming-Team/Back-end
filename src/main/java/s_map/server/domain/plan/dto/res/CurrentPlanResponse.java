@@ -2,11 +2,11 @@ package s_map.server.domain.plan.dto.res;
 
 import lombok.Builder;
 import lombok.Getter;
-import s_map.server.domain.plan.entity.ProductionPlan;
+import s_map.server.domain.order.entity.ProductionPlan;
 import s_map.server.domain.plan.entity.ProductionResult;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 @Getter
 @Builder
@@ -18,15 +18,15 @@ public class CurrentPlanResponse {
     private Long lineId;
     private Long operatorId;
 
-    private LocalDateTime plannedStartAt;
-    private LocalDateTime plannedEndAt;
+    private OffsetDateTime plannedStartAt;
+    private OffsetDateTime plannedEndAt;
     private BigDecimal estimatedDurationHr;
     private Integer plannedQuantity;
     private Integer planSequence;
     private String planStatus;
 
-    private LocalDateTime actualStartAt;
-    private LocalDateTime actualEndAt;
+    private OffsetDateTime actualStartAt;
+    private OffsetDateTime actualEndAt;
     private BigDecimal actualQuantity;
     private BigDecimal defectQuantity;
     private BigDecimal yieldRate;

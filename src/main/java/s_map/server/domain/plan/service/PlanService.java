@@ -10,17 +10,20 @@ import s_map.server.domain.plan.dto.res.CurrentPlanResponse;
 import s_map.server.domain.plan.dto.res.PlanDetailResponse;
 import s_map.server.domain.plan.dto.res.PlanListResponse;
 import s_map.server.domain.plan.dto.res.PlanUpdateResponse;
-import s_map.server.domain.plan.entity.PlanStatus;
-import s_map.server.domain.plan.entity.ProductionPlan;
+import s_map.server.domain.order.entity.PlanStatus;
+import s_map.server.domain.order.entity.ProductionPlan;
+import s_map.server.domain.order.repository.ProductionPlanRepository;
 import s_map.server.domain.plan.entity.ProductionResult;
-import s_map.server.domain.plan.repository.ProductionPlanRepository;
 import s_map.server.domain.plan.repository.ProductionResultRepository;
+import s_map.server.domain.user.entity.Role;
+import s_map.server.domain.user.entity.UserStatus;
+import s_map.server.domain.user.repository.UserRepository;
 import s_map.server.global.error.CustomException;
 import s_map.server.global.error.ErrorCode;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -31,8 +34,11 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class PlanService {
 
+    private static final ZoneId DEFAULT_PRODUCTION_ZONE = ZoneId.of("Asia/Seoul");
+
     private final ProductionPlanRepository productionPlanRepository;
     private final ProductionResultRepository productionResultRepository;
+    private final UserRepository userRepository;
 
     /*
      * ProductionPlanMaterial은 현재 material 도메인에 위치함.
@@ -111,23 +117,27 @@ public class PlanService {
      * - 현재 생산계획 정보와 실제 생산 실적 정보를 함께 반환한다.
      */
     public List<CurrentPlanResponse> getCurrentPlans() {
-        LocalDate today = LocalDate.now();
-        LocalDateTime startOfDay = today.atStartOfDay();
-        LocalDateTime endOfDay = today.atTime(LocalTime.MAX);
+        LocalDate today = LocalDate.now(DEFAULT_PRODUCTION_ZONE);
+        OffsetDateTime startOfDay = today.atStartOfDay(DEFAULT_PRODUCTION_ZONE).toOffsetDateTime();
+        OffsetDateTime endExclusive = today.plusDays(1).atStartOfDay(DEFAULT_PRODUCTION_ZONE).toOffsetDateTime();
 
         List<ProductionPlan> plans =
                 productionPlanRepository
-                        .findByPlannedStartAtLessThanEqualAndPlannedEndAtGreaterThanEqualOrderByPlannedStartAtAsc(
-                                endOfDay,
+                        .findByPlannedStartAtLessThanAndPlannedEndAtGreaterThanOrderByPlannedStartAtAsc(
+                                endExclusive,
                                 startOfDay
-                        );
+                        )
+                        .stream()
+                        .filter(this::isCurrentTarget)
+                        .toList();
 
         List<Long> planIds = plans.stream()
                 .map(ProductionPlan::getPlanId)
                 .toList();
 
-        Map<Long, ProductionResult> resultMap =
-                productionResultRepository.findByPlanIdIn(planIds)
+        Map<Long, ProductionResult> resultMap = planIds.isEmpty()
+                ? Map.of()
+                : productionResultRepository.findByPlanIdIn(planIds)
                         .stream()
                         .collect(Collectors.toMap(
                                 ProductionResult::getPlanId,
@@ -141,6 +151,12 @@ public class PlanService {
                         resultMap.get(plan.getPlanId())
                 ))
                 .toList();
+    }
+
+    private boolean isCurrentTarget(ProductionPlan plan) {
+        return plan.getPlanStatus() == PlanStatus.SCHEDULED
+                || plan.getPlanStatus() == PlanStatus.IN_PROGRESS
+                || plan.getPlanStatus() == PlanStatus.DELAYED;
     }
 
     /**
@@ -164,21 +180,22 @@ public class PlanService {
      * - 완료 또는 취소 상태의 생산계획이면 수정할 수 없도록 차단한다.
      * - 요청값의 필수값, 기간, 수량, 순서를 검증한다.
      * - 동일 라인에 겹치는 일정이 있는지 검증한다.
-     * - Entity의 updatePlan 메서드를 통해 수정 가능한 항목만 변경한다.
-     * - estimatedDurationHr는 사용자가 직접 수정하지 않는다.
-     * - @Transactional에 의해 변경 감지로 DB에 반영된다.
+     * - 실제 production_plans 변경은 아직 반영하지 않는다.
+     * - 추후 시뮬레이션 분석 결과 생성 후 승인/반영 플로우와 연결한다.
      *
      * [Output]
      * - PlanUpdateResponse
      * - 수정된 생산계획 정보를 반환한다.
      */
-    @Transactional
+    @Transactional(readOnly = true)
     public PlanUpdateResponse updatePlan(Long planId, PlanUpdateRequest request) {
         ProductionPlan plan = productionPlanRepository.findById(planId)
                 .orElseThrow(() -> new CustomException(ErrorCode.PRODUCTION_PLAN_NOT_FOUND));
 
         validateEditablePlan(plan);
         validateUpdateRequest(request);
+        validateLineCapability(plan, request);
+        validateOperator(request);
         validateScheduleConflict(planId, request);
 
         // 바로 DB 반영하면 비교시 롤백을 못할 거 같으니 일단 보류
@@ -192,7 +209,34 @@ public class PlanService {
 //                request.getPlanStatus()
 //        );
 
-        return PlanUpdateResponse.from(plan);
+        return PlanUpdateResponse.validationOnly(plan);
+    }
+
+    private void validateLineCapability(ProductionPlan plan, PlanUpdateRequest request) {
+        boolean existsActiveLineCapability = productionPlanRepository.existsActiveLineCapability(
+                request.getLineId(),
+                plan.getProductId()
+        );
+
+        if (!existsActiveLineCapability) {
+            throw new CustomException(ErrorCode.AVAILABLE_PRODUCTION_LINE_NOT_FOUND);
+        }
+    }
+
+    private void validateOperator(PlanUpdateRequest request) {
+        if (request.getOperatorId() == null) {
+            return;
+        }
+
+        boolean existsActiveOperator = userRepository.existsByIdAndStatusAndRole(
+                request.getOperatorId(),
+                UserStatus.ACTIVE,
+                Role.OPERATOR
+        );
+
+        if (!existsActiveOperator) {
+            throw new CustomException(ErrorCode.OPERATOR_NOT_FOUND);
+        }
     }
 
     /**

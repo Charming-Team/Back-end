@@ -1,5 +1,6 @@
 package s_map.server.domain.plan.controller;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -44,7 +45,7 @@ public class PlanController {
     @PatchMapping("/{planId}")
     public BaseResponse<PlanUpdateResponse> updatePlan(
             @PathVariable Long planId,
-            @RequestBody PlanUpdateRequest request
+            @Valid @RequestBody PlanUpdateRequest request
     ) {
         return BaseResponse.success(planService.updatePlan(planId, request));
     }

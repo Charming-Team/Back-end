@@ -15,6 +15,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 @Getter
 @Entity
@@ -33,10 +34,10 @@ public class ProductionResult {
     private Long planId;
 
     @Column(name = "actual_start_at")
-    private LocalDateTime actualStartAt;
+    private OffsetDateTime actualStartAt;
 
     @Column(name = "actual_end_at")
-    private LocalDateTime actualEndAt;
+    private OffsetDateTime actualEndAt;
 
     @Column(name = "actual_quantity", precision = 12, scale = 4)
     private BigDecimal actualQuantity;
