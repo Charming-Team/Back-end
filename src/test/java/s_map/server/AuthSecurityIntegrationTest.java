@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.EnumSource.Mode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -477,6 +478,41 @@ class AuthSecurityIntegrationTest {
                     .andExpect(MockMvcResultMatchers.status().isOk())
                     .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(true))
                     .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("COMMON200"));
+        }
+    }
+
+    @Nested
+    @DisplayName("주문 등록 권한")
+    class OrderCreateAuthorization {
+
+        @ParameterizedTest
+        @EnumSource(value = Role.class, names = {"EXECUTIVE", "MANUFACTURING_MANAGER"})
+        @DisplayName("경영진과 생산관리자는 주문 등록 API에 접근할 수 있다")
+        void executiveAndManufacturingManagerCanAccessOrderCreate(Role role) throws Exception {
+            String accessToken = loginAndGetAccessToken(saveUser(role, role.name().toLowerCase() + "@example.com", PASSWORD));
+
+            mockMvc.perform(MockMvcRequestBuilders.post("/api/orders")
+                            .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{}"))
+                    .andExpect(MockMvcResultMatchers.status().isBadRequest())
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(false))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("400-001"));
+        }
+
+        @ParameterizedTest
+        @EnumSource(value = Role.class, names = {"EXECUTIVE", "MANUFACTURING_MANAGER"}, mode = Mode.EXCLUDE)
+        @DisplayName("경영진과 생산관리자가 아닌 사용자는 주문 등록 API에 접근할 수 없다")
+        void otherRolesCannotAccessOrderCreate(Role role) throws Exception {
+            String accessToken = loginAndGetAccessToken(saveUser(role, role.name().toLowerCase() + "@example.com", PASSWORD));
+
+            mockMvc.perform(MockMvcRequestBuilders.post("/api/orders")
+                            .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{}"))
+                    .andExpect(MockMvcResultMatchers.status().isForbidden())
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(false))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("403"));
         }
     }
 
