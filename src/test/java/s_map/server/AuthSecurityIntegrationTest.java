@@ -284,6 +284,51 @@ class AuthSecurityIntegrationTest {
     }
 
     @Nested
+    @DisplayName("인증 사용자 API")
+    class AuthenticatedUser {
+
+        @Test
+        @DisplayName("내 정보 조회는 JWT principal의 이메일로 사용자 정보를 반환한다")
+        void meReturnsAuthenticatedUserInfo() throws Exception {
+            User user = saveUser(Role.MANUFACTURING_MANAGER, "manager@example.com", PASSWORD);
+            String accessToken = loginAndGetAccessToken(user);
+
+            mockMvc.perform(MockMvcRequestBuilders.get("/api/auth/me")
+                            .header(HttpHeaders.AUTHORIZATION, bearer(accessToken)))
+                    .andExpect(MockMvcResultMatchers.status().isOk())
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(true))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("COMMON200"))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.data.id").value(user.getId()))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.data.name").value(user.getName()))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.data.email").value(user.getEmail()))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.data.role").value(user.getRole().name()))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.data.department").value(user.getDepartment()))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.data.companyName").value(user.getCompanyName()))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.data.phoneNumber").value(user.getPhoneNumber()));
+        }
+
+        @Test
+        @DisplayName("로그아웃은 JWT principal 소유자의 Refresh Token을 폐기한다")
+        void logoutRevokesAuthenticatedUsersRefreshToken() throws Exception {
+            User user = saveUser(Role.OPERATOR, "operator@example.com", PASSWORD);
+            MvcResult loginResult = login(user);
+            String accessToken = dataValue(loginResult, "accessToken");
+            String refreshToken = dataValue(loginResult, "refreshToken");
+
+            mockMvc.perform(MockMvcRequestBuilders.post("/api/auth/logout")
+                            .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(json(Map.of("refreshToken", refreshToken))))
+                    .andExpect(MockMvcResultMatchers.status().isOk())
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(true))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("COMMON200"));
+
+            Assertions.assertEquals(1, refreshTokenRepository.count());
+            Assertions.assertTrue(refreshTokenRepository.findAll().getFirst().isRevoked());
+        }
+    }
+
+    @Nested
     @DisplayName("ADMIN 사용자 삭제")
     class AdminUserDelete {
 
