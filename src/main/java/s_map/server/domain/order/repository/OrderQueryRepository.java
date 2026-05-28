@@ -290,7 +290,7 @@ public interface OrderQueryRepository extends Repository<CustomerOrder, Long> {
 
     @Query(
             value = """
-ㅁ                    WITH selected_order_base AS (
+                    WITH selected_order_base AS (
                         SELECT
                             co.order_id,
                             co.order_no,
