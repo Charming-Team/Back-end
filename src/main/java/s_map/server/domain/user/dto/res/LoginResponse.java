@@ -11,7 +11,7 @@ public record LoginResponse(
         @Schema(description = "사용자 이름", example = "김길동")
         String name,
 
-        @Schema(description = "이메일", example = "user@example.com")
+        @Schema(description = "이메일", example = "user@sk.com")
         String email,
 
         @Schema(description = "사용자 권한", example = "OPERATOR")

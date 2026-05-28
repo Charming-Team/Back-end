@@ -34,7 +34,7 @@ import s_map.server.domain.user.repository.UserRepository;
 @ActiveProfiles("test")
 class AuthSecurityIntegrationTest {
 
-    private static final String PASSWORD = "password1234!";
+    private static final String PASSWORD = "Password1234!";
 
     @Autowired
     private MockMvc mockMvc;
@@ -65,7 +65,7 @@ class AuthSecurityIntegrationTest {
         @EnumSource(Role.class)
         @DisplayName("모든 role은 로그인 성공 시 access token과 refresh token을 발급받는다")
         void allRolesCanLogin(Role role) throws Exception {
-            User user = saveUser(role, role.name().toLowerCase() + "@example.com", PASSWORD);
+            User user = saveUser(role, role.name().toLowerCase() + "@sk.com", PASSWORD);
 
             MvcResult result = mockMvc.perform(MockMvcRequestBuilders.post("/api/auth/login")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -98,7 +98,7 @@ class AuthSecurityIntegrationTest {
             mockMvc.perform(MockMvcRequestBuilders.post("/api/auth/login")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(json(Map.of(
-                                    "email", "missing@example.com",
+                                    "email", "missing@sk.com",
                                     "password", PASSWORD
                             ))))
                     .andExpect(MockMvcResultMatchers.status().isUnauthorized())
@@ -110,7 +110,7 @@ class AuthSecurityIntegrationTest {
         @Test
         @DisplayName("비밀번호가 틀리면 401-003을 반환한다")
         void wrongPasswordFails() throws Exception {
-            User user = saveUser(Role.OPERATOR, "operator@example.com", PASSWORD);
+            User user = saveUser(Role.OPERATOR, "operator@sk.com", PASSWORD);
 
             mockMvc.perform(MockMvcRequestBuilders.post("/api/auth/login")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -126,7 +126,7 @@ class AuthSecurityIntegrationTest {
         @Test
         @DisplayName("비활성 계정은 로그인할 수 없다")
         void inactiveUserCannotLogin() throws Exception {
-            User user = saveUser(Role.OPERATOR, "inactive@example.com", PASSWORD);
+            User user = saveUser(Role.OPERATOR, "inactive@sk.com", PASSWORD);
             user.suspend();
             userRepository.save(user);
 
@@ -156,9 +156,23 @@ class AuthSecurityIntegrationTest {
         }
 
         @Test
+        @DisplayName("sk.com 도메인이 아닌 이메일은 로그인 validation error를 반환한다")
+        void nonSkEmailDomainFailsValidation() throws Exception {
+            mockMvc.perform(MockMvcRequestBuilders.post("/api/auth/login")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(json(Map.of(
+                                    "email", "operator@example.com",
+                                    "password", PASSWORD
+                            ))))
+                    .andExpect(MockMvcResultMatchers.status().isBadRequest())
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(false))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("400-001"));
+        }
+
+        @Test
         @DisplayName("로그인은 잘못된 Authorization 헤더가 있어도 JWT 필터에 막히지 않는다")
         void loginIgnoresInvalidAuthorizationHeader() throws Exception {
-            User user = saveUser(Role.OPERATOR, "operator@example.com", PASSWORD);
+            User user = saveUser(Role.OPERATOR, "operator@sk.com", PASSWORD);
 
             mockMvc.perform(MockMvcRequestBuilders.post("/api/auth/login")
                             .header(HttpHeaders.AUTHORIZATION, bearer("invalid-token"))
@@ -181,26 +195,68 @@ class AuthSecurityIntegrationTest {
         @Test
         @DisplayName("ADMIN 토큰으로 OPERATOR 사용자를 생성할 수 있다")
         void adminCanCreateOperator() throws Exception {
-            String adminAccessToken = loginAndGetAccessToken(saveUser(Role.ADMIN, "admin@example.com", PASSWORD));
+            String adminAccessToken = loginAndGetAccessToken(saveUser(Role.ADMIN, "admin@sk.com", PASSWORD));
 
             mockMvc.perform(MockMvcRequestBuilders.post("/api/admin/users")
                             .header(HttpHeaders.AUTHORIZATION, bearer(adminAccessToken))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(createUserJson("operator01@example.com", "operator1234!", "operator1234!", Role.OPERATOR)))
+                            .content(createUserJson("operator01@sk.com", "Operator1234!", "Operator1234!", Role.OPERATOR)))
                     .andExpect(MockMvcResultMatchers.status().isOk())
                     .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(true))
                     .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("COMMON200"))
                     .andExpect(MockMvcResultMatchers.jsonPath("$.data.name").value("김길동"))
-                    .andExpect(MockMvcResultMatchers.jsonPath("$.data.email").value("operator01@example.com"))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.data.email").value("operator01@sk.com"))
                     .andExpect(MockMvcResultMatchers.jsonPath("$.data.role").value("OPERATOR"))
                     .andExpect(MockMvcResultMatchers.jsonPath("$.data.department").value("생산관리팀"))
                     .andExpect(MockMvcResultMatchers.jsonPath("$.data.companyName").value("s_map"))
                     .andExpect(MockMvcResultMatchers.jsonPath("$.data.phoneNumber").value("010-1234-5678"))
                     .andExpect(MockMvcResultMatchers.jsonPath("$.data.password").doesNotExist());
 
-            User createdUser = userRepository.findByEmail("operator01@example.com").orElseThrow();
-            Assertions.assertTrue(passwordEncoder.matches("operator1234!", createdUser.getPassword()));
-            Assertions.assertNotEquals("operator1234!", createdUser.getPassword());
+            User createdUser = userRepository.findByEmail("operator01@sk.com").orElseThrow();
+            Assertions.assertTrue(passwordEncoder.matches("Operator1234!", createdUser.getPassword()));
+            Assertions.assertNotEquals("Operator1234!", createdUser.getPassword());
+        }
+
+        @Test
+        @DisplayName("sk.com 도메인이 아닌 이메일로는 사용자를 생성할 수 없다")
+        void nonSkEmailDomainCreateFailsValidation() throws Exception {
+            String adminAccessToken = loginAndGetAccessToken(saveUser(Role.ADMIN, "admin@sk.com", PASSWORD));
+
+            mockMvc.perform(MockMvcRequestBuilders.post("/api/admin/users")
+                            .header(HttpHeaders.AUTHORIZATION, bearer(adminAccessToken))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(createUserJson("operator01@example.com", "Operator1234!", "Operator1234!", Role.OPERATOR)))
+                    .andExpect(MockMvcResultMatchers.status().isBadRequest())
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(false))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("400-001"));
+        }
+
+        @Test
+        @DisplayName("비밀번호 규칙을 만족하지 않으면 사용자를 생성할 수 없다")
+        void weakPasswordCreateFailsValidation() throws Exception {
+            String adminAccessToken = loginAndGetAccessToken(saveUser(Role.ADMIN, "admin@sk.com", PASSWORD));
+
+            mockMvc.perform(MockMvcRequestBuilders.post("/api/admin/users")
+                            .header(HttpHeaders.AUTHORIZATION, bearer(adminAccessToken))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(createUserJson("operator01@sk.com", "operator1234!", "operator1234!", Role.OPERATOR)))
+                    .andExpect(MockMvcResultMatchers.status().isBadRequest())
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(false))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("400-001"));
+        }
+
+        @Test
+        @DisplayName("연락처 형식이 다르면 사용자를 생성할 수 없다")
+        void invalidPhoneNumberCreateFailsValidation() throws Exception {
+            String adminAccessToken = loginAndGetAccessToken(saveUser(Role.ADMIN, "admin@sk.com", PASSWORD));
+
+            mockMvc.perform(MockMvcRequestBuilders.post("/api/admin/users")
+                            .header(HttpHeaders.AUTHORIZATION, bearer(adminAccessToken))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(createUserJson("operator01@sk.com", "Operator1234!", "Operator1234!", Role.OPERATOR, "01012345678")))
+                    .andExpect(MockMvcResultMatchers.status().isBadRequest())
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(false))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("400-001"));
         }
 
         @Test
@@ -208,7 +264,7 @@ class AuthSecurityIntegrationTest {
         void createUserWithoutTokenFails() throws Exception {
             mockMvc.perform(MockMvcRequestBuilders.post("/api/admin/users")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(createUserJson("operator01@example.com", "operator1234!", "operator1234!", Role.OPERATOR)))
+                            .content(createUserJson("operator01@sk.com", "Operator1234!", "Operator1234!", Role.OPERATOR)))
                     .andExpect(MockMvcResultMatchers.status().isUnauthorized())
                     .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(false))
                     .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("401"));
@@ -217,12 +273,12 @@ class AuthSecurityIntegrationTest {
         @Test
         @DisplayName("ADMIN이 아닌 role의 토큰으로는 사용자 생성이 403을 반환한다")
         void nonAdminCannotCreateUser() throws Exception {
-            String operatorAccessToken = loginAndGetAccessToken(saveUser(Role.OPERATOR, "operator@example.com", PASSWORD));
+            String operatorAccessToken = loginAndGetAccessToken(saveUser(Role.OPERATOR, "operator@sk.com", PASSWORD));
 
             mockMvc.perform(MockMvcRequestBuilders.post("/api/admin/users")
                             .header(HttpHeaders.AUTHORIZATION, bearer(operatorAccessToken))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(createUserJson("new-operator@example.com", "operator1234!", "operator1234!", Role.OPERATOR)))
+                            .content(createUserJson("new-operator@sk.com", "Operator1234!", "Operator1234!", Role.OPERATOR)))
                     .andExpect(MockMvcResultMatchers.status().isForbidden())
                     .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(false))
                     .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("403"));
@@ -231,12 +287,12 @@ class AuthSecurityIntegrationTest {
         @Test
         @DisplayName("비밀번호 확인이 다르면 400-003을 반환한다")
         void passwordConfirmMismatchFails() throws Exception {
-            String adminAccessToken = loginAndGetAccessToken(saveUser(Role.ADMIN, "admin@example.com", PASSWORD));
+            String adminAccessToken = loginAndGetAccessToken(saveUser(Role.ADMIN, "admin@sk.com", PASSWORD));
 
             mockMvc.perform(MockMvcRequestBuilders.post("/api/admin/users")
                             .header(HttpHeaders.AUTHORIZATION, bearer(adminAccessToken))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(createUserJson("operator01@example.com", "operator1234!", "different1234!", Role.OPERATOR)))
+                            .content(createUserJson("operator01@sk.com", "Operator1234!", "Different1234!", Role.OPERATOR)))
                     .andExpect(MockMvcResultMatchers.status().isBadRequest())
                     .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(false))
                     .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("400-003"));
@@ -245,13 +301,13 @@ class AuthSecurityIntegrationTest {
         @Test
         @DisplayName("중복 이메일이면 409-001을 반환한다")
         void duplicateEmailFails() throws Exception {
-            String adminAccessToken = loginAndGetAccessToken(saveUser(Role.ADMIN, "admin@example.com", PASSWORD));
-            saveUser(Role.OPERATOR, "operator01@example.com", PASSWORD);
+            String adminAccessToken = loginAndGetAccessToken(saveUser(Role.ADMIN, "admin@sk.com", PASSWORD));
+            saveUser(Role.OPERATOR, "operator01@sk.com", PASSWORD);
 
             mockMvc.perform(MockMvcRequestBuilders.post("/api/admin/users")
                             .header(HttpHeaders.AUTHORIZATION, bearer(adminAccessToken))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(createUserJson("operator01@example.com", "operator1234!", "operator1234!", Role.OPERATOR)))
+                            .content(createUserJson("operator01@sk.com", "Operator1234!", "Operator1234!", Role.OPERATOR)))
                     .andExpect(MockMvcResultMatchers.status().isConflict())
                     .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(false))
                     .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("409-001"));
@@ -260,7 +316,7 @@ class AuthSecurityIntegrationTest {
         @Test
         @DisplayName("잘못된 role 값이면 400을 반환한다")
         void invalidRoleFails() throws Exception {
-            String adminAccessToken = loginAndGetAccessToken(saveUser(Role.ADMIN, "admin@example.com", PASSWORD));
+            String adminAccessToken = loginAndGetAccessToken(saveUser(Role.ADMIN, "admin@sk.com", PASSWORD));
 
             mockMvc.perform(MockMvcRequestBuilders.post("/api/admin/users")
                             .header(HttpHeaders.AUTHORIZATION, bearer(adminAccessToken))
@@ -268,9 +324,9 @@ class AuthSecurityIntegrationTest {
                             .content("""
                                     {
                                       "name": "김길동",
-                                      "email": "operator01@example.com",
-                                      "password": "operator1234!",
-                                      "passwordConfirm": "operator1234!",
+                                      "email": "operator01@sk.com",
+                                      "password": "Operator1234!",
+                                      "passwordConfirm": "Operator1234!",
                                       "role": "INVALID_ROLE",
                                       "department": "생산관리팀",
                                       "companyName": "s_map",
@@ -290,7 +346,7 @@ class AuthSecurityIntegrationTest {
         @Test
         @DisplayName("내 정보 조회는 JWT principal의 이메일로 사용자 정보를 반환한다")
         void meReturnsAuthenticatedUserInfo() throws Exception {
-            User user = saveUser(Role.MANUFACTURING_MANAGER, "manager@example.com", PASSWORD);
+            User user = saveUser(Role.MANUFACTURING_MANAGER, "manager@sk.com", PASSWORD);
             String accessToken = loginAndGetAccessToken(user);
 
             mockMvc.perform(MockMvcRequestBuilders.get("/api/auth/me")
@@ -310,7 +366,7 @@ class AuthSecurityIntegrationTest {
         @Test
         @DisplayName("로그아웃은 JWT principal 소유자의 Refresh Token을 폐기한다")
         void logoutRevokesAuthenticatedUsersRefreshToken() throws Exception {
-            User user = saveUser(Role.OPERATOR, "operator@example.com", PASSWORD);
+            User user = saveUser(Role.OPERATOR, "operator@sk.com", PASSWORD);
             MvcResult loginResult = login(user);
             String accessToken = dataValue(loginResult, "accessToken");
             String refreshToken = dataValue(loginResult, "refreshToken");
@@ -335,8 +391,8 @@ class AuthSecurityIntegrationTest {
         @Test
         @DisplayName("ADMIN 토큰으로 일반 사용자를 삭제 처리할 수 있다")
         void adminCanDeleteOperator() throws Exception {
-            User admin = saveUser(Role.ADMIN, "admin@example.com", PASSWORD);
-            User operator = saveUser(Role.OPERATOR, "operator@example.com", PASSWORD);
+            User admin = saveUser(Role.ADMIN, "admin@sk.com", PASSWORD);
+            User operator = saveUser(Role.OPERATOR, "operator@sk.com", PASSWORD);
             String adminAccessToken = loginAndGetAccessToken(admin);
 
             mockMvc.perform(MockMvcRequestBuilders.delete("/api/admin/users/{userId}", operator.getId())
@@ -352,7 +408,7 @@ class AuthSecurityIntegrationTest {
         @Test
         @DisplayName("삭제할 사용자가 없으면 404-201을 반환한다")
         void missingUserCannotBeDeleted() throws Exception {
-            User admin = saveUser(Role.ADMIN, "admin@example.com", PASSWORD);
+            User admin = saveUser(Role.ADMIN, "admin@sk.com", PASSWORD);
             String adminAccessToken = loginAndGetAccessToken(admin);
 
             mockMvc.perform(MockMvcRequestBuilders.delete("/api/admin/users/{userId}", 999_999L)
@@ -366,8 +422,8 @@ class AuthSecurityIntegrationTest {
         @Test
         @DisplayName("이미 삭제된 사용자는 409-201을 반환한다")
         void alreadyDeletedUserCannotBeDeletedAgain() throws Exception {
-            User admin = saveUser(Role.ADMIN, "admin@example.com", PASSWORD);
-            User operator = saveUser(Role.OPERATOR, "operator@example.com", PASSWORD);
+            User admin = saveUser(Role.ADMIN, "admin@sk.com", PASSWORD);
+            User operator = saveUser(Role.OPERATOR, "operator@sk.com", PASSWORD);
             operator.withdraw();
             userRepository.save(operator);
             String adminAccessToken = loginAndGetAccessToken(admin);
@@ -383,7 +439,7 @@ class AuthSecurityIntegrationTest {
         @Test
         @DisplayName("시스템 관리자는 본인 계정을 삭제할 수 없다")
         void adminCannotDeleteSelf() throws Exception {
-            User admin = saveUser(Role.ADMIN, "admin@example.com", PASSWORD);
+            User admin = saveUser(Role.ADMIN, "admin@sk.com", PASSWORD);
             String adminAccessToken = loginAndGetAccessToken(admin);
 
             mockMvc.perform(MockMvcRequestBuilders.delete("/api/admin/users/{userId}", admin.getId())
@@ -397,8 +453,8 @@ class AuthSecurityIntegrationTest {
         @Test
         @DisplayName("시스템 관리자 계정은 삭제할 수 없다")
         void adminCannotDeleteAnotherAdmin() throws Exception {
-            User admin = saveUser(Role.ADMIN, "admin@example.com", PASSWORD);
-            User anotherAdmin = saveUser(Role.ADMIN, "another-admin@example.com", PASSWORD);
+            User admin = saveUser(Role.ADMIN, "admin@sk.com", PASSWORD);
+            User anotherAdmin = saveUser(Role.ADMIN, "another-admin@sk.com", PASSWORD);
             String adminAccessToken = loginAndGetAccessToken(admin);
 
             mockMvc.perform(MockMvcRequestBuilders.delete("/api/admin/users/{userId}", anotherAdmin.getId())
@@ -412,8 +468,8 @@ class AuthSecurityIntegrationTest {
         @Test
         @DisplayName("삭제 권한이 없는 사용자는 403-201을 반환한다")
         void nonAdminCannotDeleteUser() throws Exception {
-            User operator = saveUser(Role.OPERATOR, "operator@example.com", PASSWORD);
-            User executive = saveUser(Role.EXECUTIVE, "executive@example.com", PASSWORD);
+            User operator = saveUser(Role.OPERATOR, "operator@sk.com", PASSWORD);
+            User executive = saveUser(Role.EXECUTIVE, "executive@sk.com", PASSWORD);
             String operatorAccessToken = loginAndGetAccessToken(operator);
 
             mockMvc.perform(MockMvcRequestBuilders.delete("/api/admin/users/{userId}", executive.getId())
@@ -432,7 +488,7 @@ class AuthSecurityIntegrationTest {
         @Test
         @DisplayName("Refresh Token 재발급은 새 토큰을 발급하고 기존 Refresh Token을 폐기한다")
         void refreshTokenRotates() throws Exception {
-            User user = saveUser(Role.EXECUTIVE, "executive@example.com", PASSWORD);
+            User user = saveUser(Role.EXECUTIVE, "executive@sk.com", PASSWORD);
             MvcResult loginResult = login(user);
             String oldAccessToken = dataValue(loginResult, "accessToken");
             String oldRefreshToken = dataValue(loginResult, "refreshToken");
@@ -464,7 +520,7 @@ class AuthSecurityIntegrationTest {
         @Test
         @DisplayName("Access Token으로 토큰 재발급을 요청하면 401-001을 반환한다")
         void accessTokenCannotBeUsedAsRefreshToken() throws Exception {
-            User user = saveUser(Role.OPERATOR, "operator@example.com", PASSWORD);
+            User user = saveUser(Role.OPERATOR, "operator@sk.com", PASSWORD);
             String accessToken = dataValue(login(user), "accessToken");
 
             mockMvc.perform(MockMvcRequestBuilders.post("/api/token/refresh")
@@ -478,7 +534,7 @@ class AuthSecurityIntegrationTest {
         @Test
         @DisplayName("Refresh Token 재발급은 잘못된 Authorization 헤더가 있어도 body의 Refresh Token으로 처리한다")
         void refreshTokenIgnoresInvalidAuthorizationHeader() throws Exception {
-            User user = saveUser(Role.OPERATOR, "operator@example.com", PASSWORD);
+            User user = saveUser(Role.OPERATOR, "operator@sk.com", PASSWORD);
             String refreshToken = dataValue(login(user), "refreshToken");
 
             mockMvc.perform(MockMvcRequestBuilders.post("/api/token/refresh")
@@ -495,14 +551,14 @@ class AuthSecurityIntegrationTest {
         @Test
         @DisplayName("위조된 Access Token은 보호 API에서 401-001을 반환한다")
         void tamperedAccessTokenFails() throws Exception {
-            User admin = saveUser(Role.ADMIN, "admin@example.com", PASSWORD);
+            User admin = saveUser(Role.ADMIN, "admin@sk.com", PASSWORD);
             String accessToken = loginAndGetAccessToken(admin);
             String tamperedToken = accessToken.substring(0, accessToken.length() - 2) + "xx";
 
             mockMvc.perform(MockMvcRequestBuilders.post("/api/admin/users")
                             .header(HttpHeaders.AUTHORIZATION, bearer(tamperedToken))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(createUserJson("operator01@example.com", "operator1234!", "operator1234!", Role.OPERATOR)))
+                            .content(createUserJson("operator01@sk.com", "Operator1234!", "Operator1234!", Role.OPERATOR)))
                     .andExpect(MockMvcResultMatchers.status().isUnauthorized())
                     .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(false))
                     .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("401-001"));
@@ -511,7 +567,7 @@ class AuthSecurityIntegrationTest {
         @Test
         @DisplayName("기존 Access Token은 계정 상태 변경 후에도 만료 전까지 클레임 기반으로 동작한다")
         void existingAccessTokenUsesClaimsUntilItExpires() throws Exception {
-            User admin = saveUser(Role.ADMIN, "admin@example.com", PASSWORD);
+            User admin = saveUser(Role.ADMIN, "admin@sk.com", PASSWORD);
             String accessToken = loginAndGetAccessToken(admin);
             admin.suspend();
             userRepository.save(admin);
@@ -519,7 +575,7 @@ class AuthSecurityIntegrationTest {
             mockMvc.perform(MockMvcRequestBuilders.post("/api/admin/users")
                             .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(createUserJson("operator01@example.com", "operator1234!", "operator1234!", Role.OPERATOR)))
+                            .content(createUserJson("operator01@sk.com", "Operator1234!", "Operator1234!", Role.OPERATOR)))
                     .andExpect(MockMvcResultMatchers.status().isOk())
                     .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(true))
                     .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("COMMON200"));
@@ -534,7 +590,7 @@ class AuthSecurityIntegrationTest {
         @EnumSource(value = Role.class, names = {"EXECUTIVE", "MANUFACTURING_MANAGER"})
         @DisplayName("경영진과 생산관리자는 주문 등록 API에 접근할 수 있다")
         void executiveAndManufacturingManagerCanAccessOrderCreate(Role role) throws Exception {
-            String accessToken = loginAndGetAccessToken(saveUser(role, role.name().toLowerCase() + "@example.com", PASSWORD));
+            String accessToken = loginAndGetAccessToken(saveUser(role, role.name().toLowerCase() + "@sk.com", PASSWORD));
 
             mockMvc.perform(MockMvcRequestBuilders.post("/api/orders")
                             .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
@@ -549,7 +605,7 @@ class AuthSecurityIntegrationTest {
         @EnumSource(value = Role.class, names = {"EXECUTIVE", "MANUFACTURING_MANAGER"}, mode = Mode.EXCLUDE)
         @DisplayName("경영진과 생산관리자가 아닌 사용자는 주문 등록 API에 접근할 수 없다")
         void otherRolesCannotAccessOrderCreate(Role role) throws Exception {
-            String accessToken = loginAndGetAccessToken(saveUser(role, role.name().toLowerCase() + "@example.com", PASSWORD));
+            String accessToken = loginAndGetAccessToken(saveUser(role, role.name().toLowerCase() + "@sk.com", PASSWORD));
 
             mockMvc.perform(MockMvcRequestBuilders.post("/api/orders")
                             .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
@@ -631,6 +687,16 @@ class AuthSecurityIntegrationTest {
     }
 
     private String createUserJson(String email, String password, String passwordConfirm, Role role) throws Exception {
+        return createUserJson(email, password, passwordConfirm, role, "010-1234-5678");
+    }
+
+    private String createUserJson(
+            String email,
+            String password,
+            String passwordConfirm,
+            Role role,
+            String phoneNumber
+    ) throws Exception {
         return json(Map.of(
                 "name", "김길동",
                 "email", email,
@@ -639,7 +705,7 @@ class AuthSecurityIntegrationTest {
                 "role", role.name(),
                 "department", "생산관리팀",
                 "companyName", "s_map",
-                "phoneNumber", "010-1234-5678"
+                "phoneNumber", phoneNumber
         ));
     }
 

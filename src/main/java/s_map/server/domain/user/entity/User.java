@@ -38,7 +38,7 @@ public class User extends BaseEntity {
 
     @Email
     @Column(nullable = false, unique = true, length = 100)
-    @Schema(description = "이메일", example = "operator01@example.com")
+    @Schema(description = "이메일", example = "operator01@sk.com")
     private String email;
 
     @Column(nullable = false)
