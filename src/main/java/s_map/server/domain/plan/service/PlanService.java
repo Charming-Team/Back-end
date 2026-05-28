@@ -13,8 +13,8 @@ import s_map.server.domain.plan.dto.res.PlanUpdateResponse;
 import s_map.server.domain.order.entity.PlanStatus;
 import s_map.server.domain.order.entity.ProductionPlan;
 import s_map.server.domain.order.repository.ProductionPlanRepository;
-import s_map.server.domain.plan.entity.ProductionResult;
 import s_map.server.domain.plan.repository.ProductionResultRepository;
+import s_map.server.domain.plan.repository.ProductionResultRow;
 import s_map.server.domain.user.entity.Role;
 import s_map.server.domain.user.entity.UserStatus;
 import s_map.server.domain.user.repository.UserRepository;
@@ -135,12 +135,12 @@ public class PlanService {
                 .map(ProductionPlan::getPlanId)
                 .toList();
 
-        Map<Long, ProductionResult> resultMap = planIds.isEmpty()
+        Map<Long, ProductionResultRow> resultMap = planIds.isEmpty()
                 ? Map.of()
                 : productionResultRepository.findByPlanIdIn(planIds)
                         .stream()
                         .collect(Collectors.toMap(
-                                ProductionResult::getPlanId,
+                                ProductionResultRow::planId,
                                 Function.identity(),
                                 (first, second) -> first
                         ));
