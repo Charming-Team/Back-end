@@ -16,6 +16,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.ColumnTransformer;
 
 @Entity
 @Getter
@@ -45,13 +46,15 @@ public class User extends BaseEntity {
     private String password;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 30)
+    @ColumnTransformer(write = "?::role_enum")
+    @Column(nullable = false, columnDefinition = "role_enum")
     @Schema(description = "사용자 권한", example = "OPERATOR")
     private Role role;
 
     @Builder.Default
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @ColumnTransformer(write = "?::user_status_enum")
+    @Column(nullable = false, columnDefinition = "user_status_enum")
     @Schema(description = "계정 상태", example = "ACTIVE")
     private UserStatus status = UserStatus.ACTIVE;
 

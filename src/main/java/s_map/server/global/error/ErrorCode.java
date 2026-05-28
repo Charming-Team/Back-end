@@ -17,6 +17,9 @@ public enum ErrorCode {
     INVALID_INVENTORY_OPERATION_QUANTITY(HttpStatus.BAD_REQUEST, "400-102", "재고 처리 수량은 0보다 커야 합니다."),
     INSUFFICIENT_AVAILABLE_INVENTORY(HttpStatus.BAD_REQUEST, "400-103", "예약 가능한 재고 수량이 부족합니다."),
     INVALID_INVENTORY_RELEASE_QUANTITY(HttpStatus.BAD_REQUEST, "400-104", "해제할 예약 수량은 현재 예약 재고보다 클 수 없습니다."),
+    INVALID_ORDER_DATE(HttpStatus.BAD_REQUEST, "400-301", "주문 일정 조건이 올바르지 않습니다."),
+    INVALID_ORDER_OPERATOR(HttpStatus.BAD_REQUEST, "400-302", "생산 담당자 정보가 올바르지 않습니다."),
+    ORDER_SCHEDULE_EXCEEDS_DUE_DATE(HttpStatus.BAD_REQUEST, "400-303", "생산계획 종료일은 납기일을 초과할 수 없습니다."),
 
     // 401 Unauthorized
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "401", "인증이 필요합니다."),
@@ -41,6 +44,10 @@ public enum ErrorCode {
     BOM_NOT_FOUND(HttpStatus.NOT_FOUND, "404-104", "BOM 정보를 찾을 수 없습니다."),
     PRODUCT_BOM_NOT_FOUND(HttpStatus.NOT_FOUND, "404-105", "해당 제품에 등록된 BOM 정보가 없습니다."),
     USER_DELETE_NOT_ALLOWED(HttpStatus.NOT_FOUND, "404-201", "삭제할 수 없는 사용자 정보입니다."),
+    ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "404-301", "주문 정보를 찾을 수 없습니다."),
+    PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "404-302", "제품 정보를 찾을 수 없습니다."),
+    OPERATOR_NOT_FOUND(HttpStatus.NOT_FOUND, "404-303", "생산 담당자 정보를 찾을 수 없습니다."),
+    AVAILABLE_PRODUCTION_LINE_NOT_FOUND(HttpStatus.NOT_FOUND, "404-304", "생산 가능한 라인을 찾을 수 없습니다."),
 
     // 405 Method Not Allowed
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "405", "지원하지 않는 HTTP 메서드입니다."),
@@ -52,10 +59,20 @@ public enum ErrorCode {
     DUPLICATE_BOM(HttpStatus.CONFLICT, "409-102", "이미 등록된 제품-자재 BOM 정보입니다."),
     CONCURRENT_INVENTORY_UPDATE(HttpStatus.CONFLICT, "409-103", "재고 정보가 동시에 수정되었습니다. 다시 조회 후 시도해주세요."),
     USER_ALREADY_DELETED(HttpStatus.CONFLICT, "409-201", "이미 삭제된 사용자입니다."),
+    CONCURRENT_ORDER_CREATION(HttpStatus.CONFLICT, "409-301", "주문 또는 생산계획이 동시에 생성되었습니다. 다시 조회 후 시도해주세요."),
 
     // 500 Internal Server Error
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "500", "서버 내부 오류가 발생했습니다."),
-    USER_DELETE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "500-201", "사용자 삭제 처리에 실패했습니다. 잠시 후 다시 시도해주세요.");
+    USER_DELETE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "500-201", "사용자 삭제 처리에 실패했습니다. 잠시 후 다시 시도해주세요."),
+
+    // Chat FastAPI Gateway
+    CHAT_FASTAPI_CONNECTION_FAILED(HttpStatus.BAD_GATEWAY, "CHAT_FASTAPI_001", "챗봇 서버 연결에 실패했습니다."),
+    CHAT_FASTAPI_TIMEOUT(HttpStatus.GATEWAY_TIMEOUT, "CHAT_FASTAPI_002", "챗봇 응답 시간이 초과되었습니다."),
+    CHAT_FASTAPI_BAD_REQUEST(HttpStatus.BAD_GATEWAY, "CHAT_FASTAPI_003", "챗봇 요청을 처리할 수 없습니다."),
+    CHAT_FASTAPI_FORBIDDEN(HttpStatus.BAD_GATEWAY, "CHAT_FASTAPI_004", "챗봇 서버 요청에 실패했습니다."),
+    CHAT_FASTAPI_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "CHAT_FASTAPI_005", "챗봇 서버를 사용할 수 없습니다."),
+    CHAT_FASTAPI_INTERNAL_ERROR(HttpStatus.BAD_GATEWAY, "CHAT_FASTAPI_006", "챗봇 서버 내부 오류가 발생했습니다."),
+    CHAT_FASTAPI_INVALID_RESPONSE(HttpStatus.BAD_GATEWAY, "CHAT_FASTAPI_007", "챗봇 서버 응답을 처리할 수 없습니다.");
 
     private final HttpStatus httpStatus;
     private final String code;

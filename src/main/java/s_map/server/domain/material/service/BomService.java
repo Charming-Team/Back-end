@@ -9,7 +9,9 @@ import s_map.server.domain.material.repository.BomRepository;
 import s_map.server.domain.material.repository.MaterialRepository;
 import s_map.server.global.error.CustomException;
 import s_map.server.global.error.ErrorCode;
+import s_map.server.global.security.AuthUser;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -23,6 +25,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 @Transactional(readOnly = true)
 public class BomService {
 
@@ -48,10 +51,10 @@ public class BomService {
      * - result / BomResponse / 등록된 BOM 정보
      */
     @Transactional
-    public BomResponse createBom(BomCreateRequest request) {
-        Material material = getMaterialEntity(request.materialId());
+    public BomResponse createBom(BomCreateRequest request, AuthUser actor) {
+        Material material = getMaterialEntity(request.materialId(), "BOM 등록", actor);
 
-        validateDuplicateBom(request.productId(), request.materialId());
+        validateDuplicateBom(request.productId(), request.materialId(), actor);
 
         String unit = StringUtils.hasText(request.unit()) ? request.unit() : material.getUnit();
 
@@ -67,9 +70,27 @@ public class BomService {
         try {
             savedBom = bomRepository.saveAndFlush(bom);
         } catch (DataIntegrityViolationException exception) {
+            log.warn(
+                    "[BomService] BOM 등록 실패 reason=duplicate_bom productId={}, materialId={}, actorUserId={}, actorEmail={}, actorRole={}",
+                    request.productId(),
+                    request.materialId(),
+                    actorUserId(actor),
+                    actorEmail(actor),
+                    actorRole(actor)
+            );
             throw new CustomException(ErrorCode.DUPLICATE_BOM);
         }
 
+        log.info(
+                "[BomService] BOM 등록 성공 bomId={}, productId={}, materialId={}, materialCode={}, actorUserId={}, actorEmail={}, actorRole={}",
+                savedBom.getBomId(),
+                savedBom.getProductId(),
+                savedBom.getMaterial().getMaterialId(),
+                savedBom.getMaterial().getMaterialCode(),
+                actorUserId(actor),
+                actorEmail(actor),
+                actorRole(actor)
+        );
         return BomResponse.from(savedBom);
     }
 
@@ -130,8 +151,12 @@ public class BomService {
      * - result / BomResponse / 수정된 BOM 정보
      */
     @Transactional
-    public BomResponse updateBom(Long bomId, BomUpdateRequest request) {
-        Bom bom = getBomEntity(bomId);
+    public BomResponse updateBom(
+            Long bomId,
+            BomUpdateRequest request,
+            AuthUser actor
+    ) {
+        Bom bom = getBomEntity(bomId, actor);
 
         String unit = StringUtils.hasText(request.unit()) ? request.unit() : bom.getMaterial().getUnit();
 
@@ -141,6 +166,16 @@ public class BomService {
                 request.lossRate()
         );
 
+        log.info(
+                "[BomService] BOM 수정 성공 bomId={}, productId={}, materialId={}, materialCode={}, actorUserId={}, actorEmail={}, actorRole={}",
+                bom.getBomId(),
+                bom.getProductId(),
+                bom.getMaterial().getMaterialId(),
+                bom.getMaterial().getMaterialCode(),
+                actorUserId(actor),
+                actorEmail(actor),
+                actorRole(actor)
+        );
         return BomResponse.from(bom);
     }
 
@@ -153,9 +188,23 @@ public class BomService {
      * Output:
      * - result / Material / 조회된 자재 엔티티
      */
-    private Material getMaterialEntity(Long materialId) {
+    private Material getMaterialEntity(
+            Long materialId,
+            String action,
+            AuthUser actor
+    ) {
         return materialRepository.findById(materialId)
-                .orElseThrow(() -> new CustomException(ErrorCode.MATERIAL_NOT_FOUND));
+                .orElseThrow(() -> {
+                    log.warn(
+                            "[BomService] {} 실패 reason=material_not_found materialId={}, actorUserId={}, actorEmail={}, actorRole={}",
+                            action,
+                            materialId,
+                            actorUserId(actor),
+                            actorEmail(actor),
+                            actorRole(actor)
+                    );
+                    return new CustomException(ErrorCode.MATERIAL_NOT_FOUND);
+                });
     }
 
     /**
@@ -167,9 +216,18 @@ public class BomService {
      * Output:
      * - result / Bom / 조회된 BOM 엔티티
      */
-    private Bom getBomEntity(Long bomId) {
+    private Bom getBomEntity(Long bomId, AuthUser actor) {
         return bomRepository.findById(bomId)
-                .orElseThrow(() -> new CustomException(ErrorCode.BOM_NOT_FOUND));
+                .orElseThrow(() -> {
+                    log.warn(
+                            "[BomService] BOM 수정 실패 reason=bom_not_found bomId={}, actorUserId={}, actorEmail={}, actorRole={}",
+                            bomId,
+                            actorUserId(actor),
+                            actorEmail(actor),
+                            actorRole(actor)
+                    );
+                    return new CustomException(ErrorCode.BOM_NOT_FOUND);
+                });
     }
 
     /**
@@ -182,9 +240,29 @@ public class BomService {
      * Output:
      * - result / void / 반환값 없음, 중복 시 예외 발생
      */
-    private void validateDuplicateBom(Long productId, Long materialId) {
+    private void validateDuplicateBom(Long productId, Long materialId, AuthUser actor) {
         if (bomRepository.existsByProductIdAndMaterialMaterialId(productId, materialId)) {
+            log.warn(
+                    "[BomService] BOM 등록 실패 reason=duplicate_bom productId={}, materialId={}, actorUserId={}, actorEmail={}, actorRole={}",
+                    productId,
+                    materialId,
+                    actorUserId(actor),
+                    actorEmail(actor),
+                    actorRole(actor)
+            );
             throw new CustomException(ErrorCode.DUPLICATE_BOM);
         }
+    }
+
+    private Long actorUserId(AuthUser actor) {
+        return actor != null ? actor.id() : null;
+    }
+
+    private String actorEmail(AuthUser actor) {
+        return actor != null ? actor.email() : null;
+    }
+
+    private Object actorRole(AuthUser actor) {
+        return actor != null ? actor.role() : null;
     }
 }

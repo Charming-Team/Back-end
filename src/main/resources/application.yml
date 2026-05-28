@@ -38,15 +38,22 @@ app:
     access-token-expiration-ms: 300000
     refresh-token-expiration-ms: 86400000
 
+ai:
+  fastapi:
+    base-url: ${FASTAPI_BASE_URL:http://fastapi-service:8000}
+    chat-answer-path: /ai/api/v1/chat/answer
+    chat-answer-internal-token: ${CHAT_ANSWER_INTERNAL_TOKEN:}
+    timeout-seconds: 60
+
 ---
 spring:
   config:
     activate:
       on-profile: local
   datasource:
-    url: jdbc:postgresql://localhost:5432/postgres
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/smap}
     driver-class-name: org.postgresql.Driver
-    username: postgres
+    username: ${SPRING_DATASOURCE_USERNAME:smap}
     password: ${DB_PASSWORD}
   jpa:
     hibernate:
@@ -64,7 +71,8 @@ spring:
     activate:
       on-profile: test
   datasource:
-    url: jdbc:h2:mem:s_map-test;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
+    url: >-
+      jdbc:h2:mem:s_map-test;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1;INIT=CREATE DOMAIN IF NOT EXISTS role_enum AS VARCHAR(30)\;CREATE DOMAIN IF NOT EXISTS user_status_enum AS VARCHAR(30)\;CREATE DOMAIN IF NOT EXISTS order_status_enum AS VARCHAR(30)\;CREATE DOMAIN IF NOT EXISTS plan_status_enum AS VARCHAR(30)\;CREATE DOMAIN IF NOT EXISTS inventory_status_enum AS VARCHAR(30)\;CREATE DOMAIN IF NOT EXISTS material_plan_status_enum AS VARCHAR(30)
     driver-class-name: org.h2.Driver
     username: sa
     password:
@@ -103,5 +111,13 @@ management:
 app:
   cors:
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS}
+  internal:
+    chat:
+      evidence-token: ${CHAT_EVIDENCE_INTERNAL_TOKEN}
   jwt:
     secret: ${JWT_SECRET}
+
+ai:
+  fastapi:
+    base-url: ${FASTAPI_BASE_URL:http://fastapi-service:8000}
+    chat-answer-internal-token: ${CHAT_ANSWER_INTERNAL_TOKEN}

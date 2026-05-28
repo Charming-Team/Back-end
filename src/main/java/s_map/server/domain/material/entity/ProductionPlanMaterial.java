@@ -18,6 +18,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.ColumnTransformer;
 import s_map.server.global.common.BaseEntity;
 
 import java.math.BigDecimal;
@@ -63,7 +64,8 @@ public class ProductionPlanMaterial extends BaseEntity {
     private BigDecimal shortageQuantity;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "material_plan_status", nullable = false, length = 30)
+    @ColumnTransformer(write = "?::material_plan_status_enum")
+    @Column(name = "material_plan_status", nullable = false, columnDefinition = "material_plan_status_enum")
     private MaterialPlanStatus materialPlanStatus;
 
     public void updateCalculationResult(

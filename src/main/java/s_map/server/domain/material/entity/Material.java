@@ -11,7 +11,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import s_map.server.global.common.BaseEntity;
+import s_map.server.global.common.LastModifiedEntity;
 
 @Getter
 @Entity
@@ -19,7 +19,7 @@ import s_map.server.global.common.BaseEntity;
 @AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "materials")
-public class Material extends BaseEntity {
+public class Material extends LastModifiedEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

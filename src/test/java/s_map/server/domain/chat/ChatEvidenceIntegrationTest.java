@@ -16,10 +16,15 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 import s_map.server.domain.material.entity.Material;
+import s_map.server.domain.material.entity.MaterialInventory;
 import s_map.server.domain.material.entity.MaterialPlanStatus;
 import s_map.server.domain.material.entity.ProductionPlanMaterial;
+import s_map.server.domain.material.repository.MaterialInventoryRepository;
 import s_map.server.domain.material.repository.MaterialRepository;
 import s_map.server.domain.material.repository.ProductionPlanMaterialRepository;
+import s_map.server.domain.user.entity.Role;
+import s_map.server.domain.user.entity.User;
+import s_map.server.domain.user.repository.UserRepository;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -39,17 +44,26 @@ class ChatEvidenceIntegrationTest {
     private MaterialRepository materialRepository;
 
     @Autowired
+    private MaterialInventoryRepository materialInventoryRepository;
+
+    @Autowired
     private ProductionPlanMaterialRepository productionPlanMaterialRepository;
+
+    @Autowired
+    private UserRepository userRepository;
 
     @BeforeEach
     void setUp() {
         productionPlanMaterialRepository.deleteAll();
+        materialInventoryRepository.deleteAll();
         materialRepository.deleteAll();
+        userRepository.deleteAll();
     }
 
     @Test
     @DisplayName("내부 토큰이 유효하면 자재 부족 Evidence를 반환한다")
     void lookupEvidenceReturnsMaterialShortageEvidence() throws Exception {
+        User user = saveUser(Role.MANUFACTURING_MANAGER);
         Material material = materialRepository.save(Material.builder()
                 .materialCode("RM-AL-001")
                 .materialName("알루미늄 원자재")
@@ -65,6 +79,12 @@ class ChatEvidenceIntegrationTest {
                 .shortageQuantity(new BigDecimal("60.0000"))
                 .materialPlanStatus(MaterialPlanStatus.SHORTAGE)
                 .build());
+        materialInventoryRepository.save(MaterialInventory.builder()
+                .material(material)
+                .currentQuantity(new BigDecimal("120.0000"))
+                .reservedQuantity(new BigDecimal("90.0000"))
+                .safetyStockQuantity(new BigDecimal("50.0000"))
+                .build());
 
         mockMvc.perform(MockMvcRequestBuilders.post("/internal/chat/evidence")
                         .header(INTERNAL_TOKEN_HEADER, "test-internal-token")
@@ -75,7 +95,7 @@ class ChatEvidenceIntegrationTest {
                                 "intent", "MATERIAL_SHORTAGE",
                                 "question", "자재 부족으로 영향받는 생산계획 알려줘",
                                 "user", Map.of(
-                                        "userId", 1,
+                                        "userId", user.getId(),
                                         "role", "MANUFACTURING_MANAGER",
                                         "companyName", "S-MAP"
                                 ),
@@ -95,6 +115,10 @@ class ChatEvidenceIntegrationTest {
                 .andExpect(MockMvcResultMatchers.jsonPath("$.data.items[0].data.planId").value(1001))
                 .andExpect(MockMvcResultMatchers.jsonPath("$.data.items[0].data.materialCode").value("RM-AL-001"))
                 .andExpect(MockMvcResultMatchers.jsonPath("$.data.items[0].data.materialPlanStatus").value("SHORTAGE"))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.data.items[0].data.inventoryRegistered").value(true))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.data.items[0].data.availableInventoryQuantity").value(30.0))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.data.items[0].data.safetyStockQuantity").value(50.0))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.data.items[0].data.inventoryStatus").value("LOW"))
                 .andExpect(MockMvcResultMatchers.jsonPath("$.data.items[0].allowedRoles[0]").value("OPERATOR"))
                 .andExpect(MockMvcResultMatchers.jsonPath("$.data.items[0].allowedRoles[1]").value("EXECUTIVE"))
                 .andExpect(MockMvcResultMatchers.jsonPath("$.data.items[0].allowedRoles[2]").value("MANUFACTURING_MANAGER"));
@@ -103,6 +127,7 @@ class ChatEvidenceIntegrationTest {
     @Test
     @DisplayName("서비스 관리자 Role은 자재 부족 Evidence를 조회하지 않는다")
     void lookupEvidenceReturnsEmptyItemsForAdminRole() throws Exception {
+        User user = saveUser(Role.ADMIN);
         saveShortageMaterial("RM-AL-001", "알루미늄 원자재", 1001L);
 
         mockMvc.perform(MockMvcRequestBuilders.post("/internal/chat/evidence")
@@ -114,7 +139,7 @@ class ChatEvidenceIntegrationTest {
                                 "intent", "MATERIAL_SHORTAGE",
                                 "question", "자재 부족으로 영향받는 생산계획 알려줘",
                                 "user", Map.of(
-                                        "userId", 1,
+                                        "userId", user.getId(),
                                         "role", "ADMIN",
                                         "companyName", "S-MAP"
                                 ),
@@ -128,8 +153,65 @@ class ChatEvidenceIntegrationTest {
     }
 
     @Test
+    @DisplayName("요청 바디 Role이 허용 Role로 위조되어도 DB Role 기준으로 차단한다")
+    void lookupEvidenceUsesDatabaseRoleInsteadOfRequestRole() throws Exception {
+        User user = saveUser(Role.ADMIN);
+        saveShortageMaterial("RM-AL-001", "알루미늄 원자재", 1001L);
+
+        mockMvc.perform(MockMvcRequestBuilders.post("/internal/chat/evidence")
+                        .header(INTERNAL_TOKEN_HEADER, "test-internal-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "sessionId", 10,
+                                "messageId", 24,
+                                "intent", "MATERIAL_SHORTAGE",
+                                "question", "자재 부족으로 영향받는 생산계획 알려줘",
+                                "user", Map.of(
+                                        "userId", user.getId(),
+                                        "role", "MANUFACTURING_MANAGER",
+                                        "companyName", "S-MAP"
+                                ),
+                                "filters", Map.of("limit", 5)
+                        ))))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(true))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.data.items").isArray())
+                .andExpect(MockMvcResultMatchers.jsonPath("$.data.items").isEmpty());
+    }
+
+    @Test
+    @DisplayName("비활성 사용자는 자재 부족 Evidence를 조회하지 않는다")
+    void lookupEvidenceReturnsEmptyItemsForInactiveUser() throws Exception {
+        User user = saveUser(Role.MANUFACTURING_MANAGER);
+        user.suspend();
+        userRepository.save(user);
+        saveShortageMaterial("RM-AL-001", "알루미늄 원자재", 1001L);
+
+        mockMvc.perform(MockMvcRequestBuilders.post("/internal/chat/evidence")
+                        .header(INTERNAL_TOKEN_HEADER, "test-internal-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "sessionId", 10,
+                                "messageId", 24,
+                                "intent", "MATERIAL_SHORTAGE",
+                                "question", "자재 부족으로 영향받는 생산계획 알려줘",
+                                "user", Map.of(
+                                        "userId", user.getId(),
+                                        "role", "MANUFACTURING_MANAGER",
+                                        "companyName", "S-MAP"
+                                ),
+                                "filters", Map.of("limit", 5)
+                        ))))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(true))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.data.items").isArray())
+                .andExpect(MockMvcResultMatchers.jsonPath("$.data.items").isEmpty());
+    }
+
+    @Test
     @DisplayName("limit은 자재 부족 Evidence 조회 개수를 제한한다")
     void lookupEvidenceAppliesLimit() throws Exception {
+        User user = saveUser(Role.MANUFACTURING_MANAGER);
         saveShortageMaterial("RM-AL-001", "알루미늄 원자재", 1001L);
         saveShortageMaterial("RM-CU-002", "구리 원자재", 1002L);
 
@@ -142,7 +224,7 @@ class ChatEvidenceIntegrationTest {
                                 "intent", "MATERIAL_SHORTAGE",
                                 "question", "자재 부족 한 건만 알려줘",
                                 "user", Map.of(
-                                        "userId", 1,
+                                        "userId", user.getId(),
                                         "role", "MANUFACTURING_MANAGER",
                                         "companyName", "S-MAP"
                                 ),
@@ -157,6 +239,7 @@ class ChatEvidenceIntegrationTest {
     @Test
     @DisplayName("자재 targetCode가 있으면 해당 자재 Evidence만 반환한다")
     void lookupEvidenceFiltersByMaterialTargetCode() throws Exception {
+        User user = saveUser(Role.MANUFACTURING_MANAGER);
         saveShortageMaterial("RM-AL-001", "알루미늄 원자재", 1001L);
         saveShortageMaterial("RM-CU-002", "구리 원자재", 1002L);
 
@@ -169,7 +252,7 @@ class ChatEvidenceIntegrationTest {
                                 "intent", "MATERIAL_SHORTAGE",
                                 "question", "RM-CU-002 자재 부족 현황 알려줘",
                                 "user", Map.of(
-                                        "userId", 1,
+                                        "userId", user.getId(),
                                         "role", "MANUFACTURING_MANAGER",
                                         "companyName", "S-MAP"
                                 ),
@@ -188,6 +271,7 @@ class ChatEvidenceIntegrationTest {
     @Test
     @DisplayName("자재 부족 intent에서 지원하지 않는 targetType이면 Evidence를 반환하지 않는다")
     void lookupEvidenceReturnsEmptyItemsForUnsupportedTargetType() throws Exception {
+        User user = saveUser(Role.MANUFACTURING_MANAGER);
         saveShortageMaterial("RM-AL-001", "알루미늄 원자재", 1001L);
 
         mockMvc.perform(MockMvcRequestBuilders.post("/internal/chat/evidence")
@@ -199,7 +283,7 @@ class ChatEvidenceIntegrationTest {
                                 "intent", "MATERIAL_SHORTAGE",
                                 "question", "LINE-A01 자재 부족 현황 알려줘",
                                 "user", Map.of(
-                                        "userId", 1,
+                                        "userId", user.getId(),
                                         "role", "MANUFACTURING_MANAGER",
                                         "companyName", "S-MAP"
                                 ),
@@ -265,6 +349,18 @@ class ChatEvidenceIntegrationTest {
 
     private String json(Object value) throws Exception {
         return objectMapper.writeValueAsString(value);
+    }
+
+    private User saveUser(Role role) {
+        return userRepository.save(User.builder()
+                .name("챗봇 사용자")
+                .email("chat-" + role.name().toLowerCase() + "@example.com")
+                .password("encoded-password")
+                .role(role)
+                .department("생산관리팀")
+                .companyName("S-MAP")
+                .phoneNumber("010-1234-5678")
+                .build());
     }
 
     private ProductionPlanMaterial saveShortageMaterial(
