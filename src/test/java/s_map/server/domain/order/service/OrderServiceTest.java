@@ -12,6 +12,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
 import s_map.server.domain.order.dto.req.OrderCreateRequest;
 import s_map.server.domain.order.entity.CustomerOrder;
+import s_map.server.domain.order.entity.OrderStatus;
 import s_map.server.domain.order.entity.ProductionPlan;
 import s_map.server.domain.order.repository.CustomerOrderRepository;
 import s_map.server.domain.order.repository.LineAssignmentCandidateProjection;
@@ -30,6 +31,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -38,6 +40,8 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -48,6 +52,7 @@ import static org.mockito.Mockito.when;
 class OrderServiceTest {
 
     private static final DateTimeFormatter ORDER_NO_DATE_FORMATTER = DateTimeFormatter.ofPattern("yyMMdd");
+    private static final ZoneId DEFAULT_PRODUCTION_ZONE = ZoneId.of("Asia/Seoul");
 
     @Mock
     private CustomerOrderRepository customerOrderRepository;
@@ -108,7 +113,7 @@ class OrderServiceTest {
         ProductionPlan savedPlan = planCaptor.getValue();
 
         assertThat(savedOrder.getOrderNo())
-                .isEqualTo("PO-" + LocalDate.now().format(ORDER_NO_DATE_FORMATTER) + "-007");
+                .isEqualTo("PO-" + LocalDate.now(DEFAULT_PRODUCTION_ZONE).format(ORDER_NO_DATE_FORMATTER) + "-007");
         assertThat(savedOrder.getCustomerName()).isEqualTo("A사");
         assertThat(savedOrder.getOrderQuantity()).isEqualTo(1000);
         assertThat(savedPlan.getOrderId()).isEqualTo(101L);
@@ -164,28 +169,125 @@ class OrderServiceTest {
     }
 
     @Test
-    @DisplayName("주문 목록 조회는 상태 갱신 UPDATE 없이 projection 쿼리로 조회한다")
-    void getOrdersQueriesProjectionWithoutStatusRefresh() {
-        when(orderQueryRepository.findOrderSummaries(
+    @DisplayName("희망 생산 시작일시가 과거이면 주문 등록을 거절한다")
+    void createOrderFailsWhenDesiredStartAtIsPast() {
+        OffsetDateTime desiredStartAt = OffsetDateTime.now(ZoneOffset.UTC).minusHours(1);
+        OrderCreateRequest request = createRequest(LocalDate.now(DEFAULT_PRODUCTION_ZONE).plusDays(5), desiredStartAt, 3L);
+
+        assertThatThrownBy(() -> orderService.createOrder(request))
+                .isInstanceOf(CustomException.class)
+                .extracting(exception -> ((CustomException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_ORDER_DATE);
+
+        verify(productQueryRepository, never()).findProductNameById(any());
+        verify(productionPlanRepository, never()).lockAssignableLineIds(any());
+        verify(customerOrderRepository, never()).saveAndFlush(any(CustomerOrder.class));
+        verify(productionPlanRepository, never()).saveAndFlush(any(ProductionPlan.class));
+    }
+
+    @Test
+    @DisplayName("상태 필터가 없으면 경량 목록 쿼리와 단순 count 쿼리로 조회한다")
+    void getOrdersWithoutStatusUsesPagedStatusQueryAndSimpleCount() {
+        when(orderQueryRepository.findOrderSummariesWithoutStatusFilter(
                 eq(null),
                 eq(null),
                 eq(null),
                 eq(null),
                 eq(null),
+                eq(10),
+                eq(0L),
+                any(LocalDate.class),
+                any(OffsetDateTime.class)
+        )).thenReturn(List.of(summaryProjection()));
+        when(orderQueryRepository.countOrderSummariesWithoutStatusFilter(
                 eq(null),
-                any(Pageable.class)
-        )).thenReturn(new PageImpl<>(List.of(summaryProjection())));
+                eq(null),
+                eq(null),
+                eq(null),
+                eq(null)
+        )).thenReturn(1L);
 
         var response = orderService.getOrders(0, 10, null, null, null, null, null, null);
 
+        verify(orderQueryRepository).findOrderSummariesWithoutStatusFilter(
+                eq(null),
+                eq(null),
+                eq(null),
+                eq(null),
+                eq(null),
+                eq(10),
+                eq(0L),
+                any(LocalDate.class),
+                any(OffsetDateTime.class)
+        );
+        verify(orderQueryRepository).countOrderSummariesWithoutStatusFilter(
+                eq(null),
+                eq(null),
+                eq(null),
+                eq(null),
+                eq(null)
+        );
+        verify(orderQueryRepository, never()).findOrderSummaries(
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(Pageable.class)
+        );
+        assertThat(response.getContent()).hasSize(1);
+        assertThat(response.getContent().getFirst().orderStatusLabel()).isEqualTo("진행 중");
+        assertThat(response.getTotalElements()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("상태 필터가 있으면 상태 계산 포함 목록 쿼리로 조회한다")
+    void getOrdersWithStatusUsesStatusFilterQuery() {
+        when(orderQueryRepository.findOrderSummaries(
+                eq(null),
+                eq("IN_PROGRESS"),
+                eq(null),
+                eq(null),
+                eq(null),
+                eq(null),
+                any(LocalDate.class),
+                any(OffsetDateTime.class),
+                any(Pageable.class)
+        )).thenReturn(new PageImpl<>(List.of(summaryProjection())));
+
+        var response = orderService.getOrders(0, 10, null, OrderStatus.IN_PROGRESS, null, null, null, null);
+
         verify(orderQueryRepository).findOrderSummaries(
                 eq(null),
+                eq("IN_PROGRESS"),
                 eq(null),
                 eq(null),
                 eq(null),
                 eq(null),
-                eq(null),
+                any(LocalDate.class),
+                any(OffsetDateTime.class),
                 any(Pageable.class)
+        );
+        verify(orderQueryRepository, never()).findOrderSummariesWithoutStatusFilter(
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                anyInt(),
+                anyLong(),
+                any(LocalDate.class),
+                any(OffsetDateTime.class)
+        );
+        verify(orderQueryRepository, never()).countOrderSummariesWithoutStatusFilter(
+                any(),
+                any(),
+                any(),
+                any(),
+                any()
         );
         assertThat(response.getContent()).hasSize(1);
         assertThat(response.getContent().getFirst().orderStatusLabel()).isEqualTo("진행 중");
@@ -293,7 +395,7 @@ class OrderServiceTest {
 
             @Override
             public LocalDate getDueDate() {
-                return LocalDate.now().plusDays(7);
+                return LocalDate.now(DEFAULT_PRODUCTION_ZONE).plusDays(7);
             }
 
             @Override
