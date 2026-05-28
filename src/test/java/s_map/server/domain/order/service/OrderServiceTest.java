@@ -195,7 +195,9 @@ class OrderServiceTest {
                 eq(null),
                 eq(null),
                 eq(10),
-                eq(0L)
+                eq(0L),
+                any(LocalDate.class),
+                any(OffsetDateTime.class)
         )).thenReturn(List.of(summaryProjection()));
         when(orderQueryRepository.countOrderSummariesWithoutStatusFilter(
                 eq(null),
@@ -214,7 +216,9 @@ class OrderServiceTest {
                 eq(null),
                 eq(null),
                 eq(10),
-                eq(0L)
+                eq(0L),
+                any(LocalDate.class),
+                any(OffsetDateTime.class)
         );
         verify(orderQueryRepository).countOrderSummariesWithoutStatusFilter(
                 eq(null),
@@ -224,6 +228,8 @@ class OrderServiceTest {
                 eq(null)
         );
         verify(orderQueryRepository, never()).findOrderSummaries(
+                any(),
+                any(),
                 any(),
                 any(),
                 any(),
@@ -247,6 +253,8 @@ class OrderServiceTest {
                 eq(null),
                 eq(null),
                 eq(null),
+                any(LocalDate.class),
+                any(OffsetDateTime.class),
                 any(Pageable.class)
         )).thenReturn(new PageImpl<>(List.of(summaryProjection())));
 
@@ -259,6 +267,8 @@ class OrderServiceTest {
                 eq(null),
                 eq(null),
                 eq(null),
+                any(LocalDate.class),
+                any(OffsetDateTime.class),
                 any(Pageable.class)
         );
         verify(orderQueryRepository, never()).findOrderSummariesWithoutStatusFilter(
@@ -268,7 +278,9 @@ class OrderServiceTest {
                 any(),
                 any(),
                 anyInt(),
-                anyLong()
+                anyLong(),
+                any(LocalDate.class),
+                any(OffsetDateTime.class)
         );
         verify(orderQueryRepository, never()).countOrderSummariesWithoutStatusFilter(
                 any(),

@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import s_map.server.domain.order.entity.CustomerOrder;
 
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -43,14 +44,14 @@ public interface OrderQueryRepository extends Repository<CustomerOrder, Long> {
                             fo.order_id,
                             CASE
                                 WHEN fo.stored_order_status IN ('COMPLETED', 'CANCELLED') THEN fo.stored_order_status
-                                WHEN fo.due_date < CURRENT_DATE THEN 'DELAYED'
+                                WHEN fo.due_date < :today THEN 'DELAYED'
                                 WHEN COALESCE(MAX(
                                         CASE
                                             WHEN pp.plan_id IS NOT NULL
                                              AND CAST(pp.plan_status AS varchar) NOT IN ('COMPLETED', 'CANCELLED')
                                              AND (
                                                     CAST(pp.plan_status AS varchar) = 'DELAYED'
-                                                    OR pp.planned_end_at < CURRENT_TIMESTAMP
+                                                    OR pp.planned_end_at < :now
                                                  )
                                             THEN 1
                                             ELSE 0
@@ -62,7 +63,7 @@ public interface OrderQueryRepository extends Repository<CustomerOrder, Long> {
                                              AND CAST(pp.plan_status AS varchar) NOT IN ('COMPLETED', 'CANCELLED')
                                              AND (
                                                     CAST(pp.plan_status AS varchar) = 'IN_PROGRESS'
-                                                    OR pp.planned_start_at <= CURRENT_TIMESTAMP
+                                                    OR pp.planned_start_at <= :now
                                                  )
                                             THEN 1
                                             ELSE 0
@@ -114,14 +115,14 @@ public interface OrderQueryRepository extends Repository<CustomerOrder, Long> {
                             fo.order_id,
                             CASE
                                 WHEN fo.stored_order_status IN ('COMPLETED', 'CANCELLED') THEN fo.stored_order_status
-                                WHEN fo.due_date < CURRENT_DATE THEN 'DELAYED'
+                                WHEN fo.due_date < :today THEN 'DELAYED'
                                 WHEN COALESCE(MAX(
                                         CASE
                                             WHEN pp.plan_id IS NOT NULL
                                              AND CAST(pp.plan_status AS varchar) NOT IN ('COMPLETED', 'CANCELLED')
                                              AND (
                                                     CAST(pp.plan_status AS varchar) = 'DELAYED'
-                                                    OR pp.planned_end_at < CURRENT_TIMESTAMP
+                                                    OR pp.planned_end_at < :now
                                                  )
                                             THEN 1
                                             ELSE 0
@@ -133,7 +134,7 @@ public interface OrderQueryRepository extends Repository<CustomerOrder, Long> {
                                              AND CAST(pp.plan_status AS varchar) NOT IN ('COMPLETED', 'CANCELLED')
                                              AND (
                                                     CAST(pp.plan_status AS varchar) = 'IN_PROGRESS'
-                                                    OR pp.planned_start_at <= CURRENT_TIMESTAMP
+                                                    OR pp.planned_start_at <= :now
                                                  )
                                             THEN 1
                                             ELSE 0
@@ -159,6 +160,8 @@ public interface OrderQueryRepository extends Repository<CustomerOrder, Long> {
             @Param("productId") Long productId,
             @Param("dueDateFrom") LocalDate dueDateFrom,
             @Param("dueDateTo") LocalDate dueDateTo,
+            @Param("today") LocalDate today,
+            @Param("now") OffsetDateTime now,
             Pageable pageable
     );
 
@@ -199,14 +202,14 @@ public interface OrderQueryRepository extends Repository<CustomerOrder, Long> {
                             po.order_id,
                             CASE
                                 WHEN po.stored_order_status IN ('COMPLETED', 'CANCELLED') THEN po.stored_order_status
-                                WHEN po.due_date < CURRENT_DATE THEN 'DELAYED'
+                                WHEN po.due_date < :today THEN 'DELAYED'
                                 WHEN COALESCE(MAX(
                                         CASE
                                             WHEN pp.plan_id IS NOT NULL
                                              AND CAST(pp.plan_status AS varchar) NOT IN ('COMPLETED', 'CANCELLED')
                                              AND (
                                                     CAST(pp.plan_status AS varchar) = 'DELAYED'
-                                                    OR pp.planned_end_at < CURRENT_TIMESTAMP
+                                                    OR pp.planned_end_at < :now
                                                  )
                                             THEN 1
                                             ELSE 0
@@ -218,7 +221,7 @@ public interface OrderQueryRepository extends Repository<CustomerOrder, Long> {
                                              AND CAST(pp.plan_status AS varchar) NOT IN ('COMPLETED', 'CANCELLED')
                                              AND (
                                                     CAST(pp.plan_status AS varchar) = 'IN_PROGRESS'
-                                                    OR pp.planned_start_at <= CURRENT_TIMESTAMP
+                                                    OR pp.planned_start_at <= :now
                                                  )
                                             THEN 1
                                             ELSE 0
@@ -255,7 +258,9 @@ public interface OrderQueryRepository extends Repository<CustomerOrder, Long> {
             @Param("dueDateFrom") LocalDate dueDateFrom,
             @Param("dueDateTo") LocalDate dueDateTo,
             @Param("limit") int limit,
-            @Param("offset") long offset
+            @Param("offset") long offset,
+            @Param("today") LocalDate today,
+            @Param("now") OffsetDateTime now
     );
 
     @Query(
@@ -327,14 +332,14 @@ public interface OrderQueryRepository extends Repository<CustomerOrder, Long> {
                             sob.late_penalty_amount,
                             CASE
                                 WHEN sob.stored_order_status IN ('COMPLETED', 'CANCELLED') THEN sob.stored_order_status
-                                WHEN sob.due_date < CURRENT_DATE THEN 'DELAYED'
+                                WHEN sob.due_date < :today THEN 'DELAYED'
                                 WHEN COALESCE(MAX(
                                         CASE
                                             WHEN status_pp.plan_id IS NOT NULL
                                              AND CAST(status_pp.plan_status AS varchar) NOT IN ('COMPLETED', 'CANCELLED')
                                              AND (
                                                     CAST(status_pp.plan_status AS varchar) = 'DELAYED'
-                                                    OR status_pp.planned_end_at < CURRENT_TIMESTAMP
+                                                    OR status_pp.planned_end_at < :now
                                                  )
                                             THEN 1
                                             ELSE 0
@@ -346,7 +351,7 @@ public interface OrderQueryRepository extends Repository<CustomerOrder, Long> {
                                              AND CAST(status_pp.plan_status AS varchar) NOT IN ('COMPLETED', 'CANCELLED')
                                              AND (
                                                     CAST(status_pp.plan_status AS varchar) = 'IN_PROGRESS'
-                                                    OR status_pp.planned_start_at <= CURRENT_TIMESTAMP
+                                                    OR status_pp.planned_start_at <= :now
                                                  )
                                             THEN 1
                                             ELSE 0
@@ -405,14 +410,14 @@ public interface OrderQueryRepository extends Repository<CustomerOrder, Long> {
                                         CASE
                                             WHEN CAST(priority_co.order_status AS varchar) IN ('COMPLETED', 'CANCELLED')
                                                 THEN CAST(priority_co.order_status AS varchar)
-                                            WHEN priority_co.due_date < CURRENT_DATE THEN 'DELAYED'
+                                            WHEN priority_co.due_date < :today THEN 'DELAYED'
                                             WHEN COALESCE(MAX(
                                                     CASE
                                                         WHEN priority_pp.plan_id IS NOT NULL
                                                          AND CAST(priority_pp.plan_status AS varchar) NOT IN ('COMPLETED', 'CANCELLED')
                                                          AND (
                                                                 CAST(priority_pp.plan_status AS varchar) = 'DELAYED'
-                                                                OR priority_pp.planned_end_at < CURRENT_TIMESTAMP
+                                                                OR priority_pp.planned_end_at < :now
                                                              )
                                                         THEN 1
                                                         ELSE 0
@@ -424,7 +429,7 @@ public interface OrderQueryRepository extends Repository<CustomerOrder, Long> {
                                                          AND CAST(priority_pp.plan_status AS varchar) NOT IN ('COMPLETED', 'CANCELLED')
                                                          AND (
                                                                 CAST(priority_pp.plan_status AS varchar) = 'IN_PROGRESS'
-                                                                OR priority_pp.planned_start_at <= CURRENT_TIMESTAMP
+                                                                OR priority_pp.planned_start_at <= :now
                                                              )
                                                         THEN 1
                                                         ELSE 0
@@ -515,5 +520,9 @@ public interface OrderQueryRepository extends Repository<CustomerOrder, Long> {
                     """,
             nativeQuery = true
     )
-    Optional<OrderDetailProjection> findOrderDetail(@Param("orderId") Long orderId);
+    Optional<OrderDetailProjection> findOrderDetail(
+            @Param("orderId") Long orderId,
+            @Param("today") LocalDate today,
+            @Param("now") OffsetDateTime now
+    );
 }

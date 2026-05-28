@@ -83,6 +83,8 @@ public class OrderService {
         Pageable pageable = createPageable(page, size);
         String normalizedKeyword = normalize(keyword);
         String normalizedCustomerName = normalize(customerName);
+        LocalDate today = LocalDate.now(DEFAULT_PRODUCTION_ZONE);
+        OffsetDateTime now = OffsetDateTime.now(DEFAULT_PRODUCTION_ZONE);
 
         if (status == null) {
             List<OrderListResponse> content = orderQueryRepository.findOrderSummariesWithoutStatusFilter(
@@ -92,7 +94,9 @@ public class OrderService {
                             dueDateFrom,
                             dueDateTo,
                             pageable.getPageSize(),
-                            pageable.getOffset()
+                            pageable.getOffset(),
+                            today,
+                            now
                     )
                     .stream()
                     .map(OrderListResponse::from)
@@ -116,13 +120,18 @@ public class OrderService {
                         productId,
                         dueDateFrom,
                         dueDateTo,
+                        today,
+                        now,
                         pageable
                 )
                 .map(OrderListResponse::from);
     }
 
     public OrderDetailResponse getOrder(Long orderId) {
-        return orderQueryRepository.findOrderDetail(orderId)
+        LocalDate today = LocalDate.now(DEFAULT_PRODUCTION_ZONE);
+        OffsetDateTime now = OffsetDateTime.now(DEFAULT_PRODUCTION_ZONE);
+
+        return orderQueryRepository.findOrderDetail(orderId, today, now)
                 .map(OrderDetailResponse::from)
                 .orElseThrow(() -> new CustomException(ErrorCode.ORDER_NOT_FOUND));
     }
