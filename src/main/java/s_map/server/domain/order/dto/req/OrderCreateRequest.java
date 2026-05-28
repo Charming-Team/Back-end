@@ -41,6 +41,7 @@ public record OrderCreateRequest(
         LocalDate productionStartDate,
 
         @Schema(description = "희망 생산 시작일시. 시간이 필요한 클라이언트에서 사용합니다.", example = "2026-05-28T09:00:00+09:00")
+        @FutureOrPresent(message = "희망 생산 시작일시는 현재보다 이전일 수 없습니다.")
         OffsetDateTime desiredStartAt,
 
         @Schema(description = "생산 담당자 ID. 가능하면 operatorId 사용을 권장합니다.", example = "3")

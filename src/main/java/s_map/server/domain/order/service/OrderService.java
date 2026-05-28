@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -80,27 +81,63 @@ public class OrderService {
         validateDueDateRange(dueDateFrom, dueDateTo);
 
         Pageable pageable = createPageable(page, size);
+        String normalizedKeyword = normalize(keyword);
+        String normalizedCustomerName = normalize(customerName);
+        LocalDate today = LocalDate.now(DEFAULT_PRODUCTION_ZONE);
+        OffsetDateTime now = OffsetDateTime.now(DEFAULT_PRODUCTION_ZONE);
+
+        if (status == null) {
+            List<OrderListResponse> content = orderQueryRepository.findOrderSummariesWithoutStatusFilter(
+                            normalizedKeyword,
+                            normalizedCustomerName,
+                            productId,
+                            dueDateFrom,
+                            dueDateTo,
+                            pageable.getPageSize(),
+                            pageable.getOffset(),
+                            today,
+                            now
+                    )
+                    .stream()
+                    .map(OrderListResponse::from)
+                    .toList();
+
+            long total = orderQueryRepository.countOrderSummariesWithoutStatusFilter(
+                    normalizedKeyword,
+                    normalizedCustomerName,
+                    productId,
+                    dueDateFrom,
+                    dueDateTo
+            );
+
+            return new PageImpl<>(content, pageable, total);
+        }
 
         return orderQueryRepository.findOrderSummaries(
-                        normalize(keyword),
-                        status != null ? status.name() : null,
-                        normalize(customerName),
+                        normalizedKeyword,
+                        status.name(),
+                        normalizedCustomerName,
                         productId,
                         dueDateFrom,
                         dueDateTo,
+                        today,
+                        now,
                         pageable
                 )
                 .map(OrderListResponse::from);
     }
 
     public OrderDetailResponse getOrder(Long orderId) {
-        return orderQueryRepository.findOrderDetail(orderId)
+        LocalDate today = LocalDate.now(DEFAULT_PRODUCTION_ZONE);
+        OffsetDateTime now = OffsetDateTime.now(DEFAULT_PRODUCTION_ZONE);
+
+        return orderQueryRepository.findOrderDetail(orderId, today, now)
                 .map(OrderDetailResponse::from)
                 .orElseThrow(() -> new CustomException(ErrorCode.ORDER_NOT_FOUND));
     }
 
     public OrderNoPreviewResponse getNextOrderNoPreview() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(DEFAULT_PRODUCTION_ZONE);
         int latestPersistedSequence = findLatestPersistedOrderNoSequence(today);
         int latestIssuedSequence = orderNoSequenceRepository.findLastSequence(today)
                 .orElse(0);
@@ -146,6 +183,7 @@ public class OrderService {
                 request.orderQuantity(),
                 request.customerName().trim(),
                 request.customerContactName().trim(),
+                LocalDate.now(DEFAULT_PRODUCTION_ZONE),
                 request.dueDate(),
                 request.contractAmount(),
                 request.latePenaltyAmount()
@@ -176,9 +214,14 @@ public class OrderService {
     }
 
     private void validateOrderCreateRequest(OrderCreateRequest request, OffsetDateTime desiredStartAt) {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(DEFAULT_PRODUCTION_ZONE);
 
         if (request.dueDate().isBefore(today)) {
+            throw new CustomException(ErrorCode.INVALID_ORDER_DATE);
+        }
+
+        if (request.desiredStartAt() != null
+                && desiredStartAt.isBefore(OffsetDateTime.now(DEFAULT_PRODUCTION_ZONE))) {
             throw new CustomException(ErrorCode.INVALID_ORDER_DATE);
         }
 
@@ -350,7 +393,7 @@ public class OrderService {
     }
 
     private String generateOrderNo() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(DEFAULT_PRODUCTION_ZONE);
         int initialSequence = findLatestPersistedOrderNoSequence(today) + 1;
         int nextSequence = orderNoSequenceRepository.nextSequence(today, initialSequence);
 
