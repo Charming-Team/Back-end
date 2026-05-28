@@ -3,7 +3,7 @@ package s_map.server.domain.plan.dto.res;
 import lombok.Builder;
 import lombok.Getter;
 import s_map.server.domain.order.entity.ProductionPlan;
-import s_map.server.domain.plan.entity.ProductionResult;
+import s_map.server.domain.plan.repository.ProductionResultRow;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -33,7 +33,7 @@ public class CurrentPlanResponse {
 
     public static CurrentPlanResponse of(
             ProductionPlan plan,
-            ProductionResult result
+            ProductionResultRow result
     ) {
         return CurrentPlanResponse.builder()
                 .planId(plan.getPlanId())
@@ -47,11 +47,11 @@ public class CurrentPlanResponse {
                 .plannedQuantity(plan.getPlannedQuantity())
                 .planSequence(plan.getPlanSequence())
                 .planStatus(plan.getPlanStatus().name())
-                .actualStartAt(result != null ? result.getActualStartAt() : null)
-                .actualEndAt(result != null ? result.getActualEndAt() : null)
-                .actualQuantity(result != null ? result.getActualQuantity() : BigDecimal.ZERO)
-                .defectQuantity(result != null ? result.getDefectQuantity() : BigDecimal.ZERO)
-                .yieldRate(result != null ? result.getYieldRate() : null)
+                .actualStartAt(result != null ? result.actualStartAt() : null)
+                .actualEndAt(result != null ? result.actualEndAt() : null)
+                .actualQuantity(result != null ? result.actualQuantity() : BigDecimal.ZERO)
+                .defectQuantity(result != null ? result.defectQuantity() : BigDecimal.ZERO)
+                .yieldRate(result != null ? result.yieldRate() : null)
                 .build();
     }
 }
