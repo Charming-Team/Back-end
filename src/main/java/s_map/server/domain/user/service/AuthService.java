@@ -11,6 +11,7 @@ import s_map.server.domain.user.dto.req.LogoutRequest;
 import s_map.server.global.error.CustomException;
 import s_map.server.global.error.ErrorCode;
 import s_map.server.global.security.JwtTokenProvider;
+import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -49,9 +50,10 @@ public class AuthService {
      */
     @Transactional(noRollbackFor = CustomException.class)
     public LoginResponse login(LoginRequest request) {
-        User user = userRepository.findByEmail(request.email())
+        String email = request.email().trim().toLowerCase(Locale.ROOT);
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> {
-                    log.warn("[AuthService] 로그인 실패 reason=user_not_found email={}", request.email());
+                    log.warn("[AuthService] 로그인 실패 reason=user_not_found email={}", email);
                     return new CustomException(ErrorCode.INVALID_LOGIN_CREDENTIALS);
                 });
 

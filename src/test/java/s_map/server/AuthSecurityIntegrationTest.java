@@ -93,6 +93,26 @@ class AuthSecurityIntegrationTest {
         }
 
         @Test
+        @DisplayName("대문자가 섞인 sk.com 이메일도 정규화하여 로그인할 수 있다")
+        void mixedCaseEmailCanLogin() throws Exception {
+            User user = saveUser(Role.OPERATOR, "operator@sk.com", PASSWORD);
+
+            mockMvc.perform(MockMvcRequestBuilders.post("/api/auth/login")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(json(Map.of(
+                                    "email", "OPERATOR@SK.COM",
+                                    "password", PASSWORD
+                            ))))
+                    .andExpect(MockMvcResultMatchers.status().isOk())
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(true))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("COMMON200"))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.data.id").value(user.getId()))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.data.email").value(user.getEmail()))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.data.accessToken").isNotEmpty())
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.data.refreshToken").isNotEmpty());
+        }
+
+        @Test
         @DisplayName("존재하지 않는 이메일은 401-003을 반환한다")
         void unknownEmailFails() throws Exception {
             mockMvc.perform(MockMvcRequestBuilders.post("/api/auth/login")
