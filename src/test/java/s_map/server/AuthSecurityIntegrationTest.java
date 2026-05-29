@@ -340,6 +340,83 @@ class AuthSecurityIntegrationTest {
     }
 
     @Nested
+    @DisplayName("ADMIN 사용자 목록 조회")
+    class AdminUserList {
+
+        @Test
+        @DisplayName("사용자 목록은 WITHDRAWN을 제외하고 기본 10건씩 최신순으로 조회한다")
+        void adminCanListUsersWithDefaultPageSize() throws Exception {
+            User admin = saveUser(Role.ADMIN, "admin@sk.com", PASSWORD);
+            User withdrawn = saveUser(Role.OPERATOR, "withdrawn@sk.com", PASSWORD);
+            withdrawn.withdraw();
+            userRepository.saveAndFlush(withdrawn);
+
+            for (int index = 1; index <= 11; index++) {
+                saveUser(Role.OPERATOR, "operator%02d@sk.com".formatted(index), PASSWORD);
+            }
+
+            String adminAccessToken = loginAndGetAccessToken(admin);
+
+            mockMvc.perform(MockMvcRequestBuilders.get("/api/admin/users")
+                            .header(HttpHeaders.AUTHORIZATION, bearer(adminAccessToken)))
+                    .andExpect(MockMvcResultMatchers.status().isOk())
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(true))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("COMMON200"))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.data.size").value(10))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.data.totalElements").value(12))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.data.content.length()").value(10))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.data.content[0].email").value("operator11@sk.com"));
+        }
+
+        @ParameterizedTest
+        @org.junit.jupiter.params.provider.ValueSource(strings = {"홍길동", "quality", "품질관리팀", "SK AX"})
+        @DisplayName("사용자 목록은 이름, 이메일, 부서, 회사명으로 검색할 수 있다")
+        void adminCanSearchUsersByKeyword(String keyword) throws Exception {
+            User admin = saveUser(Role.ADMIN, "admin@sk.com", PASSWORD);
+            saveUser(
+                    "홍길동",
+                    Role.OPERATOR,
+                    "quality@sk.com",
+                    PASSWORD,
+                    "품질관리팀",
+                    "SK AX",
+                    "010-1111-2222"
+            );
+            saveUser(
+                    "검색 제외 사용자",
+                    Role.OPERATOR,
+                    "operator@sk.com",
+                    PASSWORD,
+                    "생산관리팀",
+                    "s_map",
+                    "010-3333-4444"
+            );
+            User withdrawn = saveUser(
+                    "홍길동",
+                    Role.OPERATOR,
+                    "withdrawn@sk.com",
+                    PASSWORD,
+                    "품질관리팀",
+                    "SK AX",
+                    "010-5555-6666"
+            );
+            withdrawn.withdraw();
+            userRepository.saveAndFlush(withdrawn);
+
+            String adminAccessToken = loginAndGetAccessToken(admin);
+
+            mockMvc.perform(MockMvcRequestBuilders.get("/api/admin/users")
+                            .header(HttpHeaders.AUTHORIZATION, bearer(adminAccessToken))
+                            .param("keyword", keyword))
+                    .andExpect(MockMvcResultMatchers.status().isOk())
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(true))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("COMMON200"))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.data.totalElements").value(1))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.data.content[0].email").value("quality@sk.com"));
+        }
+    }
+
+    @Nested
     @DisplayName("인증 사용자 API")
     class AuthenticatedUser {
 
@@ -658,14 +735,34 @@ class AuthSecurityIntegrationTest {
     }
 
     private User saveUser(Role role, String email, String password) {
+        return saveUser(
+                role.name() + " 사용자",
+                role,
+                email,
+                password,
+                "생산관리팀",
+                "s_map",
+                "010-0000-0000"
+        );
+    }
+
+    private User saveUser(
+            String name,
+            Role role,
+            String email,
+            String password,
+            String department,
+            String companyName,
+            String phoneNumber
+    ) {
         User user = User.builder()
-                .name(role.name() + " 사용자")
+                .name(name)
                 .email(email)
                 .password(passwordEncoder.encode(password))
                 .role(role)
-                .department("생산관리팀")
-                .companyName("s_map")
-                .phoneNumber("010-0000-0000")
+                .department(department)
+                .companyName(companyName)
+                .phoneNumber(phoneNumber)
                 .status(UserStatus.ACTIVE)
                 .build();
         return userRepository.save(user);

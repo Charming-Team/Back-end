@@ -27,7 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AdminAuthService {
 
     private static final int DEFAULT_PAGE = 0;
-    private static final int DEFAULT_SIZE = 20;
+    private static final int DEFAULT_SIZE = 10;
     private static final int MAX_SIZE = 100;
 
     private final UserRepository userRepository;
@@ -104,11 +104,12 @@ public class AdminAuthService {
     /**
      * 기능: 관리자 화면에서 사용자 목록을 페이지 단위로 조회한다.
      * WITHDRAWN 상태의 사용자는 목록에서 제외한다.
-     * page와 size 값은 허용 범위 내로 보정한다.
+     * page와 size 값은 허용 범위 내로 보정하고, 검색어가 있으면 이름/이메일/부서/회사명 기준으로 필터링한다.
      *
      * Input:
      * - page / int / 조회할 페이지 번호
      * - size / int / 한 페이지에 조회할 사용자 수
+     * - keyword / String / 검색어
      *
      * Output:
      * - response / Page<AdminUserResponse> / 사용자 목록 페이지 응답 값
@@ -126,17 +127,21 @@ public class AdminAuthService {
      * - response.totalPages / int / 전체 페이지 수
      */
     @Transactional(readOnly = true)
-    public Page<AdminUserResponse> getUsers(int page, int size) {
+    public Page<AdminUserResponse> getUsers(int page, int size, String keyword) {
         int safePage = Math.max(page, DEFAULT_PAGE);
         int safeSize = size <= 0 ? DEFAULT_SIZE : Math.min(size, MAX_SIZE);
+        String safeKeyword = keyword == null ? "" : keyword.trim();
 
         Pageable pageable = PageRequest.of(
                 safePage,
                 safeSize,
-                Sort.by(Sort.Direction.DESC, "id")
+                Sort.by(Sort.Direction.DESC, "createdAt")
+                        .and(Sort.by(Sort.Direction.DESC, "id"))
         );
 
-        Page<User> users = userRepository.findByStatusNot(UserStatus.WITHDRAWN, pageable);
+        Page<User> users = safeKeyword.isBlank()
+                ? userRepository.findByStatusNot(UserStatus.WITHDRAWN, pageable)
+                : userRepository.searchByKeywordExcludingStatus(safeKeyword, UserStatus.WITHDRAWN, pageable);
 
         return users.map(AdminUserResponse::from);
     }

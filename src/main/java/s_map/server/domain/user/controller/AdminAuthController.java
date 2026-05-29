@@ -40,9 +40,10 @@ public class AdminAuthController {
     @GetMapping("/users")
     public BaseResponse<Page<AdminUserResponse>> getUsers(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String keyword
     ) {
-        return BaseResponse.success(adminAuthService.getUsers(page, size));
+        return BaseResponse.success(adminAuthService.getUsers(page, size, keyword));
     }
 
     @Operation(summary = "사용자 삭제")
