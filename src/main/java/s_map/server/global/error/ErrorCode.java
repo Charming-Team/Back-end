@@ -48,6 +48,8 @@ public enum ErrorCode {
     PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "404-302", "제품 정보를 찾을 수 없습니다."),
     OPERATOR_NOT_FOUND(HttpStatus.NOT_FOUND, "404-303", "생산 담당자 정보를 찾을 수 없습니다."),
     AVAILABLE_PRODUCTION_LINE_NOT_FOUND(HttpStatus.NOT_FOUND, "404-304", "생산 가능한 라인을 찾을 수 없습니다."),
+    REPORT_NOT_FOUND(HttpStatus.NOT_FOUND, "404-301", "보고서 정보를 찾을 수 없습니다."),
+    REPORT_JOB_NOT_FOUND(HttpStatus.NOT_FOUND, "404-302", "보고서 생성 작업 정보를 찾을 수 없습니다."),
 
     // 405 Method Not Allowed
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "405", "지원하지 않는 HTTP 메서드입니다."),
@@ -64,6 +66,8 @@ public enum ErrorCode {
     // 500 Internal Server Error
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "500", "서버 내부 오류가 발생했습니다."),
     USER_DELETE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "500-201", "사용자 삭제 처리에 실패했습니다. 잠시 후 다시 시도해주세요."),
+    REPORT_GENERATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "500-301", "보고서 생성에 실패했습니다."),
+    AI_SERVER_CALL_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "500-302", "AI 서버 호출에 실패했습니다."),
 
     // Chat FastAPI Gateway
     CHAT_FASTAPI_CONNECTION_FAILED(HttpStatus.BAD_GATEWAY, "CHAT_FASTAPI_001", "챗봇 서버 연결에 실패했습니다."),

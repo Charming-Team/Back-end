@@ -82,6 +82,9 @@ spring:
 app:
   jwt:
     secret: test-jwt-secret-key-for-h2-tests-only
+  ai-server:
+    report:
+      base-url: http://localhost:8000
 
 ---
 spring:
