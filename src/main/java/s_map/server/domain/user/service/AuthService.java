@@ -140,7 +140,7 @@ public class AuthService {
      */
     @Transactional
     public void logout(LogoutRequest request, String email) {
-        refreshTokenService.validateOwnerAndRevoke(request.getRefreshToken(), email);
+        refreshTokenService.revokeOwnedTokenForLogout(request.getRefreshToken(), email);
 
         log.info("[AuthService] 로그아웃 성공 email={}", email);
     }

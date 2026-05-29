@@ -3,7 +3,12 @@ package s_map.server;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.HexFormat;
 import java.util.Map;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,6 +29,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
+import s_map.server.domain.token.entity.RefreshToken;
 import s_map.server.domain.token.repository.RefreshTokenRepository;
 import s_map.server.domain.user.entity.Role;
 import s_map.server.domain.user.entity.User;
@@ -480,6 +486,62 @@ class AuthSecurityIntegrationTest {
             Assertions.assertEquals(1, refreshTokenRepository.count());
             Assertions.assertTrue(refreshTokenRepository.findAll().getFirst().isRevoked());
         }
+
+        @Test
+        @DisplayName("로그아웃은 서버에 없는 Refresh Token도 완료로 처리한다")
+        void logoutTreatsMissingRefreshTokenAsCompleted() throws Exception {
+            User user = saveUser(Role.OPERATOR, "operator@sk.com", PASSWORD);
+            String accessToken = dataValue(login(user), "accessToken");
+
+            mockMvc.perform(MockMvcRequestBuilders.post("/api/auth/logout")
+                            .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(json(Map.of("refreshToken", "missing-refresh-token"))))
+                    .andExpect(MockMvcResultMatchers.status().isOk())
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(true))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("COMMON200"));
+        }
+
+        @Test
+        @DisplayName("로그아웃은 이미 만료된 Refresh Token도 완료로 처리한다")
+        void logoutTreatsExpiredRefreshTokenAsCompleted() throws Exception {
+            User user = saveUser(Role.OPERATOR, "operator@sk.com", PASSWORD);
+            String accessToken = dataValue(login(user), "accessToken");
+            String expiredRefreshToken = "expired-refresh-token";
+            RefreshToken savedRefreshToken = refreshTokenRepository.save(RefreshToken.builder()
+                    .user(user)
+                    .tokenHash(hashToken(expiredRefreshToken))
+                    .expiresAt(LocalDateTime.now().minusMinutes(1))
+                    .build());
+
+            mockMvc.perform(MockMvcRequestBuilders.post("/api/auth/logout")
+                            .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(json(Map.of("refreshToken", expiredRefreshToken))))
+                    .andExpect(MockMvcResultMatchers.status().isOk())
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(true))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("COMMON200"));
+
+            RefreshToken revokedRefreshToken = refreshTokenRepository.findById(savedRefreshToken.getId()).orElseThrow();
+            Assertions.assertTrue(revokedRefreshToken.isRevoked());
+        }
+
+        @Test
+        @DisplayName("로그아웃은 다른 사용자 소유 Refresh Token 폐기를 거부한다")
+        void logoutRejectsOtherUsersRefreshToken() throws Exception {
+            User user = saveUser(Role.OPERATOR, "operator@sk.com", PASSWORD);
+            User otherUser = saveUser(Role.EXECUTIVE, "executive@sk.com", PASSWORD);
+            String accessToken = dataValue(login(user), "accessToken");
+            String otherRefreshToken = dataValue(login(otherUser), "refreshToken");
+
+            mockMvc.perform(MockMvcRequestBuilders.post("/api/auth/logout")
+                            .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(json(Map.of("refreshToken", otherRefreshToken))))
+                    .andExpect(MockMvcResultMatchers.status().isUnauthorized())
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(false))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("401-001"));
+        }
     }
 
     @Nested
@@ -907,5 +969,11 @@ class AuthSecurityIntegrationTest {
             throw new IllegalStateException("Response data." + fieldName + " is not a string");
         }
         return stringValue;
+    }
+
+    private String hashToken(String token) throws NoSuchAlgorithmException {
+        MessageDigest messageDigest = MessageDigest.getInstance("SHA-256");
+        byte[] tokenHash = messageDigest.digest(token.getBytes(StandardCharsets.UTF_8));
+        return HexFormat.of().formatHex(tokenHash);
     }
 }

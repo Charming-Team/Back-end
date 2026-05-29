@@ -148,49 +148,30 @@ public class RefreshTokenService {
         }
     }
     /**
-     * 기능: Refresh Token이 현재 로그인한 사용자의 토큰인지 검증하고 검증에 성공한 토큰을 폐기한다.
+     * 기능: 로그아웃 요청의 Refresh Token이 현재 로그인한 사용자의 토큰이면 폐기한다.
+     * 이미 만료, 폐기, 삭제된 토큰은 로그아웃 완료 상태로 처리한다.
      *
      * Input:
      * - token / String / 검증할 Refresh Token 원문
      * - email / String / 현재 로그인한 사용자 이메일
      *
      * Output:
-     * - user / User / 토큰 소유 사용자
-     * - user.id / Long / 토큰 소유 사용자 ID
-     * - user.email / String / 토큰 소유 사용자 이메일
-     * - user.role / Role / 토큰 소유 사용자 권한
+     * - result / void / 반환값 없음, 소유자 불일치 시 예외 발생
      */
     @Transactional
-    public User validateOwnerAndRevoke(String token, String email) {
+    public void revokeOwnedTokenForLogout(String token, String email) {
         String tokenHash = hashToken(token);
         RefreshToken refreshToken = refreshTokenRepository.findByTokenHash(tokenHash)
-                .orElseThrow(() -> {
-                    log.warn("[RefreshTokenService] Refresh Token 검증 실패 reason=not_found");
-                    return new CustomException(ErrorCode.INVALID_TOKEN);
-                });
+                .orElse(null);
 
-        if (refreshToken.isRevoked()) {
-            log.warn(
-                    "[RefreshTokenService] Refresh Token 검증 실패 reason=already_revoked refreshTokenId={}, userId={}",
-                    refreshToken.getId(),
-                    refreshToken.getUser().getId()
-            );
-            throw new CustomException(ErrorCode.INVALID_TOKEN);
-        }
-
-        LocalDateTime now = LocalDateTime.now();
-        if (refreshToken.isExpired(now)) {
-            log.warn(
-                    "[RefreshTokenService] Refresh Token 검증 실패 reason=expired refreshTokenId={}, userId={}",
-                    refreshToken.getId(),
-                    refreshToken.getUser().getId()
-            );
-            throw new CustomException(ErrorCode.EXPIRED_TOKEN);
+        if (refreshToken == null) {
+            log.info("[RefreshTokenService] 로그아웃 처리 완료 reason=token_not_found email={}", email);
+            return;
         }
 
         if (!refreshToken.getUser().getEmail().equals(email)) {
             log.warn(
-                    "[RefreshTokenService] Refresh Token 소유자 불일치 tokenUserId={}, tokenUserEmail={}, requestEmail={}",
+                    "[RefreshTokenService] 로그아웃 Refresh Token 소유자 불일치 tokenUserId={}, tokenUserEmail={}, requestEmail={}",
                     refreshToken.getUser().getId(),
                     refreshToken.getUser().getEmail(),
                     email
@@ -198,23 +179,33 @@ public class RefreshTokenService {
             throw new CustomException(ErrorCode.INVALID_TOKEN);
         }
 
-        int revokedCount = refreshTokenRepository.revokeIfActive(tokenHash, now);
-        if (revokedCount != 1) {
-            log.warn(
-                    "[RefreshTokenService] Refresh Token 검증 실패 reason=concurrent_reuse refreshTokenId={}, userId={}",
+        if (refreshToken.isRevoked()) {
+            log.info(
+                    "[RefreshTokenService] 로그아웃 처리 완료 reason=already_revoked refreshTokenId={}, userId={}",
                     refreshToken.getId(),
                     refreshToken.getUser().getId()
             );
-            throw new CustomException(ErrorCode.INVALID_TOKEN);
+            return;
         }
 
+        LocalDateTime now = LocalDateTime.now();
+        if (refreshToken.isExpired(now)) {
+            refreshToken.revoke();
+            log.info(
+                    "[RefreshTokenService] 로그아웃 처리 완료 reason=expired refreshTokenId={}, userId={}",
+                    refreshToken.getId(),
+                    refreshToken.getUser().getId()
+            );
+            return;
+        }
+
+        refreshToken.revoke();
+
         log.debug(
-                "[RefreshTokenService] Refresh Token 소유자 검증 후 폐기 refreshTokenId={}, userId={}",
+                "[RefreshTokenService] 로그아웃 Refresh Token 폐기 refreshTokenId={}, userId={}",
                 refreshToken.getId(),
                 refreshToken.getUser().getId()
         );
-
-        return refreshToken.getUser();
     }
 
 }
