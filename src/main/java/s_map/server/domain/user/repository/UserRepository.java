@@ -33,7 +33,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
                  or lower(u.companyName) like lower(concat('%', :keyword, '%'))
               )
             """)
-    Page<User> searchByKeywordExcludingStatus(
+    Page<User> findByKeywordAndStatusNot(
             @Param("keyword") String keyword,
             @Param("status") UserStatus status,
             Pageable pageable

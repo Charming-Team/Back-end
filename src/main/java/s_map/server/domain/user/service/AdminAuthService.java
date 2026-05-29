@@ -141,7 +141,7 @@ public class AdminAuthService {
 
         Page<User> users = safeKeyword.isBlank()
                 ? userRepository.findByStatusNot(UserStatus.WITHDRAWN, pageable)
-                : userRepository.searchByKeywordExcludingStatus(safeKeyword, UserStatus.WITHDRAWN, pageable);
+                : userRepository.findByKeywordAndStatusNot(safeKeyword, UserStatus.WITHDRAWN, pageable);
 
         return users.map(AdminUserResponse::from);
     }
