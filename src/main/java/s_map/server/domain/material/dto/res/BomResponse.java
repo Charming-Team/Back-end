@@ -33,7 +33,7 @@ public record BomResponse(
         @Schema(description = "제품 1단위 생산에 필요한 자재 소요량", example = "2.5000")
         BigDecimal requiredQuantityPerUnit,
 
-        @Schema(description = "생산 과정 손실률. 퍼센트 단위이며 5.00은 5%를 의미합니다.", example = "5.00")
+        @Schema(description = "생산 과정 손실률. 2%는 0.0200처럼 0~1 기준으로 표시합니다.", example = "0.0200")
         BigDecimal lossRate,
 
         @Schema(description = "BOM 마지막 수정 일시", example = "2026-05-15T08:00:00")

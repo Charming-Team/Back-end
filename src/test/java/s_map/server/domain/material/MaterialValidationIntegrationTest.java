@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.util.Map;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -158,6 +159,66 @@ class MaterialValidationIntegrationTest {
                 .andExpect(MockMvcResultMatchers.status().isBadRequest())
                 .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(false))
                 .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("400-001"));
+    }
+
+    @Test
+    @DisplayName("BOM 등록은 0~1 범위를 벗어난 손실률을 거부한다")
+    void createBomRejectsLossRateGreaterThanOne() throws Exception {
+        Material material = saveMaterial();
+        String accessToken = loginAndGetAccessToken(saveUser());
+
+        mockMvc.perform(MockMvcRequestBuilders.post("/api/materials/boms")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "productId", 1L,
+                                "materialId", material.getMaterialId(),
+                                "requiredQuantityPerUnit", new BigDecimal("1.5000"),
+                                "unit", "KG",
+                                "lossRate", new BigDecimal("2.0000")
+                        ))))
+                .andExpect(MockMvcResultMatchers.status().isBadRequest())
+                .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(false))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("400-001"));
+    }
+
+    @Test
+    @DisplayName("BOM 수정은 0~1 범위를 벗어난 손실률을 거부한다")
+    void updateBomRejectsLossRateGreaterThanOne() throws Exception {
+        Bom bom = bomRepository.save(Bom.builder()
+                .productId(1L)
+                .material(saveMaterial())
+                .requiredQuantityPerUnit(new BigDecimal("1.5000"))
+                .unit("KG")
+                .lossRate(new BigDecimal("0.0200"))
+                .build());
+        String accessToken = loginAndGetAccessToken(saveUser());
+
+        mockMvc.perform(MockMvcRequestBuilders.put("/api/materials/boms/{bomId}", bom.getBomId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "requiredQuantityPerUnit", new BigDecimal("2.0000"),
+                                "unit", "KG",
+                                "lossRate", new BigDecimal("2.0000")
+                        ))))
+                .andExpect(MockMvcResultMatchers.status().isBadRequest())
+                .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(false))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("400-001"));
+    }
+
+    @Test
+    @DisplayName("BOM 손실률은 0.0200을 2%로 계산한다")
+    void bomCalculatesRequiredQuantityWithRatioLossRate() {
+        Bom bom = Bom.builder()
+                .requiredQuantityPerUnit(new BigDecimal("2.0000"))
+                .unit("KG")
+                .lossRate(new BigDecimal("0.0200"))
+                .build();
+
+        BigDecimal requiredQuantity = bom.calculateRequiredQuantity(new BigDecimal("100.0000"));
+
+        Assertions.assertEquals(0, requiredQuantity.compareTo(new BigDecimal("204.0000")));
     }
 
     private Material saveMaterial() {

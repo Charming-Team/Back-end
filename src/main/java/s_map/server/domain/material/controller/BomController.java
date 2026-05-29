@@ -37,7 +37,7 @@ public class BomController {
 
     @Operation(
             summary = "BOM 등록",
-            description = "제품 1단위 생산에 필요한 자재 소요량과 손실률을 등록합니다. 손실률은 퍼센트 단위이며 5.00은 5%를 의미합니다."
+            description = "제품 1단위 생산에 필요한 자재 소요량과 손실률을 등록합니다. 손실률은 0.0200이 2%를 의미하는 0~1 기준입니다."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "BOM 등록 성공"),
