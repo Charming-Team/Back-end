@@ -3,6 +3,7 @@ package s_map.server;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
+import java.time.LocalDate;
 import java.util.Map;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -696,6 +697,59 @@ class AuthSecurityIntegrationTest {
                             .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{}"))
+                    .andExpect(MockMvcResultMatchers.status().isBadRequest())
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(false))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("400-001"));
+        }
+
+        @Test
+        @DisplayName("주문 등록은 생산 시작일이 없으면 입력 검증 오류를 반환한다")
+        void orderCreateRequiresProductionStart() throws Exception {
+            String accessToken = loginAndGetAccessToken(saveUser(
+                    Role.MANUFACTURING_MANAGER,
+                    "manufacturing_manager@sk.com",
+                    PASSWORD
+            ));
+            LocalDate dueDate = LocalDate.now().plusDays(7);
+
+            mockMvc.perform(MockMvcRequestBuilders.post("/api/orders")
+                            .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(json(Map.of(
+                                    "customerName", "A사",
+                                    "productId", 1,
+                                    "orderQuantity", 1000,
+                                    "dueDate", dueDate.toString(),
+                                    "operatorId", 1,
+                                    "customerContactName", "배난수"
+                            ))))
+                    .andExpect(MockMvcResultMatchers.status().isBadRequest())
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(false))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("400-001"));
+        }
+
+        @Test
+        @DisplayName("주문 등록은 생산 담당자가 없으면 입력 검증 오류를 반환한다")
+        void orderCreateRequiresOperator() throws Exception {
+            String accessToken = loginAndGetAccessToken(saveUser(
+                    Role.MANUFACTURING_MANAGER,
+                    "manufacturing_manager@sk.com",
+                    PASSWORD
+            ));
+            LocalDate productionStartDate = LocalDate.now().plusDays(1);
+            LocalDate dueDate = productionStartDate.plusDays(6);
+
+            mockMvc.perform(MockMvcRequestBuilders.post("/api/orders")
+                            .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(json(Map.of(
+                                    "customerName", "A사",
+                                    "productId", 1,
+                                    "orderQuantity", 1000,
+                                    "dueDate", dueDate.toString(),
+                                    "productionStartDate", productionStartDate.toString(),
+                                    "customerContactName", "배난수"
+                            ))))
                     .andExpect(MockMvcResultMatchers.status().isBadRequest())
                     .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(false))
                     .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("400-001"));
