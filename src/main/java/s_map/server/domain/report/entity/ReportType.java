@@ -1,4 +1,7 @@
 package s_map.server.domain.report.entity;
 
-public class ReportType {
+public enum ReportType {
+    DAILY,
+    WEEKLY,
+    MONTHLY
 }
