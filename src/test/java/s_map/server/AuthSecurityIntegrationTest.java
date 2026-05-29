@@ -683,11 +683,14 @@ class AuthSecurityIntegrationTest {
     @DisplayName("주문 등록 권한")
     class OrderCreateAuthorization {
 
-        @ParameterizedTest
-        @EnumSource(value = Role.class, names = {"EXECUTIVE", "MANUFACTURING_MANAGER"})
-        @DisplayName("경영진과 생산관리자는 주문 등록 API에 접근할 수 있다")
-        void executiveAndManufacturingManagerCanAccessOrderCreate(Role role) throws Exception {
-            String accessToken = loginAndGetAccessToken(saveUser(role, role.name().toLowerCase() + "@sk.com", PASSWORD));
+        @Test
+        @DisplayName("생산관리자는 주문 등록 API에 접근할 수 있다")
+        void manufacturingManagerCanAccessOrderCreate() throws Exception {
+            String accessToken = loginAndGetAccessToken(saveUser(
+                    Role.MANUFACTURING_MANAGER,
+                    "manufacturing_manager@sk.com",
+                    PASSWORD
+            ));
 
             mockMvc.perform(MockMvcRequestBuilders.post("/api/orders")
                             .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
@@ -699,8 +702,8 @@ class AuthSecurityIntegrationTest {
         }
 
         @ParameterizedTest
-        @EnumSource(value = Role.class, names = {"EXECUTIVE", "MANUFACTURING_MANAGER"}, mode = Mode.EXCLUDE)
-        @DisplayName("경영진과 생산관리자가 아닌 사용자는 주문 등록 API에 접근할 수 없다")
+        @EnumSource(value = Role.class, names = {"MANUFACTURING_MANAGER"}, mode = Mode.EXCLUDE)
+        @DisplayName("생산관리자가 아닌 사용자는 주문 등록 API에 접근할 수 없다")
         void otherRolesCannotAccessOrderCreate(Role role) throws Exception {
             String accessToken = loginAndGetAccessToken(saveUser(role, role.name().toLowerCase() + "@sk.com", PASSWORD));
 
