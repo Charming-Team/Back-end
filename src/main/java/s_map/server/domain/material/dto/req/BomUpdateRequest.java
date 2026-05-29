@@ -5,6 +5,7 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
@@ -19,6 +20,7 @@ public record BomUpdateRequest(
         BigDecimal requiredQuantityPerUnit,
 
         @Schema(description = "BOM 소요량 단위. 비우면 연결된 자재의 기본 단위를 사용합니다.", example = "KG")
+        @Pattern(regexp = "^(KG|L|EA|LOT)?$", message = "단위는 KG, L, EA, LOT 중 하나여야 합니다.")
         @Size(max = 20, message = "단위는 20자 이하여야 합니다.")
         String unit,
 
