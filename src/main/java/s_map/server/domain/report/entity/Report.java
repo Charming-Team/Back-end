@@ -37,7 +37,8 @@ public class Report extends BaseEntity {
     private String reportTitle;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "report_type", nullable = false, length = 30)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "report_type", nullable = false, columnDefinition = "report_type_enum")
     private ReportType reportType;
 
     @Column(name = "author_id", nullable = false)
@@ -53,8 +54,9 @@ public class Report extends BaseEntity {
     @Column(name = "included_items", columnDefinition = "jsonb")
     private JsonNode includedItems;
 
-    @Column(name = "report_content", nullable = false, columnDefinition = "text")
-    private String reportContent;
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "report_content", nullable = false, columnDefinition = "jsonb")
+    private JsonNode reportContent;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "report_evidence", columnDefinition = "jsonb")

@@ -40,7 +40,8 @@ public class ReportJob extends BaseEntity {
     private Long requestedBy;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "job_status", nullable = false, length = 30)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "job_status", nullable = false, columnDefinition = "job_status_enum")
     private ReportJobStatus jobStatus;
 
     @JdbcTypeCode(SqlTypes.JSON)

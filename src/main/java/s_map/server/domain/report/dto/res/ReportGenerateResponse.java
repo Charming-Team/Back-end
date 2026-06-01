@@ -23,6 +23,20 @@ public class ReportGenerateResponse {
     private JsonNode evidence;
     private String markdown;
 
+    private static String extractMarkdown(JsonNode reportContent) {
+        if (reportContent == null || reportContent.isNull()) {
+            return null;
+        }
+
+        JsonNode markdownNode = reportContent.path("markdown");
+
+        if (markdownNode.isMissingNode() || markdownNode.isNull()) {
+            return reportContent.toString();
+        }
+
+        return markdownNode.asText();
+    }
+
     public static ReportGenerateResponse of(Report report, ReportJob reportJob) {
         return ReportGenerateResponse.builder()
                 .reportId(report.getReportId())
@@ -34,7 +48,7 @@ public class ReportGenerateResponse {
                 .targetEndDate(report.getTargetEndDate())
                 .sections(report.getIncludedItems())
                 .evidence(report.getReportEvidence())
-                .markdown(report.getReportContent())
+                .markdown(extractMarkdown(report.getReportContent()))
                 .build();
     }
 }

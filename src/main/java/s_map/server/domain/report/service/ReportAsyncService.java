@@ -16,6 +16,8 @@ import s_map.server.domain.report.repository.ReportJobRepository;
 import s_map.server.domain.report.repository.ReportRepository;
 import s_map.server.global.error.CustomException;
 import s_map.server.global.error.ErrorCode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 @Slf4j
 @Service
@@ -25,6 +27,7 @@ public class ReportAsyncService {
     private final ReportRepository reportRepository;
     private final ReportJobRepository reportJobRepository;
     private final FastApiReportClient fastApiReportClient;
+    private final ObjectMapper objectMapper;
 
     @Async
     @Transactional
@@ -80,6 +83,8 @@ public class ReportAsyncService {
             FastApiReportGenerateResponse fastApiResponse
     ) {
         Long relatedSimulationId = extractRelatedSimulationId(fastApiResponse.getSections());
+        ObjectNode reportContent = objectMapper.createObjectNode();
+        reportContent.put("markdown", fastApiResponse.getMarkdown());
 
         Report report = Report.builder()
                 .reportTitle(fastApiResponse.getTitle())
@@ -88,7 +93,7 @@ public class ReportAsyncService {
                 .targetStartDate(request.getPeriod().getStartDate())
                 .targetEndDate(request.getPeriod().getEndDate())
                 .includedItems(fastApiResponse.getSections())
-                .reportContent(fastApiResponse.getMarkdown())
+                .reportContent(reportContent)
                 .reportEvidence(fastApiResponse.getEvidence())
                 .relatedSimulationId(relatedSimulationId)
                 .build();

@@ -25,6 +25,20 @@ public class ReportDetailResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
+    private static String extractMarkdown(JsonNode reportContent) {
+        if (reportContent == null || reportContent.isNull()) {
+            return null;
+        }
+
+        JsonNode markdownNode = reportContent.path("markdown");
+
+        if (markdownNode.isMissingNode() || markdownNode.isNull()) {
+            return reportContent.toString();
+        }
+
+        return markdownNode.asText();
+    }
+
     public static ReportDetailResponse from(Report report) {
         return ReportDetailResponse.builder()
                 .reportId(report.getReportId())
@@ -34,7 +48,7 @@ public class ReportDetailResponse {
                 .targetStartDate(report.getTargetStartDate())
                 .targetEndDate(report.getTargetEndDate())
                 .sections(report.getIncludedItems())
-                .markdown(report.getReportContent())
+                .markdown(extractMarkdown(report.getReportContent()))
                 .evidence(report.getReportEvidence())
                 .relatedSimulationId(report.getRelatedSimulationId())
                 .createdAt(report.getCreatedAt())
