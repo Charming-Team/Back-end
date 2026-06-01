@@ -19,8 +19,8 @@ public class ReportGenerateResponse {
     private String reportType;
     private LocalDate targetStartDate;
     private LocalDate targetEndDate;
-    private JsonNode sections;
-    private JsonNode evidence;
+    private Object sections;
+    private Object evidence;
     private String markdown;
 
     private static String extractMarkdown(JsonNode reportContent) {

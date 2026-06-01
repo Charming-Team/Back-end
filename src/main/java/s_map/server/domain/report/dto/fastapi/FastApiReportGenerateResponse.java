@@ -11,8 +11,8 @@ public class FastApiReportGenerateResponse {
     private String title;
     private String reportType;
     private String markdown;
-    private JsonNode sections;
-    private JsonNode evidence;
+    private Object sections;
+    private Object evidence;
     private FastApiReportValidationResponse validation;
     private String errorMessage;
 

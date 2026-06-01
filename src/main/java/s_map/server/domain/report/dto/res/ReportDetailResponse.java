@@ -18,9 +18,9 @@ public class ReportDetailResponse {
     private Long authorId;
     private LocalDate targetStartDate;
     private LocalDate targetEndDate;
-    private JsonNode sections;
+    private Object sections;
+    private Object evidence;
     private String markdown;
-    private JsonNode evidence;
     private Long relatedSimulationId;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -48,8 +48,8 @@ public class ReportDetailResponse {
                 .targetStartDate(report.getTargetStartDate())
                 .targetEndDate(report.getTargetEndDate())
                 .sections(report.getIncludedItems())
-                .markdown(extractMarkdown(report.getReportContent()))
                 .evidence(report.getReportEvidence())
+                .markdown(extractMarkdown(report.getReportContent()))
                 .relatedSimulationId(report.getRelatedSimulationId())
                 .createdAt(report.getCreatedAt())
                 .updatedAt(report.getUpdatedAt())

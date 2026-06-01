@@ -1,6 +1,9 @@
 package s_map.server.domain.report.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -16,8 +19,6 @@ import s_map.server.domain.report.repository.ReportJobRepository;
 import s_map.server.domain.report.repository.ReportRepository;
 import s_map.server.global.error.CustomException;
 import s_map.server.global.error.ErrorCode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 
 @Slf4j
 @Service
@@ -82,9 +83,13 @@ public class ReportAsyncService {
             ReportGenerateRequest request,
             FastApiReportGenerateResponse fastApiResponse
     ) {
-        Long relatedSimulationId = extractRelatedSimulationId(fastApiResponse.getSections());
+        JsonNode sections = objectMapper.valueToTree(fastApiResponse.getSections());
+        JsonNode evidence = objectMapper.valueToTree(fastApiResponse.getEvidence());
+
         ObjectNode reportContent = objectMapper.createObjectNode();
         reportContent.put("markdown", fastApiResponse.getMarkdown());
+
+        Long relatedSimulationId = extractRelatedSimulationId(sections);
 
         Report report = Report.builder()
                 .reportTitle(fastApiResponse.getTitle())
@@ -92,9 +97,9 @@ public class ReportAsyncService {
                 .authorId(request.getRequestedBy())
                 .targetStartDate(request.getPeriod().getStartDate())
                 .targetEndDate(request.getPeriod().getEndDate())
-                .includedItems(fastApiResponse.getSections())
+                .includedItems(sections)
                 .reportContent(reportContent)
-                .reportEvidence(fastApiResponse.getEvidence())
+                .reportEvidence(evidence)
                 .relatedSimulationId(relatedSimulationId)
                 .build();
 

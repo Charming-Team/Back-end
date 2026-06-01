@@ -15,7 +15,7 @@ public class ReportGenerateStartResponse {
     public static ReportGenerateStartResponse from(ReportJob reportJob) {
         return ReportGenerateStartResponse.builder()
                 .reportJobId(reportJob.getJobId())
-                .jobStatus(reportJob.getJobStatus().name())
+                .jobStatus("RUNNING")
                 .message("보고서 생성 작업이 시작되었습니다.")
                 .build();
     }
