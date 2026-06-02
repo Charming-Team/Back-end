@@ -1,7 +1,6 @@
 package s_map.server.domain.report.service;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClientException;
@@ -18,15 +17,13 @@ public class FastApiReportClient {
     private final RestTemplate restTemplate;
     private final String reportGenerateUrl;
 
-    public FastApiReportClient(
-            @Value("${app.ai-server.report.base-url}") String aiServerBaseUrl
-    ) {
+    public FastApiReportClient(FastApiReportProperties properties) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(5_000);
-        factory.setReadTimeout(120_000);
+        factory.setConnectTimeout(properties.getReportConnectTimeoutMillis());
+        factory.setReadTimeout(properties.getReportReadTimeoutMillis());
 
         this.restTemplate = new RestTemplate(factory);
-        this.reportGenerateUrl = aiServerBaseUrl + "/api/v1/reports/generate";
+        this.reportGenerateUrl = resolveUrl(properties.getBaseUrl(), properties.getReportGeneratePath());
     }
 
     public FastApiReportGenerateResponse generateReport(FastApiReportGenerateRequest request) {
@@ -62,5 +59,22 @@ public class FastApiReportClient {
             );
             throw new CustomException(ErrorCode.AI_SERVER_CALL_FAILED, exception.getMessage());
         }
+    }
+
+    private String resolveUrl(String baseUrl, String path) {
+        String normalizedBaseUrl = trimTrailingSlash(baseUrl);
+        String normalizedPath = path != null && path.startsWith("/")
+                ? path
+                : "/" + path;
+        return normalizedBaseUrl + normalizedPath;
+    }
+
+    private String trimTrailingSlash(String value) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+        return value.endsWith("/")
+                ? value.substring(0, value.length() - 1)
+                : value;
     }
 }
