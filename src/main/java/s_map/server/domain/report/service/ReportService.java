@@ -96,8 +96,9 @@ public class ReportService {
 
         Report report = reportRepository.findById(reportId)
                 .orElseThrow(() -> new CustomException(ErrorCode.REPORT_NOT_FOUND));
+        String authorName = findAuthorName(report.getAuthorId());
 
-        return ReportDetailResponse.from(report);
+        return ReportDetailResponse.from(report, authorName);
     }
 
     private void validateGenerateRequest(ReportGenerateRequest request) {
@@ -172,6 +173,16 @@ public class ReportService {
         return userRepository.findAllById(authorIds)
                 .stream()
                 .collect(Collectors.toMap(User::getId, User::getName));
+    }
+
+    private String findAuthorName(Long authorId) {
+        if (authorId == null) {
+            return null;
+        }
+
+        return userRepository.findById(authorId)
+                .map(User::getName)
+                .orElse(null);
     }
 
     private JsonNode createRequestPayload(User user, ReportGenerateRequest request) {

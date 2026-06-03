@@ -16,6 +16,7 @@ public class ReportDetailResponse {
     private String title;
     private String reportType;
     private Long authorId;
+    private String authorName;
     private LocalDate targetStartDate;
     private LocalDate targetEndDate;
     private Object sections;
@@ -39,12 +40,13 @@ public class ReportDetailResponse {
         return markdownNode.asText();
     }
 
-    public static ReportDetailResponse from(Report report) {
+    public static ReportDetailResponse from(Report report, String authorName) {
         return ReportDetailResponse.builder()
                 .reportId(report.getReportId())
                 .title(report.getReportTitle())
                 .reportType(report.getReportType().name())
                 .authorId(report.getAuthorId())
+                .authorName(authorName)
                 .targetStartDate(report.getTargetStartDate())
                 .targetEndDate(report.getTargetEndDate())
                 .sections(report.getIncludedItems())
