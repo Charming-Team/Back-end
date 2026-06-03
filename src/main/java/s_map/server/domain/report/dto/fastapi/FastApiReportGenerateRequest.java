@@ -16,11 +16,16 @@ public class FastApiReportGenerateRequest {
     private Boolean includeExecutiveSummary;
     private Boolean includeEvidence;
 
-    public static FastApiReportGenerateRequest of(Long reportJobId, ReportGenerateRequest request) {
+    public static FastApiReportGenerateRequest of(
+            Long reportJobId,
+            Long requestedBy,
+            String userRole,
+            ReportGenerateRequest request
+    ) {
         return FastApiReportGenerateRequest.builder()
                 .reportJobId(reportJobId)
-                .requestedBy(request.getRequestedBy())
-                .userRole(request.getUserRole())
+                .requestedBy(requestedBy)
+                .userRole(userRole)
                 .reportType(request.getReportType().name())
                 .period(FastApiReportPeriodRequest.builder()
                         .startDate(request.getPeriod().getStartDate())

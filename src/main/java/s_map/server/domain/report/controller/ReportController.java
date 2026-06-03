@@ -1,6 +1,7 @@
 package s_map.server.domain.report.controller;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -14,6 +15,7 @@ import s_map.server.domain.report.dto.res.ReportJobResponse;
 import s_map.server.domain.report.dto.res.ReportListResponse;
 import s_map.server.domain.report.service.ReportService;
 import s_map.server.global.common.BaseResponse;
+import s_map.server.global.security.AuthUser;
 
 import java.util.List;
 
@@ -26,27 +28,32 @@ public class ReportController {
 
     @PostMapping("/generate")
     public BaseResponse<ReportGenerateStartResponse> generateReport(
+            @AuthenticationPrincipal AuthUser authUser,
             @RequestBody ReportGenerateRequest request
     ) {
-        return BaseResponse.success(reportService.generateReport(request));
+        return BaseResponse.success(reportService.generateReport(authUser, request));
     }
 
     @GetMapping("/jobs/{reportJobId}")
     public BaseResponse<ReportJobResponse> getReportJob(
+            @AuthenticationPrincipal AuthUser authUser,
             @PathVariable Long reportJobId
     ) {
-        return BaseResponse.success(reportService.getReportJob(reportJobId));
+        return BaseResponse.success(reportService.getReportJob(authUser, reportJobId));
     }
 
     @GetMapping
-    public BaseResponse<List<ReportListResponse>> getReports() {
-        return BaseResponse.success(reportService.getReports());
+    public BaseResponse<List<ReportListResponse>> getReports(
+            @AuthenticationPrincipal AuthUser authUser
+    ) {
+        return BaseResponse.success(reportService.getReports(authUser));
     }
 
     @GetMapping("/{reportId}")
     public BaseResponse<ReportDetailResponse> getReport(
+            @AuthenticationPrincipal AuthUser authUser,
             @PathVariable Long reportId
     ) {
-        return BaseResponse.success(reportService.getReport(reportId));
+        return BaseResponse.success(reportService.getReport(authUser, reportId));
     }
 }

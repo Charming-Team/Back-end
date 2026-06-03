@@ -32,12 +32,17 @@ public class ReportAsyncService {
     private final TransactionTemplate transactionTemplate;
 
     @Async
-    public void generateReportAsync(Long reportJobId, ReportGenerateRequest request) {
+    public void generateReportAsync(
+            Long reportJobId,
+            Long requestedBy,
+            String userRole,
+            ReportGenerateRequest request
+    ) {
         try {
             markJobRunning(reportJobId);
 
             FastApiReportGenerateRequest fastApiRequest =
-                    FastApiReportGenerateRequest.of(reportJobId, request);
+                    FastApiReportGenerateRequest.of(reportJobId, requestedBy, userRole, request);
 
             FastApiReportGenerateResponse fastApiResponse =
                     fastApiReportClient.generateReport(fastApiRequest);
@@ -58,7 +63,7 @@ public class ReportAsyncService {
                 return;
             }
 
-            Long reportId = saveReportAndMarkSuccess(reportJobId, request, fastApiResponse);
+            Long reportId = saveReportAndMarkSuccess(reportJobId, requestedBy, request, fastApiResponse);
 
             log.info(
                     "[ReportAsyncService] 보고서 생성 완료 reportJobId={} reportId={}",
@@ -86,13 +91,14 @@ public class ReportAsyncService {
 
     private Long saveReportAndMarkSuccess(
             Long reportJobId,
+            Long requestedBy,
             ReportGenerateRequest request,
             FastApiReportGenerateResponse fastApiResponse
     ) {
         return transactionTemplate.execute(status -> {
             ReportJob reportJob = reportJobRepository.findById(reportJobId)
                     .orElseThrow(() -> new CustomException(ErrorCode.REPORT_JOB_NOT_FOUND));
-            Report report = saveReport(request, fastApiResponse);
+            Report report = saveReport(requestedBy, request, fastApiResponse);
             reportJob.markSuccess(report.getReportId());
             return report.getReportId();
         });
@@ -107,6 +113,7 @@ public class ReportAsyncService {
     }
 
     private Report saveReport(
+            Long requestedBy,
             ReportGenerateRequest request,
             FastApiReportGenerateResponse fastApiResponse
     ) {
@@ -121,7 +128,7 @@ public class ReportAsyncService {
         Report report = Report.builder()
                 .reportTitle(fastApiResponse.getTitle())
                 .reportType(ReportType.valueOf(fastApiResponse.getReportType()))
-                .authorId(request.getRequestedBy())
+                .authorId(requestedBy)
                 .targetStartDate(request.getPeriod().getStartDate())
                 .targetEndDate(request.getPeriod().getEndDate())
                 .includedItems(sections)
