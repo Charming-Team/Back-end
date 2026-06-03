@@ -20,6 +20,8 @@ public enum ErrorCode {
     INVALID_ORDER_DATE(HttpStatus.BAD_REQUEST, "400-301", "주문 일정 조건이 올바르지 않습니다."),
     INVALID_ORDER_OPERATOR(HttpStatus.BAD_REQUEST, "400-302", "생산 담당자 정보가 올바르지 않습니다."),
     ORDER_SCHEDULE_EXCEEDS_DUE_DATE(HttpStatus.BAD_REQUEST, "400-303", "생산계획 종료일은 납기일을 초과할 수 없습니다."),
+    INVALID_REPORT_REQUEST(HttpStatus.BAD_REQUEST, "400-401", "보고서 요청 값이 올바르지 않습니다."),
+    INVALID_REPORT_PERIOD(HttpStatus.BAD_REQUEST, "400-402", "보고서 기간 조건이 올바르지 않습니다."),
 
     // 401 Unauthorized
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "401", "인증이 필요합니다."),
@@ -35,6 +37,7 @@ public enum ErrorCode {
     USER_DELETE_FORBIDDEN(HttpStatus.FORBIDDEN, "403-201", "사용자 삭제 권한이 없습니다."),
     SELF_DELETE_NOT_ALLOWED(HttpStatus.FORBIDDEN, "403-202", "본인 계정은 삭제할 수 없습니다."),
     ADMIN_DELETE_NOT_ALLOWED(HttpStatus.FORBIDDEN, "403-203", "시스템 관리자 계정은 삭제할 수 없습니다."),
+    REPORT_ACCESS_DENIED(HttpStatus.FORBIDDEN, "403-301", "보고서 접근 권한이 없습니다."),
 
     // 404 Not Found
     NOT_FOUND(HttpStatus.NOT_FOUND, "404", "요청한 리소스를 찾을 수 없습니다."),
@@ -48,6 +51,8 @@ public enum ErrorCode {
     PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "404-302", "제품 정보를 찾을 수 없습니다."),
     OPERATOR_NOT_FOUND(HttpStatus.NOT_FOUND, "404-303", "생산 담당자 정보를 찾을 수 없습니다."),
     AVAILABLE_PRODUCTION_LINE_NOT_FOUND(HttpStatus.NOT_FOUND, "404-304", "생산 가능한 라인을 찾을 수 없습니다."),
+    REPORT_NOT_FOUND(HttpStatus.NOT_FOUND, "404-401", "보고서 정보를 찾을 수 없습니다."),
+    REPORT_JOB_NOT_FOUND(HttpStatus.NOT_FOUND, "404-402", "보고서 생성 작업 정보를 찾을 수 없습니다."),
 
     // 405 Method Not Allowed
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "405", "지원하지 않는 HTTP 메서드입니다."),
@@ -64,6 +69,8 @@ public enum ErrorCode {
     // 500 Internal Server Error
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "500", "서버 내부 오류가 발생했습니다."),
     USER_DELETE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "500-201", "사용자 삭제 처리에 실패했습니다. 잠시 후 다시 시도해주세요."),
+    REPORT_GENERATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "500-301", "보고서 생성에 실패했습니다."),
+    AI_SERVER_CALL_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "500-302", "AI 서버 호출에 실패했습니다."),
 
     // Chat FastAPI Gateway
     CHAT_FASTAPI_CONNECTION_FAILED(HttpStatus.BAD_GATEWAY, "CHAT_FASTAPI_001", "챗봇 서버 연결에 실패했습니다."),
@@ -72,7 +79,11 @@ public enum ErrorCode {
     CHAT_FASTAPI_FORBIDDEN(HttpStatus.BAD_GATEWAY, "CHAT_FASTAPI_004", "챗봇 서버 요청에 실패했습니다."),
     CHAT_FASTAPI_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "CHAT_FASTAPI_005", "챗봇 서버를 사용할 수 없습니다."),
     CHAT_FASTAPI_INTERNAL_ERROR(HttpStatus.BAD_GATEWAY, "CHAT_FASTAPI_006", "챗봇 서버 내부 오류가 발생했습니다."),
-    CHAT_FASTAPI_INVALID_RESPONSE(HttpStatus.BAD_GATEWAY, "CHAT_FASTAPI_007", "챗봇 서버 응답을 처리할 수 없습니다.");
+    CHAT_FASTAPI_INVALID_RESPONSE(HttpStatus.BAD_GATEWAY, "CHAT_FASTAPI_007", "챗봇 서버 응답을 처리할 수 없습니다."),
+
+    // Report FastAPI Gateway
+    REPORT_FASTAPI_CALL_FAILED(HttpStatus.BAD_GATEWAY, "REPORT_FASTAPI_001", "보고서 생성 서버 호출에 실패했습니다."),
+    REPORT_FASTAPI_INVALID_RESPONSE(HttpStatus.BAD_GATEWAY, "REPORT_FASTAPI_002", "보고서 생성 서버 응답을 처리할 수 없습니다.");
 
     private final HttpStatus httpStatus;
     private final String code;
