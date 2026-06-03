@@ -12,6 +12,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import s_map.server.domain.report.dto.fastapi.FastApiReportGenerateRequest;
 import s_map.server.domain.report.dto.fastapi.FastApiReportGenerateResponse;
 import s_map.server.domain.report.dto.req.ReportGenerateRequest;
+import s_map.server.domain.report.dto.req.ReportPeriodRequest;
 import s_map.server.domain.report.entity.Report;
 import s_map.server.domain.report.entity.ReportJob;
 import s_map.server.domain.report.entity.ReportType;
@@ -24,6 +25,8 @@ import s_map.server.global.error.ErrorCode;
 @Service
 @RequiredArgsConstructor
 public class ReportAsyncService {
+
+    private static final int MAX_REPORT_TITLE_LENGTH = 200;
 
     private final ReportRepository reportRepository;
     private final ReportJobRepository reportJobRepository;
@@ -126,8 +129,8 @@ public class ReportAsyncService {
         Long relatedSimulationId = extractRelatedSimulationId(sections);
 
         Report report = Report.builder()
-                .reportTitle(fastApiResponse.getTitle())
-                .reportType(ReportType.valueOf(fastApiResponse.getReportType()))
+                .reportTitle(resolveReportTitle(request, fastApiResponse))
+                .reportType(request.getReportType())
                 .authorId(requestedBy)
                 .targetStartDate(request.getPeriod().getStartDate())
                 .targetEndDate(request.getPeriod().getEndDate())
@@ -138,6 +141,43 @@ public class ReportAsyncService {
                 .build();
 
         return reportRepository.save(report);
+    }
+
+    private String resolveReportTitle(
+            ReportGenerateRequest request,
+            FastApiReportGenerateResponse fastApiResponse
+    ) {
+        String title = fastApiResponse.getTitle();
+
+        if (title == null || title.isBlank()) {
+            title = createDefaultReportTitle(request);
+        }
+
+        title = title.trim();
+
+        if (title.length() <= MAX_REPORT_TITLE_LENGTH) {
+            return title;
+        }
+
+        return title.substring(0, MAX_REPORT_TITLE_LENGTH);
+    }
+
+    private String createDefaultReportTitle(ReportGenerateRequest request) {
+        String reportTypeLabel = resolveReportTypeLabel(request.getReportType());
+        ReportPeriodRequest period = request.getPeriod();
+
+        if (period == null || period.getStartDate() == null || period.getEndDate() == null) {
+            return reportTypeLabel + " 보고서";
+        }
+
+        return period.getStartDate() + " ~ " + period.getEndDate() + " " + reportTypeLabel + " 보고서";
+    }
+
+    private String resolveReportTypeLabel(ReportType reportType) {
+        return switch (reportType) {
+            case MONTHLY, MONTHLY_BUSINESS -> "월간";
+            case ON_DEMAND, ON_DEMAND_BUSINESS -> "수시";
+        };
     }
 
     private Long extractRelatedSimulationId(JsonNode sections) {
