@@ -44,7 +44,7 @@ import s_map.server.domain.user.repository.UserRepository;
 @ContextConfiguration(initializers = ChatAnswerIntegrationTest.FastApiPropertyInitializer.class)
 class ChatAnswerIntegrationTest {
 
-    private static final String PASSWORD = "password1234!";
+    private static final String PASSWORD = "Password1234!";
     private static final String INTERNAL_TOKEN = "test-chat-answer-token";
     private static final ObjectMapper FAST_API_OBJECT_MAPPER = new ObjectMapper();
     private static final HttpServer FAST_API_SERVER = startFastApiServer();
@@ -82,7 +82,7 @@ class ChatAnswerIntegrationTest {
     @Test
     @DisplayName("챗봇 답변 API는 로그인 사용자 컨텍스트와 내부 토큰을 FastAPI로 전달한다")
     void answerSendsAuthenticatedUserContextAndInternalToken() throws Exception {
-        User user = saveUser(Role.MANUFACTURING_MANAGER, "manager@example.com");
+        User user = saveUser(Role.MANUFACTURING_MANAGER, "manager@sk.com");
         String accessToken = loginAndGetAccessToken(user);
 
         mockMvc.perform(MockMvcRequestBuilders.post("/api/v1/chat/answer")
@@ -125,7 +125,7 @@ class ChatAnswerIntegrationTest {
     @Test
     @DisplayName("OPERATOR 요청도 FastAPI로 정상 전달한다")
     void answerForwardsOperatorRole() throws Exception {
-        User user = saveUser(Role.OPERATOR, "operator@example.com");
+        User user = saveUser(Role.OPERATOR, "operator@sk.com");
         String accessToken = loginAndGetAccessToken(user);
 
         mockMvc.perform(MockMvcRequestBuilders.post("/api/v1/chat/answer")
@@ -148,7 +148,7 @@ class ChatAnswerIntegrationTest {
     @Test
     @DisplayName("토큰 발급 후 비활성화된 사용자는 챗봇 답변 API를 호출할 수 없다")
     void answerBlocksInactiveUserBeforeCallingFastApi() throws Exception {
-        User user = saveUser(Role.MANUFACTURING_MANAGER, "inactive-manager@example.com");
+        User user = saveUser(Role.MANUFACTURING_MANAGER, "inactive-manager@sk.com");
         String accessToken = loginAndGetAccessToken(user);
         user.suspend();
         userRepository.saveAndFlush(user);
@@ -173,7 +173,7 @@ class ChatAnswerIntegrationTest {
     @DisplayName("FastAPI의 BLOCKED_UNAUTHORIZED 응답은 HTTP 실패가 아니라 정상 챗봇 응답으로 내려간다")
     void blockedUnauthorizedSecurityResultIsSuccessfulChatResponse() throws Exception {
         fastApiMode.set(FastApiMode.BLOCKED);
-        User user = saveUser(Role.OPERATOR, "blocked-operator@example.com");
+        User user = saveUser(Role.OPERATOR, "blocked-operator@sk.com");
         String accessToken = loginAndGetAccessToken(user);
 
         mockMvc.perform(MockMvcRequestBuilders.post("/api/v1/chat/answer")
@@ -195,7 +195,7 @@ class ChatAnswerIntegrationTest {
     @DisplayName("FastAPI timeout은 BaseResponse.fail로 변환한다")
     void timeoutReturnsBaseResponseFail() throws Exception {
         fastApiMode.set(FastApiMode.TIMEOUT);
-        User user = saveUser(Role.MANUFACTURING_MANAGER, "timeout-manager@example.com");
+        User user = saveUser(Role.MANUFACTURING_MANAGER, "timeout-manager@sk.com");
         String accessToken = loginAndGetAccessToken(user);
 
         mockMvc.perform(MockMvcRequestBuilders.post("/api/v1/chat/answer")
@@ -227,7 +227,7 @@ class ChatAnswerIntegrationTest {
             String expectedMessage
     ) throws Exception {
         fastApiMode.set(mode);
-        User user = saveUser(Role.EXECUTIVE, "executive@example.com");
+        User user = saveUser(Role.EXECUTIVE, "executive@sk.com");
         String accessToken = loginAndGetAccessToken(user);
 
         mockMvc.perform(MockMvcRequestBuilders.post("/api/v1/chat/answer")
@@ -248,7 +248,7 @@ class ChatAnswerIntegrationTest {
     @DisplayName("FastAPI 응답 추적 ID가 요청과 다르면 잘못된 챗봇 응답으로 처리한다")
     void mismatchedFastApiTrackingIdsReturnInvalidResponse() throws Exception {
         fastApiMode.set(FastApiMode.MISMATCHED_TRACKING_ID);
-        User user = saveUser(Role.MANUFACTURING_MANAGER, "mismatch-manager@example.com");
+        User user = saveUser(Role.MANUFACTURING_MANAGER, "mismatch-manager@sk.com");
         String accessToken = loginAndGetAccessToken(user);
 
         mockMvc.perform(MockMvcRequestBuilders.post("/api/v1/chat/answer")

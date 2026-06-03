@@ -16,7 +16,7 @@ public class AdminUserResponse {
     @Schema(description = "사용자 이름", example = "김길동")
     private String name;
 
-    @Schema(description = "이메일", example = "operator01@example.com")
+    @Schema(description = "이메일", example = "operator01@sk.com")
     private String email;
 
     @Schema(description = "권한", example = "OPERATOR")

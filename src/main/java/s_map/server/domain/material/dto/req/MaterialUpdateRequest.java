@@ -2,6 +2,7 @@ package s_map.server.domain.material.dto.req;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 @Schema(description = "자재 정보 전체 수정 요청")
@@ -19,6 +20,7 @@ public record MaterialUpdateRequest(
 
         @Schema(description = "수정할 자재 단위", example = "KG")
         @NotBlank(message = "자재 단위는 필수입니다.")
+        @Pattern(regexp = "^(KG|L|EA|LOT)$", message = "단위는 KG, L, EA, LOT 중 하나여야 합니다.")
         @Size(max = 20, message = "자재 단위는 20자 이하여야 합니다.")
         String unit,
 

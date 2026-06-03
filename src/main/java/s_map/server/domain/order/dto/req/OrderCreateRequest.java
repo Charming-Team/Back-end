@@ -1,6 +1,7 @@
 package s_map.server.domain.order.dto.req;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.FutureOrPresent;
 import jakarta.validation.constraints.NotBlank;
@@ -67,4 +68,16 @@ public record OrderCreateRequest(
         @Digits(integer = 13, fraction = 2, message = "납기 지연 패널티 금액은 정수 13자리, 소수 2자리까지 입력할 수 있습니다.")
         BigDecimal latePenaltyAmount
 ) {
+
+    @AssertTrue(message = "생산 시작일 또는 희망 생산 시작일시는 필수입니다.")
+    @Schema(hidden = true)
+    public boolean isProductionStartProvided() {
+        return productionStartDate != null || desiredStartAt != null;
+    }
+
+    @AssertTrue(message = "생산 담당자는 필수입니다.")
+    @Schema(hidden = true)
+    public boolean isOperatorProvided() {
+        return operatorId != null || (operatorName != null && !operatorName.isBlank());
+    }
 }

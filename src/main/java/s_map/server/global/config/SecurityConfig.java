@@ -78,7 +78,7 @@ public class SecurityConfig {
                         .requestMatchers(INTERNAL_PATHS).permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/orders")
-                        .hasAnyRole("EXECUTIVE", "MANUFACTURING_MANAGER")
+                        .hasRole("MANUFACTURING_MANAGER")
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)

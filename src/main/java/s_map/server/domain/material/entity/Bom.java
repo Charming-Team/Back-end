@@ -54,7 +54,7 @@ public class Bom extends LastModifiedEntity {
     @Column(name = "unit", nullable = false, length = 20)
     private String unit;
 
-    @Column(name = "loss_rate", precision = 5, scale = 2)
+    @Column(name = "loss_rate", precision = 5, scale = 4)
     private BigDecimal lossRate;
 
     public void update(
@@ -74,9 +74,7 @@ public class Bom extends LastModifiedEntity {
             return baseQuantity;
         }
 
-        BigDecimal lossMultiplier = BigDecimal.ONE.add(
-                this.lossRate.divide(BigDecimal.valueOf(100))
-        );
+        BigDecimal lossMultiplier = BigDecimal.ONE.add(this.lossRate);
 
         return baseQuantity.multiply(lossMultiplier);
     }
