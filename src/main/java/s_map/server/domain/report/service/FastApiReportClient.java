@@ -26,7 +26,20 @@ public class FastApiReportClient {
         this.reportGenerateUrl = resolveUrl(properties.getBaseUrl(), properties.getReportGeneratePath());
     }
 
+    /**
+     * 기능: FastAPI 보고서 생성 API를 호출하고 응답 DTO로 변환한다.
+     *
+     * Input:
+     * - request / FastApiReportGenerateRequest / Job ID, 사용자 컨텍스트, 보고서 생성 조건
+     *
+     * Output:
+     * - response / FastApiReportGenerateResponse / FastAPI 보고서 생성 결과
+     */
     public FastApiReportGenerateResponse generateReport(FastApiReportGenerateRequest request) {
+        if (request == null) {
+            throw new CustomException(ErrorCode.INVALID_REPORT_REQUEST, "FastAPI 보고서 생성 요청은 필수입니다.");
+        }
+
         try {
             log.info(
                     "[FastApiReportClient] FastAPI 보고서 생성 요청 시작 reportJobId={} url={}",
@@ -42,7 +55,7 @@ public class FastApiReportClient {
                     );
 
             if (response == null) {
-                throw new CustomException(ErrorCode.AI_SERVER_CALL_FAILED, "AI 서버 응답이 비어 있습니다.");
+                throw new CustomException(ErrorCode.REPORT_FASTAPI_INVALID_RESPONSE, "AI 서버 응답이 비어 있습니다.");
             }
 
             log.info(
@@ -57,7 +70,7 @@ public class FastApiReportClient {
                     "[FastApiReportClient] FastAPI 보고서 생성 요청 실패 reason=rest_client_exception",
                     exception
             );
-            throw new CustomException(ErrorCode.AI_SERVER_CALL_FAILED, exception.getMessage());
+            throw new CustomException(ErrorCode.REPORT_FASTAPI_CALL_FAILED, resolveRestClientMessage(exception));
         }
     }
 
@@ -76,5 +89,15 @@ public class FastApiReportClient {
         return value.endsWith("/")
                 ? value.substring(0, value.length() - 1)
                 : value;
+    }
+
+    private String resolveRestClientMessage(RestClientException exception) {
+        String message = exception.getMessage();
+
+        if (message == null || message.isBlank()) {
+            return ErrorCode.REPORT_FASTAPI_CALL_FAILED.getMessage();
+        }
+
+        return message;
     }
 }

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -34,6 +35,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ReportService {
@@ -48,6 +50,16 @@ public class ReportService {
     private final ReportAsyncService reportAsyncService;
     private final ObjectMapper objectMapper;
 
+    /**
+     * 기능: 인증 사용자의 보고서 생성 요청을 검증하고 비동기 생성 Job을 접수한다.
+     *
+     * Input:
+     * - authUser / AuthUser / JWT에서 추출한 로그인 사용자 ID, 이메일, Role
+     * - request / ReportGenerateRequest / 보고서 유형, 조회 기간, 포함 항목 설정
+     *
+     * Output:
+     * - result / ReportGenerateStartResponse / 접수된 보고서 생성 Job ID와 초기 상태
+     */
     @Transactional
     public ReportGenerateStartResponse generateReport(AuthUser authUser, ReportGenerateRequest request) {
         User user = getAuthorizedReportUser(authUser);
@@ -66,11 +78,29 @@ public class ReportService {
                 request
         ));
 
+        log.info(
+                "[ReportService] 보고서 생성 작업 접수 reportJobId={}, requestedBy={}, reportType={}",
+                reportJob.getJobId(),
+                user.getId(),
+                request.getReportType()
+        );
+
         return ReportGenerateStartResponse.from(reportJob);
     }
 
+    /**
+     * 기능: 보고서 생성 Job의 현재 상태와 결과 보고서 ID를 조회한다.
+     *
+     * Input:
+     * - authUser / AuthUser / JWT에서 추출한 로그인 사용자 ID, 이메일, Role
+     * - reportJobId / Long / 조회할 보고서 생성 Job ID
+     *
+     * Output:
+     * - result / ReportJobResponse / Job 상태, 실패 사유, 결과 보고서 ID
+     */
     public ReportJobResponse getReportJob(AuthUser authUser, Long reportJobId) {
         getAuthorizedReportUser(authUser);
+        validatePositiveId(reportJobId, "reportJobId");
 
         ReportJob reportJob = reportJobRepository.findById(reportJobId)
                 .orElseThrow(() -> new CustomException(ErrorCode.REPORT_JOB_NOT_FOUND));
@@ -78,6 +108,17 @@ public class ReportService {
         return ReportJobResponse.from(reportJob);
     }
 
+    /**
+     * 기능: 보고서 목록을 작성일 최신순으로 페이지 단위 조회한다.
+     *
+     * Input:
+     * - authUser / AuthUser / JWT에서 추출한 로그인 사용자 ID, 이메일, Role
+     * - page / int / 조회할 페이지 번호
+     * - size / int / 한 페이지에 조회할 보고서 수
+     *
+     * Output:
+     * - result / Page<ReportListResponse> / 보고서 목록 페이지와 작성자 표시명
+     */
     public Page<ReportListResponse> getReports(AuthUser authUser, int page, int size) {
         getAuthorizedReportUser(authUser);
 
@@ -91,8 +132,19 @@ public class ReportService {
         ));
     }
 
+    /**
+     * 기능: 보고서 ID를 기준으로 보고서 상세 내용과 작성자 표시명을 조회한다.
+     *
+     * Input:
+     * - authUser / AuthUser / JWT에서 추출한 로그인 사용자 ID, 이메일, Role
+     * - reportId / Long / 조회할 보고서 ID
+     *
+     * Output:
+     * - result / ReportDetailResponse / 보고서 기본 정보, 본문, 근거 데이터, 작성자 표시명
+     */
     public ReportDetailResponse getReport(AuthUser authUser, Long reportId) {
         getAuthorizedReportUser(authUser);
+        validatePositiveId(reportId, "reportId");
 
         Report report = reportRepository.findById(reportId)
                 .orElseThrow(() -> new CustomException(ErrorCode.REPORT_NOT_FOUND));
@@ -103,41 +155,55 @@ public class ReportService {
 
     private void validateGenerateRequest(ReportGenerateRequest request) {
         if (request == null) {
-            throw new CustomException(ErrorCode.BAD_REQUEST);
+            throw new CustomException(ErrorCode.INVALID_REPORT_REQUEST, "보고서 생성 요청은 필수입니다.");
         }
 
         if (request.getReportType() == null) {
-            throw new CustomException(ErrorCode.BAD_REQUEST, "reportType은 필수입니다.");
+            throw new CustomException(ErrorCode.INVALID_REPORT_REQUEST, "reportType은 필수입니다.");
         }
 
         if (request.getPeriod() == null) {
-            throw new CustomException(ErrorCode.BAD_REQUEST, "period는 필수입니다.");
+            throw new CustomException(ErrorCode.INVALID_REPORT_PERIOD, "period는 필수입니다.");
         }
 
         if (request.getPeriod().getStartDate() == null
                 || request.getPeriod().getEndDate() == null) {
-            throw new CustomException(ErrorCode.BAD_REQUEST, "보고서 시작일과 종료일은 필수입니다.");
+            throw new CustomException(ErrorCode.INVALID_REPORT_PERIOD, "보고서 시작일과 종료일은 필수입니다.");
         }
 
         if (request.getPeriod().getEndDate().isBefore(request.getPeriod().getStartDate())) {
-            throw new CustomException(ErrorCode.BAD_REQUEST, "보고서 종료일은 시작일보다 이전일 수 없습니다.");
+            throw new CustomException(ErrorCode.INVALID_REPORT_PERIOD, "보고서 종료일은 시작일보다 이전일 수 없습니다.");
         }
     }
 
     private User getAuthorizedReportUser(AuthUser authUser) {
-        if (authUser == null) {
+        if (authUser == null || authUser.id() == null) {
+            log.warn("[ReportService] 보고서 요청 실패 reason=unauthenticated");
             throw new CustomException(ErrorCode.UNAUTHORIZED);
         }
 
         User user = userRepository.findById(authUser.id())
-                .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND, "요청 사용자를 찾을 수 없습니다."));
+                .orElseThrow(() -> {
+                    log.warn("[ReportService] 보고서 요청 실패 reason=user_not_found userId={}", authUser.id());
+                    return new CustomException(ErrorCode.NOT_FOUND, "요청 사용자를 찾을 수 없습니다.");
+                });
 
         if (!user.isActive()) {
+            log.warn(
+                    "[ReportService] 보고서 요청 실패 reason=inactive_user userId={}, status={}",
+                    user.getId(),
+                    user.getStatus()
+            );
             throw new CustomException(ErrorCode.INACTIVE_ACCOUNT);
         }
 
         if (!hasReportAccess(user.getRole())) {
-            throw new CustomException(ErrorCode.FORBIDDEN, "보고서 접근 권한이 없습니다.");
+            log.warn(
+                    "[ReportService] 보고서 요청 실패 reason=report_access_denied userId={}, role={}",
+                    user.getId(),
+                    user.getRole()
+            );
+            throw new CustomException(ErrorCode.REPORT_ACCESS_DENIED);
         }
 
         return user;
@@ -147,6 +213,12 @@ public class ReportService {
         return role == Role.MANUFACTURING_MANAGER
                 || role == Role.EXECUTIVE
                 || role == Role.ADMIN;
+    }
+
+    private void validatePositiveId(Long id, String fieldName) {
+        if (id == null || id <= 0) {
+            throw new CustomException(ErrorCode.INVALID_REPORT_REQUEST, fieldName + "는 1 이상의 값이어야 합니다.");
+        }
     }
 
     private Pageable createPageable(int page, int size) {

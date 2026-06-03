@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -34,6 +35,18 @@ public class ReportAsyncService {
     private final ObjectMapper objectMapper;
     private final TransactionTemplate transactionTemplate;
 
+    /**
+     * 기능: 보고서 생성 Job을 실행하고 FastAPI 응답을 reports 테이블과 report_jobs 상태에 반영한다.
+     *
+     * Input:
+     * - reportJobId / Long / 실행할 보고서 생성 Job ID
+     * - requestedBy / Long / 보고서 생성 요청 사용자 ID
+     * - userRole / String / FastAPI에 전달할 요청 사용자 권한
+     * - request / ReportGenerateRequest / 보고서 유형, 조회 기간, 포함 항목 설정
+     *
+     * Output:
+     * - none / void / 성공 시 보고서 저장 및 Job SUCCESS 처리, 실패 시 Job FAILED 처리
+     */
     @Async
     public void generateReportAsync(
             Long reportJobId,
@@ -50,17 +63,23 @@ public class ReportAsyncService {
             FastApiReportGenerateResponse fastApiResponse =
                     fastApiReportClient.generateReport(fastApiRequest);
 
-            if (!fastApiResponse.isCompleted()) {
-                String errorMessage = fastApiResponse.getErrorMessage();
-
-                if (errorMessage == null || errorMessage.isBlank()) {
-                    errorMessage = "AI 서버에서 보고서 생성에 실패했습니다.";
-                }
-
-                markJobFailed(reportJobId, errorMessage);
+            if (fastApiResponse == null) {
+                markJobFailedSafely(reportJobId, ErrorCode.REPORT_FASTAPI_INVALID_RESPONSE.getMessage());
                 log.warn(
-                        "[ReportAsyncService] 보고서 생성 실패 reportJobId={} errorMessage={}",
+                        "[ReportAsyncService] 보고서 생성 실패 reason=empty_fastapi_response reportJobId={}",
+                        reportJobId
+                );
+                return;
+            }
+
+            if (!fastApiResponse.isCompleted()) {
+                String errorMessage = resolveFastApiFailureMessage(fastApiResponse);
+
+                markJobFailedSafely(reportJobId, errorMessage);
+                log.warn(
+                        "[ReportAsyncService] 보고서 생성 실패 reportJobId={}, status={}, errorMessage={}",
                         reportJobId,
+                        fastApiResponse.getStatus(),
                         errorMessage
                 );
                 return;
@@ -74,7 +93,7 @@ public class ReportAsyncService {
                     reportId
             );
         } catch (Exception exception) {
-            markJobFailed(reportJobId, resolveFailureMessage(exception));
+            markJobFailedSafely(reportJobId, resolveFailureMessage(exception));
 
             log.error(
                     "[ReportAsyncService] 보고서 생성 중 예외 발생 reportJobId={}",
@@ -113,6 +132,18 @@ public class ReportAsyncService {
                     .orElseThrow(() -> new CustomException(ErrorCode.REPORT_JOB_NOT_FOUND));
             reportJob.markFailed(errorMessage);
         });
+    }
+
+    private void markJobFailedSafely(Long reportJobId, String errorMessage) {
+        try {
+            markJobFailed(reportJobId, errorMessage);
+        } catch (Exception exception) {
+            log.error(
+                    "[ReportAsyncService] 보고서 생성 실패 상태 저장 실패 reportJobId={}",
+                    reportJobId,
+                    exception
+            );
+        }
     }
 
     private Report saveReport(
@@ -180,6 +211,20 @@ public class ReportAsyncService {
         };
     }
 
+    private String resolveFastApiFailureMessage(FastApiReportGenerateResponse fastApiResponse) {
+        String errorMessage = fastApiResponse.getErrorMessage();
+
+        if (errorMessage != null && !errorMessage.isBlank()) {
+            return errorMessage;
+        }
+
+        if (fastApiResponse.isFailed()) {
+            return ErrorCode.REPORT_GENERATION_FAILED.getMessage();
+        }
+
+        return ErrorCode.REPORT_FASTAPI_INVALID_RESPONSE.getMessage();
+    }
+
     private Long extractRelatedSimulationId(JsonNode sections) {
         if (sections == null || sections.isNull()) {
             return null;
@@ -202,6 +247,10 @@ public class ReportAsyncService {
     }
 
     private String resolveFailureMessage(Exception exception) {
+        if (exception instanceof DataIntegrityViolationException) {
+            return ErrorCode.REPORT_GENERATION_FAILED.getMessage();
+        }
+
         String message = exception.getMessage();
 
         if (message == null || message.isBlank()) {
