@@ -8,7 +8,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import s_map.server.domain.report.dto.fastapi.FastApiReportGenerateRequest;
 import s_map.server.domain.report.dto.fastapi.FastApiReportGenerateResponse;
 import s_map.server.domain.report.dto.req.ReportGenerateRequest;
@@ -29,16 +29,15 @@ public class ReportAsyncService {
     private final ReportJobRepository reportJobRepository;
     private final FastApiReportClient fastApiReportClient;
     private final ObjectMapper objectMapper;
+    private final TransactionTemplate transactionTemplate;
 
     @Async
-    @Transactional
     public void generateReportAsync(Long reportJobId, ReportGenerateRequest request) {
-        ReportJob reportJob = reportJobRepository.findById(reportJobId)
-                .orElseThrow(() -> new CustomException(ErrorCode.REPORT_JOB_NOT_FOUND));
-
         try {
+            markJobRunning(reportJobId);
+
             FastApiReportGenerateRequest fastApiRequest =
-                    FastApiReportGenerateRequest.of(reportJob.getJobId(), request);
+                    FastApiReportGenerateRequest.of(reportJobId, request);
 
             FastApiReportGenerateResponse fastApiResponse =
                     fastApiReportClient.generateReport(fastApiRequest);
@@ -50,7 +49,7 @@ public class ReportAsyncService {
                     errorMessage = "AI 서버에서 보고서 생성에 실패했습니다.";
                 }
 
-                reportJob.markFailed(errorMessage);
+                markJobFailed(reportJobId, errorMessage);
                 log.warn(
                         "[ReportAsyncService] 보고서 생성 실패 reportJobId={} errorMessage={}",
                         reportJobId,
@@ -59,17 +58,15 @@ public class ReportAsyncService {
                 return;
             }
 
-            Report report = saveReport(request, fastApiResponse);
-
-            reportJob.markSuccess(report.getReportId());
+            Long reportId = saveReportAndMarkSuccess(reportJobId, request, fastApiResponse);
 
             log.info(
                     "[ReportAsyncService] 보고서 생성 완료 reportJobId={} reportId={}",
                     reportJobId,
-                    report.getReportId()
+                    reportId
             );
         } catch (Exception exception) {
-            reportJob.markFailed(exception.getMessage());
+            markJobFailed(reportJobId, resolveFailureMessage(exception));
 
             log.error(
                     "[ReportAsyncService] 보고서 생성 중 예외 발생 reportJobId={}",
@@ -77,6 +74,36 @@ public class ReportAsyncService {
                     exception
             );
         }
+    }
+
+    private void markJobRunning(Long reportJobId) {
+        transactionTemplate.executeWithoutResult(status -> {
+            ReportJob reportJob = reportJobRepository.findById(reportJobId)
+                    .orElseThrow(() -> new CustomException(ErrorCode.REPORT_JOB_NOT_FOUND));
+            reportJob.markRunning();
+        });
+    }
+
+    private Long saveReportAndMarkSuccess(
+            Long reportJobId,
+            ReportGenerateRequest request,
+            FastApiReportGenerateResponse fastApiResponse
+    ) {
+        return transactionTemplate.execute(status -> {
+            ReportJob reportJob = reportJobRepository.findById(reportJobId)
+                    .orElseThrow(() -> new CustomException(ErrorCode.REPORT_JOB_NOT_FOUND));
+            Report report = saveReport(request, fastApiResponse);
+            reportJob.markSuccess(report.getReportId());
+            return report.getReportId();
+        });
+    }
+
+    private void markJobFailed(Long reportJobId, String errorMessage) {
+        transactionTemplate.executeWithoutResult(status -> {
+            ReportJob reportJob = reportJobRepository.findById(reportJobId)
+                    .orElseThrow(() -> new CustomException(ErrorCode.REPORT_JOB_NOT_FOUND));
+            reportJob.markFailed(errorMessage);
+        });
     }
 
     private Report saveReport(
@@ -125,5 +152,15 @@ public class ReportAsyncService {
         }
 
         return simulationIdNode.asLong();
+    }
+
+    private String resolveFailureMessage(Exception exception) {
+        String message = exception.getMessage();
+
+        if (message == null || message.isBlank()) {
+            return "보고서 생성 중 알 수 없는 오류가 발생했습니다.";
+        }
+
+        return message;
     }
 }

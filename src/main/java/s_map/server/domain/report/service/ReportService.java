@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import s_map.server.domain.report.dto.req.ReportGenerateRequest;
 import s_map.server.domain.report.dto.res.ReportDetailResponse;
 import s_map.server.domain.report.dto.res.ReportGenerateStartResponse;
@@ -38,10 +40,10 @@ public class ReportService {
         JsonNode requestPayload = objectMapper.valueToTree(request);
 
         ReportJob reportJob = reportJobRepository.save(
-                ReportJob.start(request.getRequestedBy(), requestPayload)
+                ReportJob.createPending(request.getRequestedBy(), requestPayload)
         );
 
-        reportAsyncService.generateReportAsync(reportJob.getJobId(), request);
+        runAfterCommit(() -> reportAsyncService.generateReportAsync(reportJob.getJobId(), request));
 
         return ReportGenerateStartResponse.from(reportJob);
     }
@@ -100,5 +102,19 @@ public class ReportService {
         if (request.getPeriod().getEndDate().isBefore(request.getPeriod().getStartDate())) {
             throw new CustomException(ErrorCode.BAD_REQUEST, "보고서 종료일은 시작일보다 이전일 수 없습니다.");
         }
+    }
+
+    private void runAfterCommit(Runnable action) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            action.run();
+            return;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                action.run();
+            }
+        });
     }
 }

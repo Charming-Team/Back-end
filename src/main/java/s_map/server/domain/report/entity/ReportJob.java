@@ -60,14 +60,18 @@ public class ReportJob extends BaseEntity {
     @Column(name = "finished_at")
     private LocalDateTime finishedAt;
 
-    public static ReportJob start(Long requestedBy, JsonNode requestPayload) {
+    public static ReportJob createPending(Long requestedBy, JsonNode requestPayload) {
         return ReportJob.builder()
                 .requestedBy(requestedBy)
-                .jobStatus(ReportJobStatus.RUNNING)
+                .jobStatus(ReportJobStatus.PENDING)
                 .requestPayload(requestPayload)
                 .retryCount(0)
-                .startedAt(LocalDateTime.now())
                 .build();
+    }
+
+    public void markRunning() {
+        this.jobStatus = ReportJobStatus.RUNNING;
+        this.startedAt = LocalDateTime.now();
     }
 
     public void markSuccess(Long reportId) {
