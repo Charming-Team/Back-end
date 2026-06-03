@@ -4,6 +4,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -24,12 +28,19 @@ import s_map.server.global.error.CustomException;
 import s_map.server.global.error.ErrorCode;
 import s_map.server.global.security.AuthUser;
 
-import java.util.List;
+import java.util.Collections;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ReportService {
+
+    private static final int DEFAULT_PAGE = 0;
+    private static final int DEFAULT_SIZE = 10;
+    private static final int MAX_SIZE = 100;
 
     private final ReportRepository reportRepository;
     private final ReportJobRepository reportJobRepository;
@@ -67,13 +78,17 @@ public class ReportService {
         return ReportJobResponse.from(reportJob);
     }
 
-    public List<ReportListResponse> getReports(AuthUser authUser) {
+    public Page<ReportListResponse> getReports(AuthUser authUser, int page, int size) {
         getAuthorizedReportUser(authUser);
 
-        return reportRepository.findAllByOrderByCreatedAtDesc()
-                .stream()
-                .map(ReportListResponse::from)
-                .toList();
+        Pageable pageable = createPageable(page, size);
+        Page<Report> reports = reportRepository.findAllByOrderByCreatedAtDesc(pageable);
+        Map<Long, String> authorNameMap = findAuthorNameMap(reports);
+
+        return reports.map(report -> ReportListResponse.from(
+                report,
+                authorNameMap.get(report.getAuthorId())
+        ));
     }
 
     public ReportDetailResponse getReport(AuthUser authUser, Long reportId) {
@@ -131,6 +146,32 @@ public class ReportService {
         return role == Role.MANUFACTURING_MANAGER
                 || role == Role.EXECUTIVE
                 || role == Role.ADMIN;
+    }
+
+    private Pageable createPageable(int page, int size) {
+        int safePage = Math.max(page, DEFAULT_PAGE);
+        int safeSize = size <= 0 ? DEFAULT_SIZE : Math.min(size, MAX_SIZE);
+
+        return PageRequest.of(
+                safePage,
+                safeSize,
+                Sort.by(Sort.Direction.DESC, "createdAt")
+        );
+    }
+
+    private Map<Long, String> findAuthorNameMap(Page<Report> reports) {
+        Set<Long> authorIds = reports.getContent()
+                .stream()
+                .map(Report::getAuthorId)
+                .collect(Collectors.toSet());
+
+        if (authorIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        return userRepository.findAllById(authorIds)
+                .stream()
+                .collect(Collectors.toMap(User::getId, User::getName));
     }
 
     private JsonNode createRequestPayload(User user, ReportGenerateRequest request) {

@@ -1,12 +1,14 @@
 package s_map.server.domain.report.controller;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import s_map.server.domain.report.dto.req.ReportGenerateRequest;
 import s_map.server.domain.report.dto.res.ReportDetailResponse;
@@ -16,8 +18,6 @@ import s_map.server.domain.report.dto.res.ReportListResponse;
 import s_map.server.domain.report.service.ReportService;
 import s_map.server.global.common.BaseResponse;
 import s_map.server.global.security.AuthUser;
-
-import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
@@ -43,10 +43,12 @@ public class ReportController {
     }
 
     @GetMapping
-    public BaseResponse<List<ReportListResponse>> getReports(
-            @AuthenticationPrincipal AuthUser authUser
+    public BaseResponse<Page<ReportListResponse>> getReports(
+            @AuthenticationPrincipal AuthUser authUser,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
     ) {
-        return BaseResponse.success(reportService.getReports(authUser));
+        return BaseResponse.success(reportService.getReports(authUser, page, size));
     }
 
     @GetMapping("/{reportId}")

@@ -15,16 +15,18 @@ public class ReportListResponse {
     private String title;
     private String reportType;
     private Long authorId;
+    private String authorName;
     private LocalDate targetStartDate;
     private LocalDate targetEndDate;
     private LocalDateTime createdAt;
 
-    public static ReportListResponse from(Report report) {
+    public static ReportListResponse from(Report report, String authorName) {
         return ReportListResponse.builder()
                 .reportId(report.getReportId())
                 .title(report.getReportTitle())
                 .reportType(report.getReportType().name())
                 .authorId(report.getAuthorId())
+                .authorName(authorName)
                 .targetStartDate(report.getTargetStartDate())
                 .targetEndDate(report.getTargetEndDate())
                 .createdAt(report.getCreatedAt())
