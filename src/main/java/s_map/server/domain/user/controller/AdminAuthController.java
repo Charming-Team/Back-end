@@ -1,6 +1,7 @@
 package s_map.server.domain.user.controller;
 
 import s_map.server.domain.user.dto.req.AdminUserCreateRequest;
+import s_map.server.domain.user.dto.res.AdminDashboardResponse;
 import s_map.server.domain.user.dto.res.AdminUserCreateResponse;
 import s_map.server.domain.user.service.AdminAuthService;
 import s_map.server.global.common.BaseResponse;
@@ -44,6 +45,12 @@ public class AdminAuthController {
             @RequestParam(required = false) String keyword
     ) {
         return BaseResponse.success(adminAuthService.getUsers(page, size, keyword));
+    }
+
+    @Operation(summary = "관리자 대시보드 사용자 현황 조회")
+    @GetMapping("/dashboard")
+    public BaseResponse<AdminDashboardResponse> getDashboard() {
+        return BaseResponse.success(adminAuthService.getDashboard());
     }
 
     @Operation(summary = "사용자 삭제")

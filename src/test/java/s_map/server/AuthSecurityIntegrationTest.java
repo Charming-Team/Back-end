@@ -444,6 +444,66 @@ class AuthSecurityIntegrationTest {
     }
 
     @Nested
+    @DisplayName("ADMIN 대시보드")
+    class AdminDashboard {
+
+        @Test
+        @DisplayName("대시보드는 전체 사용자, 활성 사용자, 권한별 사용자 수를 반환한다")
+        void adminCanGetDashboardUserSummary() throws Exception {
+            User admin = saveUser(Role.ADMIN, "admin@sk.com", PASSWORD);
+            User executive = saveUser(Role.EXECUTIVE, "executive@sk.com", PASSWORD);
+            executive.suspend();
+            userRepository.saveAndFlush(executive);
+
+            saveUser(Role.MANUFACTURING_MANAGER, "manager-active@sk.com", PASSWORD);
+            User bannedManager = saveUser(Role.MANUFACTURING_MANAGER, "manager-banned@sk.com", PASSWORD);
+            bannedManager.ban();
+            userRepository.saveAndFlush(bannedManager);
+
+            saveUser(Role.OPERATOR, "operator-active@sk.com", PASSWORD);
+            User withdrawnOperator = saveUser(Role.OPERATOR, "operator-withdrawn@sk.com", PASSWORD);
+            withdrawnOperator.withdraw();
+            userRepository.saveAndFlush(withdrawnOperator);
+
+            String adminAccessToken = loginAndGetAccessToken(admin);
+
+            mockMvc.perform(MockMvcRequestBuilders.get("/api/admin/dashboard")
+                            .header(HttpHeaders.AUTHORIZATION, bearer(adminAccessToken)))
+                    .andExpect(MockMvcResultMatchers.status().isOk())
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(true))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("COMMON200"))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.data.totalUsers").value(5))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.data.activeUsers").value(3))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.data.roleDistribution.length()").value(4))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.data.roleDistribution[0].role").value("ADMIN"))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.data.roleDistribution[0].roleName").value("서버관리자"))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.data.roleDistribution[0].count").value(1))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.data.roleDistribution[1].role").value("EXECUTIVE"))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.data.roleDistribution[1].roleName").value("경영진"))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.data.roleDistribution[1].count").value(1))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.data.roleDistribution[2].role").value("MANUFACTURING_MANAGER"))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.data.roleDistribution[2].roleName").value("제조관리직"))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.data.roleDistribution[2].count").value(2))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.data.roleDistribution[3].role").value("OPERATOR"))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.data.roleDistribution[3].roleName").value("작업자"))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.data.roleDistribution[3].count").value(1));
+        }
+
+        @Test
+        @DisplayName("ADMIN이 아닌 사용자는 대시보드를 조회할 수 없다")
+        void nonAdminCannotGetDashboard() throws Exception {
+            User operator = saveUser(Role.OPERATOR, "operator@sk.com", PASSWORD);
+            String operatorAccessToken = loginAndGetAccessToken(operator);
+
+            mockMvc.perform(MockMvcRequestBuilders.get("/api/admin/dashboard")
+                            .header(HttpHeaders.AUTHORIZATION, bearer(operatorAccessToken)))
+                    .andExpect(MockMvcResultMatchers.status().isForbidden())
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(false))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("403"));
+        }
+    }
+
+    @Nested
     @DisplayName("인증 사용자 API")
     class AuthenticatedUser {
 
