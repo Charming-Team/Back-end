@@ -894,6 +894,68 @@ class AuthSecurityIntegrationTest {
     }
 
     @Nested
+    @DisplayName("자재 변경 권한")
+    class MaterialMutationAuthorization {
+
+        @Test
+        @DisplayName("작업자는 자재 등록 API에 접근할 수 없다")
+        void operatorCannotCreateMaterial() throws Exception {
+            String accessToken = loginAndGetAccessToken(saveUser(Role.OPERATOR, "operator@sk.com", PASSWORD));
+
+            mockMvc.perform(MockMvcRequestBuilders.post("/api/materials")
+                            .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{}"))
+                    .andExpect(MockMvcResultMatchers.status().isForbidden())
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(false))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("403"));
+        }
+
+        @Test
+        @DisplayName("작업자는 자재 정보 수정 API에 접근할 수 없다")
+        void operatorCannotUpdateMaterial() throws Exception {
+            String accessToken = loginAndGetAccessToken(saveUser(Role.OPERATOR, "operator@sk.com", PASSWORD));
+
+            mockMvc.perform(MockMvcRequestBuilders.put("/api/materials/{materialId}", 1L)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{}"))
+                    .andExpect(MockMvcResultMatchers.status().isForbidden())
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(false))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("403"));
+        }
+
+        @Test
+        @DisplayName("작업자는 자재 재고 수정 API에 접근할 수 없다")
+        void operatorCannotUpdateMaterialInventory() throws Exception {
+            String accessToken = loginAndGetAccessToken(saveUser(Role.OPERATOR, "operator@sk.com", PASSWORD));
+
+            mockMvc.perform(MockMvcRequestBuilders.put("/api/materials/{materialId}/inventory", 1L)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{}"))
+                    .andExpect(MockMvcResultMatchers.status().isForbidden())
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(false))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("403"));
+        }
+
+        @ParameterizedTest
+        @EnumSource(value = Role.class, names = {"OPERATOR"}, mode = Mode.EXCLUDE)
+        @DisplayName("작업자가 아닌 사용자는 자재 등록 API에 도달할 수 있다")
+        void nonOperatorsCanReachMaterialCreateValidation(Role role) throws Exception {
+            String accessToken = loginAndGetAccessToken(saveUser(role, role.name().toLowerCase() + "@sk.com", PASSWORD));
+
+            mockMvc.perform(MockMvcRequestBuilders.post("/api/materials")
+                            .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{}"))
+                    .andExpect(MockMvcResultMatchers.status().isBadRequest())
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(false))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("400-001"));
+        }
+    }
+
+    @Nested
     @DisplayName("공개 문서 경로")
     class PublicDocumentation {
 

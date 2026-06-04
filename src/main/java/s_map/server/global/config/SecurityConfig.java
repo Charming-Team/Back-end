@@ -51,6 +51,11 @@ public class SecurityConfig {
             "/internal/chat/evidence"
     };
 
+    private static final String[] MATERIAL_MUTATION_PATHS = {
+            "/api/materials",
+            "/api/materials/**"
+    };
+
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
     private final JwtAccessDeniedHandler jwtAccessDeniedHandler;
@@ -77,6 +82,10 @@ public class SecurityConfig {
                         .requestMatchers(AUTH_PATHS).permitAll()
                         .requestMatchers(INTERNAL_PATHS).permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, MATERIAL_MUTATION_PATHS)
+                        .hasAnyRole("ADMIN", "EXECUTIVE", "MANUFACTURING_MANAGER")
+                        .requestMatchers(HttpMethod.PUT, MATERIAL_MUTATION_PATHS)
+                        .hasAnyRole("ADMIN", "EXECUTIVE", "MANUFACTURING_MANAGER")
                         .requestMatchers(HttpMethod.POST, "/api/orders")
                         .hasRole("MANUFACTURING_MANAGER")
                         .anyRequest().authenticated()
