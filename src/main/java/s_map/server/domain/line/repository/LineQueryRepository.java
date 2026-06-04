@@ -48,14 +48,14 @@ public interface LineQueryRepository extends Repository<ProductionLine, Long> {
                         JOIN products
                             ON products.product_id = production_plans.product_id
                         WHERE production_plans.line_id = pl.line_id
-                          AND CAST(production_plans.plan_status AS varchar) <> 'CANCELLED'
+                          AND production_plans.plan_status <> CAST('CANCELLED' AS plan_status_enum)
                           AND (ls.plan_id IS NULL OR production_plans.plan_id <> ls.plan_id)
                           AND production_plans.planned_start_at >= COALESCE(current_plan.planned_end_at, :now)
                         ORDER BY production_plans.planned_start_at ASC, production_plans.plan_sequence ASC
                         LIMIT 1
                     ) next_plan ON true
                     WHERE (:lineId IS NULL OR pl.line_id = :lineId)
-                      AND (:status IS NULL OR CAST(ls.operation_status AS varchar) = :status)
+                      AND (:status IS NULL OR ls.operation_status = CAST(:status AS operation_status_enum))
                     ORDER BY pl.line_id ASC
                     """,
             countQuery = """
@@ -69,7 +69,7 @@ public interface LineQueryRepository extends Repository<ProductionLine, Long> {
                         LIMIT 1
                     ) ls ON true
                     WHERE (:lineId IS NULL OR pl.line_id = :lineId)
-                      AND (:status IS NULL OR CAST(ls.operation_status AS varchar) = :status)
+                      AND (:status IS NULL OR ls.operation_status = CAST(:status AS operation_status_enum))
                     """,
             nativeQuery = true
     )
@@ -89,42 +89,49 @@ public interface LineQueryRepository extends Repository<ProductionLine, Long> {
                         p.product_name AS "productName",
                         co.order_quantity AS "orderQuantity",
                         co.due_date AS "dueDate",
-                        STRING_AGG(DISTINCT pl.line_name, ', ' ORDER BY pl.line_name) AS "lineNames"
+                        line_names.line_names AS "lineNames"
                     FROM customer_orders co
                     JOIN products p
                         ON p.product_id = co.product_id
-                    LEFT JOIN production_plans pp
-                        ON pp.order_id = co.order_id
-                       AND CAST(pp.plan_status AS varchar) <> 'CANCELLED'
-                    LEFT JOIN production_lines pl
-                        ON pl.line_id = pp.line_id
+                    LEFT JOIN LATERAL (
+                        SELECT STRING_AGG(DISTINCT pl.line_name, ', ' ORDER BY pl.line_name) AS line_names
+                        FROM production_plans pp
+                        JOIN production_lines pl
+                            ON pl.line_id = pp.line_id
+                        WHERE pp.order_id = co.order_id
+                          AND pp.plan_status <> CAST('CANCELLED' AS plan_status_enum)
+                    ) line_names ON true
                     WHERE (:keyword IS NULL
                            OR LOWER(co.order_no) LIKE LOWER(CONCAT('%', :keyword, '%'))
                            OR LOWER(p.product_name) LIKE LOWER(CONCAT('%', :keyword, '%'))
-                           OR LOWER(pl.line_name) LIKE LOWER(CONCAT('%', :keyword, '%')))
-                    GROUP BY
-                        co.order_id,
-                        co.order_no,
-                        co.product_id,
-                        p.product_name,
-                        co.order_quantity,
-                        co.due_date
+                           OR EXISTS (
+                               SELECT 1
+                               FROM production_plans line_search_plans
+                               JOIN production_lines line_search_lines
+                                   ON line_search_lines.line_id = line_search_plans.line_id
+                               WHERE line_search_plans.order_id = co.order_id
+                                 AND line_search_plans.plan_status <> CAST('CANCELLED' AS plan_status_enum)
+                                 AND LOWER(line_search_lines.line_name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                           ))
                     ORDER BY co.order_id DESC
                     """,
             countQuery = """
-                    SELECT COUNT(DISTINCT co.order_id)
+                    SELECT COUNT(*)
                     FROM customer_orders co
                     JOIN products p
                         ON p.product_id = co.product_id
-                    LEFT JOIN production_plans pp
-                        ON pp.order_id = co.order_id
-                       AND CAST(pp.plan_status AS varchar) <> 'CANCELLED'
-                    LEFT JOIN production_lines pl
-                        ON pl.line_id = pp.line_id
                     WHERE (:keyword IS NULL
                            OR LOWER(co.order_no) LIKE LOWER(CONCAT('%', :keyword, '%'))
                            OR LOWER(p.product_name) LIKE LOWER(CONCAT('%', :keyword, '%'))
-                           OR LOWER(pl.line_name) LIKE LOWER(CONCAT('%', :keyword, '%')))
+                           OR EXISTS (
+                               SELECT 1
+                               FROM production_plans line_search_plans
+                               JOIN production_lines line_search_lines
+                                   ON line_search_lines.line_id = line_search_plans.line_id
+                               WHERE line_search_plans.order_id = co.order_id
+                                 AND line_search_plans.plan_status <> CAST('CANCELLED' AS plan_status_enum)
+                                 AND LOWER(line_search_lines.line_name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                           ))
                     """,
             nativeQuery = true
     )
@@ -143,7 +150,7 @@ public interface LineQueryRepository extends Repository<ProductionLine, Long> {
                             production_plans.planned_quantity
                         FROM production_plans
                         WHERE production_plans.order_id = :orderId
-                          AND CAST(production_plans.plan_status AS varchar) <> 'CANCELLED'
+                          AND production_plans.plan_status <> CAST('CANCELLED' AS plan_status_enum)
                     ),
                     result_totals AS (
                         SELECT
@@ -198,10 +205,10 @@ public interface LineQueryRepository extends Repository<ProductionLine, Long> {
                             production_plans.planned_start_at,
                             production_plans.planned_end_at,
                             production_plans.planned_quantity,
-                            CAST(production_plans.plan_status AS varchar) AS plan_status
+                            production_plans.plan_status AS plan_status
                         FROM production_plans
                         WHERE production_plans.order_id = :orderId
-                          AND CAST(production_plans.plan_status AS varchar) <> 'CANCELLED'
+                          AND production_plans.plan_status <> CAST('CANCELLED' AS plan_status_enum)
                     ),
                     result_totals AS (
                         SELECT
@@ -222,11 +229,15 @@ public interface LineQueryRepository extends Repository<ProductionLine, Long> {
                         COALESCE(SUM(target_plans.planned_quantity), 0) AS "plannedQuantity",
                         COALESCE(SUM(rt.actual_quantity), 0) AS "productionQuantity",
                         CASE
-                            WHEN BOOL_OR(target_plans.plan_status = 'DELAYED') THEN 'DELAYED'
-                            WHEN BOOL_OR(target_plans.plan_status = 'IN_PROGRESS') THEN 'IN_PROGRESS'
-                            WHEN BOOL_OR(target_plans.plan_status = 'SCHEDULED') THEN 'SCHEDULED'
-                            WHEN BOOL_OR(target_plans.plan_status = 'COMPLETED') THEN 'COMPLETED'
-                            ELSE MIN(target_plans.plan_status)
+                            WHEN BOOL_OR(target_plans.plan_status = CAST('DELAYED' AS plan_status_enum))
+                                THEN 'DELAYED'
+                            WHEN BOOL_OR(target_plans.plan_status = CAST('IN_PROGRESS' AS plan_status_enum))
+                                THEN 'IN_PROGRESS'
+                            WHEN BOOL_OR(target_plans.plan_status = CAST('SCHEDULED' AS plan_status_enum))
+                                THEN 'SCHEDULED'
+                            WHEN BOOL_OR(target_plans.plan_status = CAST('COMPLETED' AS plan_status_enum))
+                                THEN 'COMPLETED'
+                            ELSE CAST(MIN(target_plans.plan_status) AS varchar)
                         END AS "planStatus",
                         MAX(target_plans.planned_end_at) AS "transitionAt"
                     FROM target_plans
