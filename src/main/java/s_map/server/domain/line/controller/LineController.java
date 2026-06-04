@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import s_map.server.domain.line.dto.res.LineMachineOperationStatusResponse;
 import s_map.server.domain.line.dto.res.LineOperationStatusResponse;
+import s_map.server.domain.line.dto.res.LineOrderSearchResponse;
 import s_map.server.domain.line.entity.OperationStatus;
 import s_map.server.domain.line.service.LineService;
 import s_map.server.global.common.BaseResponse;
@@ -74,5 +75,31 @@ public class LineController {
             @RequestParam(required = false) Long lineId
     ) {
         return BaseResponse.success(lineService.getMachineOperationStatuses(lineId));
+    }
+
+    @Operation(
+            summary = "라인 현황 주문 검색",
+            description = "주문번호, 제품명, 라인명으로 주문을 검색합니다. 검색 결과는 주문별 생산 라인 분배 현황 조회의 선택 대상입니다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "주문 검색 성공"),
+            @ApiResponse(responseCode = "400", description = "요청 파라미터 검증 실패"),
+            @ApiResponse(responseCode = "401", description = "인증 필요"),
+            @ApiResponse(responseCode = "500", description = "주문 검색 실패")
+    })
+    @GetMapping("/orders/search")
+    public BaseResponse<Page<LineOrderSearchResponse>> searchOrders(
+            @Parameter(description = "페이지 번호, 0부터 시작", example = "0")
+            @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "페이지 크기, 최대 100", example = "5")
+            @RequestParam(defaultValue = "5") int size,
+            @Parameter(description = "주문번호, 제품명, 라인명 검색어", example = "ABS-BLACK")
+            @RequestParam(required = false) String keyword
+    ) {
+        return BaseResponse.success(lineService.searchOrders(
+                page,
+                size,
+                keyword
+        ));
     }
 }

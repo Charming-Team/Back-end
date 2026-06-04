@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import s_map.server.domain.line.dto.res.LineMachineOperationStatusResponse;
 import s_map.server.domain.line.dto.res.LineOperationStatusResponse;
+import s_map.server.domain.line.dto.res.LineOrderSearchResponse;
 import s_map.server.domain.line.dto.res.MachineOperationStatusResponse;
 import s_map.server.domain.line.entity.MachineStatus;
 import s_map.server.domain.line.entity.OperationStatus;
@@ -103,6 +104,22 @@ public class LineService {
         }
     }
 
+    public Page<LineOrderSearchResponse> searchOrders(
+            int page,
+            int size,
+            String keyword
+    ) {
+        try {
+            Pageable pageable = createPageable(page, size);
+            String normalizedKeyword = normalize(keyword);
+
+            return lineQueryRepository.searchOrders(normalizedKeyword, pageable)
+                    .map(LineOrderSearchResponse::from);
+        } catch (DataAccessException exception) {
+            throw new CustomException(ErrorCode.LINE_ORDER_SEARCH_LOAD_FAILED);
+        }
+    }
+
     private List<ProductionLine> getTargetLines(Long lineId) {
         if (lineId == null) {
             return productionLineRepository.findAllByOrderByLineIdAsc();
@@ -146,5 +163,13 @@ public class LineService {
         int safeSize = size <= 0 ? DEFAULT_SIZE : Math.min(size, MAX_SIZE);
 
         return PageRequest.of(safePage, safeSize);
+    }
+
+    private String normalize(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+
+        return value.trim();
     }
 }

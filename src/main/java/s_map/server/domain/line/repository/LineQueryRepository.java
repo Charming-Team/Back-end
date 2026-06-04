@@ -77,4 +77,57 @@ public interface LineQueryRepository extends Repository<ProductionLine, Long> {
             @Param("now") OffsetDateTime now,
             Pageable pageable
     );
+
+    @Query(
+            value = """
+                    SELECT
+                        co.order_id AS "orderId",
+                        co.order_no AS "orderNo",
+                        co.product_id AS "productId",
+                        p.product_name AS "productName",
+                        co.order_quantity AS "orderQuantity",
+                        co.due_date AS "dueDate",
+                        STRING_AGG(DISTINCT pl.line_name, ', ' ORDER BY pl.line_name) AS "lineNames"
+                    FROM customer_orders co
+                    JOIN products p
+                        ON p.product_id = co.product_id
+                    LEFT JOIN production_plans pp
+                        ON pp.order_id = co.order_id
+                       AND CAST(pp.plan_status AS varchar) <> 'CANCELLED'
+                    LEFT JOIN production_lines pl
+                        ON pl.line_id = pp.line_id
+                    WHERE (:keyword IS NULL
+                           OR LOWER(co.order_no) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                           OR LOWER(p.product_name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                           OR LOWER(pl.line_name) LIKE LOWER(CONCAT('%', :keyword, '%')))
+                    GROUP BY
+                        co.order_id,
+                        co.order_no,
+                        co.product_id,
+                        p.product_name,
+                        co.order_quantity,
+                        co.due_date
+                    ORDER BY co.order_id DESC
+                    """,
+            countQuery = """
+                    SELECT COUNT(DISTINCT co.order_id)
+                    FROM customer_orders co
+                    JOIN products p
+                        ON p.product_id = co.product_id
+                    LEFT JOIN production_plans pp
+                        ON pp.order_id = co.order_id
+                       AND CAST(pp.plan_status AS varchar) <> 'CANCELLED'
+                    LEFT JOIN production_lines pl
+                        ON pl.line_id = pp.line_id
+                    WHERE (:keyword IS NULL
+                           OR LOWER(co.order_no) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                           OR LOWER(p.product_name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                           OR LOWER(pl.line_name) LIKE LOWER(CONCAT('%', :keyword, '%')))
+                    """,
+            nativeQuery = true
+    )
+    Page<LineOrderSearchProjection> searchOrders(
+            @Param("keyword") String keyword,
+            Pageable pageable
+    );
 }
