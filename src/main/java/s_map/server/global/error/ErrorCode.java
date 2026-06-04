@@ -73,6 +73,7 @@ public enum ErrorCode {
     REPORT_GENERATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "500-301", "보고서 생성에 실패했습니다."),
     AI_SERVER_CALL_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "500-302", "AI 서버 호출에 실패했습니다."),
     LINE_OPERATION_STATUS_LOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "500-501", "라인 가동 현황을 불러올 수 없습니다. 잠시 후 다시 조회해주세요."),
+    MACHINE_OPERATION_STATUS_LOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "500-502", "설비 가동 현황을 불러올 수 없습니다. 잠시 후 다시 조회해주세요."),
 
     // Chat FastAPI Gateway
     CHAT_FASTAPI_CONNECTION_FAILED(HttpStatus.BAD_GATEWAY, "CHAT_FASTAPI_001", "챗봇 서버 연결에 실패했습니다."),

@@ -11,8 +11,6 @@ import java.time.OffsetDateTime;
 
 public interface LineQueryRepository extends Repository<ProductionLine, Long> {
 
-    boolean existsByLineId(Long lineId);
-
     @Query(
             value = """
                     SELECT
