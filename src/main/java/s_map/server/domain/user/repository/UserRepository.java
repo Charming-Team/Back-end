@@ -18,6 +18,12 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     boolean existsByIdAndStatusAndRole(Long id, UserStatus status, Role role);
 
+    long countByStatus(UserStatus status);
+
+    long countByStatusNot(UserStatus status);
+
+    long countByRoleAndStatusNot(Role role, UserStatus status);
+
     Optional<User> findFirstByNameAndStatusAndRoleOrderByIdAsc(String name, UserStatus status, Role role);
 
     Page<User> findByStatusNot(UserStatus status, Pageable pageable);

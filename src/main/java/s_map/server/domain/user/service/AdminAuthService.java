@@ -1,6 +1,8 @@
 package s_map.server.domain.user.service;
 
 import s_map.server.domain.user.dto.req.AdminUserCreateRequest;
+import s_map.server.domain.user.dto.res.AdminDashboardResponse;
+import s_map.server.domain.user.dto.res.AdminDashboardResponse.RoleDistributionResponse;
 import s_map.server.domain.user.dto.res.AdminUserCreateResponse;
 import s_map.server.domain.user.dto.res.AdminUserResponse;
 import s_map.server.domain.user.entity.User;
@@ -9,6 +11,7 @@ import s_map.server.domain.user.repository.UserRepository;
 import s_map.server.global.error.CustomException;
 import s_map.server.global.error.ErrorCode;
 import s_map.server.domain.user.entity.Role;
+import java.util.List;
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -144,6 +147,41 @@ public class AdminAuthService {
                 : userRepository.findByKeywordAndStatusNot(safeKeyword, UserStatus.WITHDRAWN, pageable);
 
         return users.map(AdminUserResponse::from);
+    }
+
+    /**
+     * 기능: 관리자 대시보드에 필요한 사용자 현황 요약을 조회한다.
+     * 전체 사용자와 권한별 분포는 WITHDRAWN 상태를 제외하고, 활성 사용자는 ACTIVE 상태만 집계한다.
+     *
+     * Output:
+     * - response / AdminDashboardResponse / 관리자 대시보드 사용자 현황
+     * - response.totalUsers / long / 전체 사용자 수
+     * - response.activeUsers / long / 활성 사용자 수
+     * - response.roleDistribution / List<RoleDistributionResponse> / 권한별 사용자 수
+     */
+    @Transactional(readOnly = true)
+    public AdminDashboardResponse getDashboard() {
+        long totalUsers = userRepository.countByStatusNot(UserStatus.WITHDRAWN);
+        long activeUsers = userRepository.countByStatus(UserStatus.ACTIVE);
+
+        return new AdminDashboardResponse(
+                totalUsers,
+                activeUsers,
+                List.of(
+                        roleDistribution(Role.ADMIN, "서버관리자"),
+                        roleDistribution(Role.EXECUTIVE, "경영진"),
+                        roleDistribution(Role.MANUFACTURING_MANAGER, "제조관리직"),
+                        roleDistribution(Role.OPERATOR, "작업자")
+                )
+        );
+    }
+
+    private RoleDistributionResponse roleDistribution(Role role, String roleName) {
+        return new RoleDistributionResponse(
+                role,
+                roleName,
+                userRepository.countByRoleAndStatusNot(role, UserStatus.WITHDRAWN)
+        );
     }
 
     /**
