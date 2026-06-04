@@ -160,7 +160,7 @@ public class LineService {
             return Map.of();
         }
 
-        return machineStatusRepository.findByMachineIdInOrderByMachineIdAscRecordedAtDesc(machineIds)
+        return machineStatusRepository.findLatestByMachineIdIn(machineIds)
                 .stream()
                 .collect(Collectors.toMap(
                         MachineStatus::getMachineId,
