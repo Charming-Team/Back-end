@@ -135,11 +135,23 @@ public interface LineQueryRepository extends Repository<ProductionLine, Long> {
 
     @Query(
             value = """
-                    WITH result_totals AS (
+                    WITH target_plans AS (
+                        SELECT
+                            production_plans.plan_id,
+                            production_plans.order_id,
+                            production_plans.line_id,
+                            production_plans.planned_quantity
+                        FROM production_plans
+                        WHERE production_plans.order_id = :orderId
+                          AND CAST(production_plans.plan_status AS varchar) <> 'CANCELLED'
+                    ),
+                    result_totals AS (
                         SELECT
                             production_results.plan_id,
                             SUM(production_results.actual_quantity) AS actual_quantity
                         FROM production_results
+                        JOIN target_plans
+                            ON target_plans.plan_id = production_results.plan_id
                         GROUP BY production_results.plan_id
                     )
                     SELECT
@@ -150,17 +162,16 @@ public interface LineQueryRepository extends Repository<ProductionLine, Long> {
                         p.unit AS "productUnit",
                         co.order_quantity AS "orderQuantity",
                         co.due_date AS "dueDate",
-                        CAST(COUNT(DISTINCT pp.line_id) AS integer) AS "assignedLineCount",
-                        COALESCE(SUM(pp.planned_quantity), 0) AS "totalPlannedQuantity",
+                        CAST(COUNT(DISTINCT target_plans.line_id) AS integer) AS "assignedLineCount",
+                        COALESCE(SUM(target_plans.planned_quantity), 0) AS "totalPlannedQuantity",
                         COALESCE(SUM(rt.actual_quantity), 0) AS "totalProductionQuantity"
                     FROM customer_orders co
                     JOIN products p
                         ON p.product_id = co.product_id
-                    LEFT JOIN production_plans pp
-                        ON pp.order_id = co.order_id
-                       AND CAST(pp.plan_status AS varchar) <> 'CANCELLED'
+                    LEFT JOIN target_plans
+                        ON target_plans.order_id = co.order_id
                     LEFT JOIN result_totals rt
-                        ON rt.plan_id = pp.plan_id
+                        ON rt.plan_id = target_plans.plan_id
                     WHERE co.order_id = :orderId
                     GROUP BY
                         co.order_id,
@@ -179,11 +190,25 @@ public interface LineQueryRepository extends Repository<ProductionLine, Long> {
 
     @Query(
             value = """
-                    WITH result_totals AS (
+                    WITH target_plans AS (
+                        SELECT
+                            production_plans.plan_id,
+                            production_plans.product_id,
+                            production_plans.line_id,
+                            production_plans.planned_start_at,
+                            production_plans.planned_end_at,
+                            production_plans.planned_quantity
+                        FROM production_plans
+                        WHERE production_plans.order_id = :orderId
+                          AND CAST(production_plans.plan_status AS varchar) <> 'CANCELLED'
+                    ),
+                    result_totals AS (
                         SELECT
                             production_results.plan_id,
                             SUM(production_results.actual_quantity) AS actual_quantity
                         FROM production_results
+                        JOIN target_plans
+                            ON target_plans.plan_id = production_results.plan_id
                         GROUP BY production_results.plan_id
                     )
                     SELECT
@@ -193,18 +218,18 @@ public interface LineQueryRepository extends Repository<ProductionLine, Long> {
                         p.product_id AS "productId",
                         p.product_name AS "productName",
                         p.unit AS "productUnit",
-                        COALESCE(SUM(pp.planned_quantity), 0) AS "plannedQuantity",
+                        COALESCE(SUM(target_plans.planned_quantity), 0) AS "plannedQuantity",
                         COALESCE(SUM(rt.actual_quantity), 0) AS "productionQuantity",
                         CAST(ls.operation_status AS varchar) AS "operationStatus",
-                        MAX(pp.planned_end_at) AS "transitionAt",
+                        MAX(target_plans.planned_end_at) AS "transitionAt",
                         ls.recorded_at AS "recordedAt"
-                    FROM production_plans pp
+                    FROM target_plans
                     JOIN production_lines pl
-                        ON pl.line_id = pp.line_id
+                        ON pl.line_id = target_plans.line_id
                     JOIN products p
-                        ON p.product_id = pp.product_id
+                        ON p.product_id = target_plans.product_id
                     LEFT JOIN result_totals rt
-                        ON rt.plan_id = pp.plan_id
+                        ON rt.plan_id = target_plans.plan_id
                     LEFT JOIN LATERAL (
                         SELECT line_status.operation_status, line_status.recorded_at
                         FROM line_status
@@ -212,8 +237,6 @@ public interface LineQueryRepository extends Repository<ProductionLine, Long> {
                         ORDER BY line_status.recorded_at DESC
                         LIMIT 1
                     ) ls ON true
-                    WHERE pp.order_id = :orderId
-                      AND CAST(pp.plan_status AS varchar) <> 'CANCELLED'
                     GROUP BY
                         pl.line_id,
                         pl.line_code,
@@ -223,7 +246,7 @@ public interface LineQueryRepository extends Repository<ProductionLine, Long> {
                         p.unit,
                         ls.operation_status,
                         ls.recorded_at
-                    ORDER BY MIN(pp.planned_start_at), pl.line_id
+                    ORDER BY MIN(target_plans.planned_start_at), pl.line_id
                     """,
             nativeQuery = true
     )
