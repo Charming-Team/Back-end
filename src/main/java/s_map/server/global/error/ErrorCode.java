@@ -75,6 +75,7 @@ public enum ErrorCode {
     LINE_OPERATION_STATUS_LOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "500-501", "라인 가동 현황을 불러올 수 없습니다. 잠시 후 다시 조회해주세요."),
     MACHINE_OPERATION_STATUS_LOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "500-502", "설비 가동 현황을 불러올 수 없습니다. 잠시 후 다시 조회해주세요."),
     LINE_ORDER_SEARCH_LOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "500-503", "주문 검색 결과를 불러올 수 없습니다. 잠시 후 다시 조회해주세요."),
+    LINE_ORDER_DISTRIBUTION_LOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "500-504", "주문별 생산 라인 분배 현황을 불러올 수 없습니다. 잠시 후 다시 조회해주세요."),
 
     // Chat FastAPI Gateway
     CHAT_FASTAPI_CONNECTION_FAILED(HttpStatus.BAD_GATEWAY, "CHAT_FASTAPI_001", "챗봇 서버 연결에 실패했습니다."),

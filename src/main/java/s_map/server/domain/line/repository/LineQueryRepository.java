@@ -8,6 +8,8 @@ import org.springframework.data.repository.query.Param;
 import s_map.server.domain.line.entity.ProductionLine;
 
 import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.Optional;
 
 public interface LineQueryRepository extends Repository<ProductionLine, Long> {
 
@@ -129,5 +131,103 @@ public interface LineQueryRepository extends Repository<ProductionLine, Long> {
     Page<LineOrderSearchProjection> searchOrders(
             @Param("keyword") String keyword,
             Pageable pageable
+    );
+
+    @Query(
+            value = """
+                    WITH result_totals AS (
+                        SELECT
+                            production_results.plan_id,
+                            SUM(production_results.actual_quantity) AS actual_quantity
+                        FROM production_results
+                        GROUP BY production_results.plan_id
+                    )
+                    SELECT
+                        co.order_id AS "orderId",
+                        co.order_no AS "orderNo",
+                        co.product_id AS "productId",
+                        p.product_name AS "productName",
+                        p.unit AS "productUnit",
+                        co.order_quantity AS "orderQuantity",
+                        co.due_date AS "dueDate",
+                        CAST(COUNT(DISTINCT pp.line_id) AS integer) AS "assignedLineCount",
+                        COALESCE(SUM(pp.planned_quantity), 0) AS "totalPlannedQuantity",
+                        COALESCE(SUM(rt.actual_quantity), 0) AS "totalProductionQuantity"
+                    FROM customer_orders co
+                    JOIN products p
+                        ON p.product_id = co.product_id
+                    LEFT JOIN production_plans pp
+                        ON pp.order_id = co.order_id
+                       AND CAST(pp.plan_status AS varchar) <> 'CANCELLED'
+                    LEFT JOIN result_totals rt
+                        ON rt.plan_id = pp.plan_id
+                    WHERE co.order_id = :orderId
+                    GROUP BY
+                        co.order_id,
+                        co.order_no,
+                        co.product_id,
+                        p.product_name,
+                        p.unit,
+                        co.order_quantity,
+                        co.due_date
+                    """,
+            nativeQuery = true
+    )
+    Optional<LineOrderDistributionSummaryProjection> findOrderDistributionSummary(
+            @Param("orderId") Long orderId
+    );
+
+    @Query(
+            value = """
+                    WITH result_totals AS (
+                        SELECT
+                            production_results.plan_id,
+                            SUM(production_results.actual_quantity) AS actual_quantity
+                        FROM production_results
+                        GROUP BY production_results.plan_id
+                    )
+                    SELECT
+                        pl.line_id AS "lineId",
+                        pl.line_code AS "lineCode",
+                        pl.line_name AS "lineName",
+                        p.product_id AS "productId",
+                        p.product_name AS "productName",
+                        p.unit AS "productUnit",
+                        COALESCE(SUM(pp.planned_quantity), 0) AS "plannedQuantity",
+                        COALESCE(SUM(rt.actual_quantity), 0) AS "productionQuantity",
+                        CAST(ls.operation_status AS varchar) AS "operationStatus",
+                        MAX(pp.planned_end_at) AS "transitionAt",
+                        ls.recorded_at AS "recordedAt"
+                    FROM production_plans pp
+                    JOIN production_lines pl
+                        ON pl.line_id = pp.line_id
+                    JOIN products p
+                        ON p.product_id = pp.product_id
+                    LEFT JOIN result_totals rt
+                        ON rt.plan_id = pp.plan_id
+                    LEFT JOIN LATERAL (
+                        SELECT line_status.operation_status, line_status.recorded_at
+                        FROM line_status
+                        WHERE line_status.line_id = pl.line_id
+                        ORDER BY line_status.recorded_at DESC
+                        LIMIT 1
+                    ) ls ON true
+                    WHERE pp.order_id = :orderId
+                      AND CAST(pp.plan_status AS varchar) <> 'CANCELLED'
+                    GROUP BY
+                        pl.line_id,
+                        pl.line_code,
+                        pl.line_name,
+                        p.product_id,
+                        p.product_name,
+                        p.unit,
+                        ls.operation_status,
+                        ls.recorded_at
+                    ORDER BY MIN(pp.planned_start_at), pl.line_id
+                    """,
+            nativeQuery = true
+    )
+    List<LineOrderDistributionLineProjection> findOrderDistributionLines(
+            @Param("orderId") Long orderId
     );
 }

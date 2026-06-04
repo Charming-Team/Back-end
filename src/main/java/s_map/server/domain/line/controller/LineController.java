@@ -8,11 +8,13 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import s_map.server.domain.line.dto.res.LineMachineOperationStatusResponse;
 import s_map.server.domain.line.dto.res.LineOperationStatusResponse;
+import s_map.server.domain.line.dto.res.LineOrderDistributionResponse;
 import s_map.server.domain.line.dto.res.LineOrderSearchResponse;
 import s_map.server.domain.line.entity.OperationStatus;
 import s_map.server.domain.line.service.LineService;
@@ -101,5 +103,23 @@ public class LineController {
                 size,
                 keyword
         ));
+    }
+
+    @Operation(
+            summary = "주문별 생산 라인 분배 현황 조회",
+            description = "선택한 주문의 요약 카드 정보와 라인별 계획/실적/진행률/상태/전환 예정 시간을 조회합니다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "주문별 생산 라인 분배 현황 조회 성공"),
+            @ApiResponse(responseCode = "401", description = "인증 필요"),
+            @ApiResponse(responseCode = "404", description = "주문 없음"),
+            @ApiResponse(responseCode = "500", description = "주문별 생산 라인 분배 현황 조회 실패")
+    })
+    @GetMapping("/orders/{orderId}/distribution")
+    public BaseResponse<LineOrderDistributionResponse> getOrderDistribution(
+            @Parameter(description = "주문 ID", example = "1")
+            @PathVariable Long orderId
+    ) {
+        return BaseResponse.success(lineService.getOrderDistribution(orderId));
     }
 }

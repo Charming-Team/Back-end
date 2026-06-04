@@ -9,12 +9,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import s_map.server.domain.line.dto.res.LineMachineOperationStatusResponse;
 import s_map.server.domain.line.dto.res.LineOperationStatusResponse;
+import s_map.server.domain.line.dto.res.LineOrderDistributionResponse;
 import s_map.server.domain.line.dto.res.LineOrderSearchResponse;
 import s_map.server.domain.line.dto.res.MachineOperationStatusResponse;
 import s_map.server.domain.line.entity.MachineStatus;
 import s_map.server.domain.line.entity.OperationStatus;
 import s_map.server.domain.line.entity.ProductionLine;
 import s_map.server.domain.line.entity.ProductionMachine;
+import s_map.server.domain.line.repository.LineOrderDistributionLineProjection;
+import s_map.server.domain.line.repository.LineOrderDistributionSummaryProjection;
 import s_map.server.domain.line.repository.LineQueryRepository;
 import s_map.server.domain.line.repository.MachineStatusRepository;
 import s_map.server.domain.line.repository.ProductionLineRepository;
@@ -22,6 +25,7 @@ import s_map.server.domain.line.repository.ProductionMachineRepository;
 import s_map.server.global.error.CustomException;
 import s_map.server.global.error.ErrorCode;
 
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.List;
@@ -117,6 +121,23 @@ public class LineService {
                     .map(LineOrderSearchResponse::from);
         } catch (DataAccessException exception) {
             throw new CustomException(ErrorCode.LINE_ORDER_SEARCH_LOAD_FAILED);
+        }
+    }
+
+    public LineOrderDistributionResponse getOrderDistribution(Long orderId) {
+        try {
+            LineOrderDistributionSummaryProjection summary =
+                    lineQueryRepository.findOrderDistributionSummary(orderId)
+                            .orElseThrow(() -> new CustomException(ErrorCode.ORDER_NOT_FOUND));
+
+            List<LineOrderDistributionLineProjection> lines =
+                    lineQueryRepository.findOrderDistributionLines(orderId);
+            LocalDate today = LocalDate.now(DEFAULT_PRODUCTION_ZONE);
+            OffsetDateTime now = OffsetDateTime.now(DEFAULT_PRODUCTION_ZONE);
+
+            return LineOrderDistributionResponse.of(summary, lines, today, now);
+        } catch (DataAccessException exception) {
+            throw new CustomException(ErrorCode.LINE_ORDER_DISTRIBUTION_LOAD_FAILED);
         }
     }
 
