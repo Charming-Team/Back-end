@@ -13,7 +13,6 @@ public interface LineOrderDistributionLineProjection {
     String getProductUnit();
     BigDecimal getPlannedQuantity();
     BigDecimal getProductionQuantity();
-    String getOperationStatus();
+    String getPlanStatus();
     Instant getTransitionAt();
-    Instant getRecordedAt();
 }

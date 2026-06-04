@@ -1,8 +1,8 @@
 package s_map.server.domain.line.dto.res;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import s_map.server.domain.line.entity.OperationStatus;
 import s_map.server.domain.line.repository.LineOrderDistributionLineProjection;
+import s_map.server.domain.order.entity.PlanStatus;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -44,20 +44,17 @@ public record LineOrderDistributionLineResponse(
         @Schema(description = "라인별 생산 진행률 퍼센트", example = "55")
         Integer progressRatePercent,
 
-        @Schema(description = "라인 가동 상태", example = "RUNNING")
-        OperationStatus operationStatus,
+        @Schema(description = "생산계획 상태", example = "IN_PROGRESS")
+        PlanStatus planStatus,
 
-        @Schema(description = "라인 가동 상태 한글 표시", example = "가동 중")
-        String operationStatusLabel,
+        @Schema(description = "생산계획 상태 한글 표시", example = "진행 중")
+        String planStatusLabel,
 
         @Schema(description = "전환 예정 시각", example = "2026-06-05T15:00:00+09:00")
         OffsetDateTime transitionAt,
 
         @Schema(description = "전환 예정 시간 표시", example = "1.2h 후")
-        String transitionExpectedTime,
-
-        @Schema(description = "라인 상태 기록 시각", example = "2026-06-05T10:00:00+09:00")
-        OffsetDateTime recordedAt
+        String transitionExpectedTime
 ) {
 
     private static final ZoneId DEFAULT_PRODUCTION_ZONE = ZoneId.of("Asia/Seoul");
@@ -69,7 +66,7 @@ public record LineOrderDistributionLineResponse(
         BigDecimal plannedQuantity = defaultZero(projection.getPlannedQuantity());
         BigDecimal productionQuantity = defaultZero(projection.getProductionQuantity());
         BigDecimal progressRate = calculateRate(productionQuantity, plannedQuantity);
-        OperationStatus operationStatus = toOperationStatus(projection.getOperationStatus());
+        PlanStatus planStatus = toPlanStatus(projection.getPlanStatus());
         OffsetDateTime transitionAt = toKst(projection.getTransitionAt());
 
         return new LineOrderDistributionLineResponse(
@@ -83,20 +80,19 @@ public record LineOrderDistributionLineResponse(
                 productionQuantity,
                 progressRate,
                 toPercent(progressRate),
-                operationStatus,
-                operationStatus != null ? operationStatus.getLabel() : "확인 필요",
+                planStatus,
+                planStatus != null ? planStatus.getLabel() : "확인 필요",
                 transitionAt,
-                createTransitionExpectedTime(now, transitionAt),
-                toKst(projection.getRecordedAt())
+                createTransitionExpectedTime(now, transitionAt)
         );
     }
 
-    private static OperationStatus toOperationStatus(String value) {
+    private static PlanStatus toPlanStatus(String value) {
         if (value == null || value.isBlank()) {
             return null;
         }
 
-        return OperationStatus.valueOf(value);
+        return PlanStatus.valueOf(value);
     }
 
     private static BigDecimal defaultZero(BigDecimal value) {

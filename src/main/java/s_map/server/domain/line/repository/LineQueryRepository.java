@@ -197,7 +197,8 @@ public interface LineQueryRepository extends Repository<ProductionLine, Long> {
                             production_plans.line_id,
                             production_plans.planned_start_at,
                             production_plans.planned_end_at,
-                            production_plans.planned_quantity
+                            production_plans.planned_quantity,
+                            CAST(production_plans.plan_status AS varchar) AS plan_status
                         FROM production_plans
                         WHERE production_plans.order_id = :orderId
                           AND CAST(production_plans.plan_status AS varchar) <> 'CANCELLED'
@@ -220,9 +221,14 @@ public interface LineQueryRepository extends Repository<ProductionLine, Long> {
                         p.unit AS "productUnit",
                         COALESCE(SUM(target_plans.planned_quantity), 0) AS "plannedQuantity",
                         COALESCE(SUM(rt.actual_quantity), 0) AS "productionQuantity",
-                        CAST(ls.operation_status AS varchar) AS "operationStatus",
-                        MAX(target_plans.planned_end_at) AS "transitionAt",
-                        ls.recorded_at AS "recordedAt"
+                        CASE
+                            WHEN BOOL_OR(target_plans.plan_status = 'DELAYED') THEN 'DELAYED'
+                            WHEN BOOL_OR(target_plans.plan_status = 'IN_PROGRESS') THEN 'IN_PROGRESS'
+                            WHEN BOOL_OR(target_plans.plan_status = 'SCHEDULED') THEN 'SCHEDULED'
+                            WHEN BOOL_OR(target_plans.plan_status = 'COMPLETED') THEN 'COMPLETED'
+                            ELSE MIN(target_plans.plan_status)
+                        END AS "planStatus",
+                        MAX(target_plans.planned_end_at) AS "transitionAt"
                     FROM target_plans
                     JOIN production_lines pl
                         ON pl.line_id = target_plans.line_id
@@ -230,22 +236,13 @@ public interface LineQueryRepository extends Repository<ProductionLine, Long> {
                         ON p.product_id = target_plans.product_id
                     LEFT JOIN result_totals rt
                         ON rt.plan_id = target_plans.plan_id
-                    LEFT JOIN LATERAL (
-                        SELECT line_status.operation_status, line_status.recorded_at
-                        FROM line_status
-                        WHERE line_status.line_id = pl.line_id
-                        ORDER BY line_status.recorded_at DESC
-                        LIMIT 1
-                    ) ls ON true
                     GROUP BY
                         pl.line_id,
                         pl.line_code,
                         pl.line_name,
                         p.product_id,
                         p.product_name,
-                        p.unit,
-                        ls.operation_status,
-                        ls.recorded_at
+                        p.unit
                     ORDER BY MIN(target_plans.planned_start_at), pl.line_id
                     """,
             nativeQuery = true
