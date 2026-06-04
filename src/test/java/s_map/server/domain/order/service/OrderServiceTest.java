@@ -53,6 +53,8 @@ class OrderServiceTest {
 
     private static final DateTimeFormatter ORDER_NO_DATE_FORMATTER = DateTimeFormatter.ofPattern("yyMMdd");
     private static final ZoneId DEFAULT_PRODUCTION_ZONE = ZoneId.of("Asia/Seoul");
+    private static final LocalDate MIN_DUE_DATE_FILTER = LocalDate.of(1, 1, 1);
+    private static final LocalDate MAX_DUE_DATE_FILTER = LocalDate.of(9999, 12, 31);
 
     @Mock
     private CustomerOrderRepository customerOrderRepository;
@@ -192,8 +194,8 @@ class OrderServiceTest {
                 eq(null),
                 eq(null),
                 eq(null),
-                eq(null),
-                eq(null),
+                eq(MIN_DUE_DATE_FILTER),
+                eq(MAX_DUE_DATE_FILTER),
                 eq(10),
                 eq(0L),
                 any(LocalDate.class),
@@ -203,8 +205,8 @@ class OrderServiceTest {
                 eq(null),
                 eq(null),
                 eq(null),
-                eq(null),
-                eq(null)
+                eq(MIN_DUE_DATE_FILTER),
+                eq(MAX_DUE_DATE_FILTER)
         )).thenReturn(1L);
 
         var response = orderService.getOrders(0, 10, null, null, null, null, null, null);
@@ -213,8 +215,8 @@ class OrderServiceTest {
                 eq(null),
                 eq(null),
                 eq(null),
-                eq(null),
-                eq(null),
+                eq(MIN_DUE_DATE_FILTER),
+                eq(MAX_DUE_DATE_FILTER),
                 eq(10),
                 eq(0L),
                 any(LocalDate.class),
@@ -224,8 +226,8 @@ class OrderServiceTest {
                 eq(null),
                 eq(null),
                 eq(null),
-                eq(null),
-                eq(null)
+                eq(MIN_DUE_DATE_FILTER),
+                eq(MAX_DUE_DATE_FILTER)
         );
         verify(orderQueryRepository, never()).findOrderSummaries(
                 any(),
@@ -251,8 +253,8 @@ class OrderServiceTest {
                 eq("IN_PROGRESS"),
                 eq(null),
                 eq(null),
-                eq(null),
-                eq(null),
+                eq(MIN_DUE_DATE_FILTER),
+                eq(MAX_DUE_DATE_FILTER),
                 any(LocalDate.class),
                 any(OffsetDateTime.class),
                 any(Pageable.class)
@@ -265,8 +267,8 @@ class OrderServiceTest {
                 eq("IN_PROGRESS"),
                 eq(null),
                 eq(null),
-                eq(null),
-                eq(null),
+                eq(MIN_DUE_DATE_FILTER),
+                eq(MAX_DUE_DATE_FILTER),
                 any(LocalDate.class),
                 any(OffsetDateTime.class),
                 any(Pageable.class)
@@ -291,6 +293,53 @@ class OrderServiceTest {
         );
         assertThat(response.getContent()).hasSize(1);
         assertThat(response.getContent().getFirst().orderStatusLabel()).isEqualTo("진행 중");
+    }
+
+    @Test
+    @DisplayName("한쪽 납기일 필터만 있어도 native query에는 null 날짜를 전달하지 않는다")
+    void getOrdersWithOneSidedDueDateFilterUsesEffectiveDateRange() {
+        LocalDate dueDateFrom = LocalDate.of(2026, 6, 1);
+
+        when(orderQueryRepository.findOrderSummariesWithoutStatusFilter(
+                eq(null),
+                eq(null),
+                eq(null),
+                eq(dueDateFrom),
+                eq(MAX_DUE_DATE_FILTER),
+                eq(10),
+                eq(0L),
+                any(LocalDate.class),
+                any(OffsetDateTime.class)
+        )).thenReturn(List.of(summaryProjection()));
+        when(orderQueryRepository.countOrderSummariesWithoutStatusFilter(
+                eq(null),
+                eq(null),
+                eq(null),
+                eq(dueDateFrom),
+                eq(MAX_DUE_DATE_FILTER)
+        )).thenReturn(1L);
+
+        var response = orderService.getOrders(0, 10, null, null, null, null, dueDateFrom, null);
+
+        verify(orderQueryRepository).findOrderSummariesWithoutStatusFilter(
+                eq(null),
+                eq(null),
+                eq(null),
+                eq(dueDateFrom),
+                eq(MAX_DUE_DATE_FILTER),
+                eq(10),
+                eq(0L),
+                any(LocalDate.class),
+                any(OffsetDateTime.class)
+        );
+        verify(orderQueryRepository).countOrderSummariesWithoutStatusFilter(
+                eq(null),
+                eq(null),
+                eq(null),
+                eq(dueDateFrom),
+                eq(MAX_DUE_DATE_FILTER)
+        );
+        assertThat(response.getContent()).hasSize(1);
     }
 
     private OrderCreateRequest createRequest(LocalDate dueDate, OffsetDateTime desiredStartAt, Long operatorId) {

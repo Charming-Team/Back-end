@@ -52,6 +52,8 @@ public class OrderService {
 
     private static final DateTimeFormatter ORDER_NO_DATE_FORMATTER = DateTimeFormatter.ofPattern("yyMMdd");
     private static final ZoneId DEFAULT_PRODUCTION_ZONE = ZoneId.of("Asia/Seoul");
+    private static final LocalDate MIN_DUE_DATE_FILTER = LocalDate.of(1, 1, 1);
+    private static final LocalDate MAX_DUE_DATE_FILTER = LocalDate.of(9999, 12, 31);
     private static final int DEFAULT_PAGE = 0;
     private static final int DEFAULT_SIZE = 10;
     private static final int MAX_SIZE = 100;
@@ -83,6 +85,8 @@ public class OrderService {
         Pageable pageable = createPageable(page, size);
         String normalizedKeyword = normalize(keyword);
         String normalizedCustomerName = normalize(customerName);
+        LocalDate effectiveDueDateFrom = dueDateFrom == null ? MIN_DUE_DATE_FILTER : dueDateFrom;
+        LocalDate effectiveDueDateTo = dueDateTo == null ? MAX_DUE_DATE_FILTER : dueDateTo;
         LocalDate today = LocalDate.now(DEFAULT_PRODUCTION_ZONE);
         OffsetDateTime now = OffsetDateTime.now(DEFAULT_PRODUCTION_ZONE);
 
@@ -91,8 +95,8 @@ public class OrderService {
                             normalizedKeyword,
                             normalizedCustomerName,
                             productId,
-                            dueDateFrom,
-                            dueDateTo,
+                            effectiveDueDateFrom,
+                            effectiveDueDateTo,
                             pageable.getPageSize(),
                             pageable.getOffset(),
                             today,
@@ -106,8 +110,8 @@ public class OrderService {
                     normalizedKeyword,
                     normalizedCustomerName,
                     productId,
-                    dueDateFrom,
-                    dueDateTo
+                    effectiveDueDateFrom,
+                    effectiveDueDateTo
             );
 
             return new PageImpl<>(content, pageable, total);
@@ -118,8 +122,8 @@ public class OrderService {
                         status.name(),
                         normalizedCustomerName,
                         productId,
-                        dueDateFrom,
-                        dueDateTo,
+                        effectiveDueDateFrom,
+                        effectiveDueDateTo,
                         today,
                         now,
                         pageable
