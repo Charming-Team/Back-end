@@ -30,14 +30,14 @@ public interface OrderQueryRepository extends Repository<CustomerOrder, Long> {
                         FROM customer_orders co
                         JOIN products p
                             ON p.product_id = co.product_id
-                        WHERE (:keyword IS NULL
+                        WHERE (CAST(:keyword AS varchar) IS NULL
                                OR LOWER(co.order_no) LIKE LOWER(CONCAT('%', :keyword, '%'))
                                OR LOWER(co.customer_name) LIKE LOWER(CONCAT('%', :keyword, '%'))
                                OR LOWER(p.product_name) LIKE LOWER(CONCAT('%', :keyword, '%')))
-                          AND (:customerName IS NULL OR co.customer_name = :customerName)
-                          AND (:productId IS NULL OR co.product_id = :productId)
-                          AND (:dueDateFrom IS NULL OR co.due_date >= :dueDateFrom)
-                          AND (:dueDateTo IS NULL OR co.due_date <= :dueDateTo)
+                          AND (CAST(:customerName AS varchar) IS NULL OR co.customer_name = :customerName)
+                          AND (CAST(:productId AS bigint) IS NULL OR co.product_id = :productId)
+                          AND (CAST(:dueDateFrom AS date) IS NULL OR co.due_date >= CAST(:dueDateFrom AS date))
+                          AND (CAST(:dueDateTo AS date) IS NULL OR co.due_date <= CAST(:dueDateTo AS date))
                     ),
                     order_statuses AS (
                         SELECT
@@ -101,14 +101,14 @@ public interface OrderQueryRepository extends Repository<CustomerOrder, Long> {
                         FROM customer_orders co
                         JOIN products p
                             ON p.product_id = co.product_id
-                        WHERE (:keyword IS NULL
+                        WHERE (CAST(:keyword AS varchar) IS NULL
                                OR LOWER(co.order_no) LIKE LOWER(CONCAT('%', :keyword, '%'))
                                OR LOWER(co.customer_name) LIKE LOWER(CONCAT('%', :keyword, '%'))
                                OR LOWER(p.product_name) LIKE LOWER(CONCAT('%', :keyword, '%')))
-                          AND (:customerName IS NULL OR co.customer_name = :customerName)
-                          AND (:productId IS NULL OR co.product_id = :productId)
-                          AND (:dueDateFrom IS NULL OR co.due_date >= :dueDateFrom)
-                          AND (:dueDateTo IS NULL OR co.due_date <= :dueDateTo)
+                          AND (CAST(:customerName AS varchar) IS NULL OR co.customer_name = :customerName)
+                          AND (CAST(:productId AS bigint) IS NULL OR co.product_id = :productId)
+                          AND (CAST(:dueDateFrom AS date) IS NULL OR co.due_date >= CAST(:dueDateFrom AS date))
+                          AND (CAST(:dueDateTo AS date) IS NULL OR co.due_date <= CAST(:dueDateTo AS date))
                     ),
                     order_statuses AS (
                         SELECT
@@ -181,14 +181,14 @@ public interface OrderQueryRepository extends Repository<CustomerOrder, Long> {
                         FROM customer_orders co
                         JOIN products p
                             ON p.product_id = co.product_id
-                        WHERE (:keyword IS NULL
+                        WHERE (CAST(:keyword AS varchar) IS NULL
                                OR LOWER(co.order_no) LIKE LOWER(CONCAT('%', :keyword, '%'))
                                OR LOWER(co.customer_name) LIKE LOWER(CONCAT('%', :keyword, '%'))
                                OR LOWER(p.product_name) LIKE LOWER(CONCAT('%', :keyword, '%')))
-                          AND (:customerName IS NULL OR co.customer_name = :customerName)
-                          AND (:productId IS NULL OR co.product_id = :productId)
-                          AND (:dueDateFrom IS NULL OR co.due_date >= :dueDateFrom)
-                          AND (:dueDateTo IS NULL OR co.due_date <= :dueDateTo)
+                          AND (CAST(:customerName AS varchar) IS NULL OR co.customer_name = :customerName)
+                          AND (CAST(:productId AS bigint) IS NULL OR co.product_id = :productId)
+                          AND (CAST(:dueDateFrom AS date) IS NULL OR co.due_date >= CAST(:dueDateFrom AS date))
+                          AND (CAST(:dueDateTo AS date) IS NULL OR co.due_date <= CAST(:dueDateTo AS date))
                     ),
                     paged_orders AS (
                         SELECT *
@@ -269,14 +269,14 @@ public interface OrderQueryRepository extends Repository<CustomerOrder, Long> {
                     FROM customer_orders co
                     JOIN products p
                         ON p.product_id = co.product_id
-                    WHERE (:keyword IS NULL
+                    WHERE (CAST(:keyword AS varchar) IS NULL
                            OR LOWER(co.order_no) LIKE LOWER(CONCAT('%', :keyword, '%'))
                            OR LOWER(co.customer_name) LIKE LOWER(CONCAT('%', :keyword, '%'))
                            OR LOWER(p.product_name) LIKE LOWER(CONCAT('%', :keyword, '%')))
-                      AND (:customerName IS NULL OR co.customer_name = :customerName)
-                      AND (:productId IS NULL OR co.product_id = :productId)
-                      AND (:dueDateFrom IS NULL OR co.due_date >= :dueDateFrom)
-                      AND (:dueDateTo IS NULL OR co.due_date <= :dueDateTo)
+                      AND (CAST(:customerName AS varchar) IS NULL OR co.customer_name = :customerName)
+                      AND (CAST(:productId AS bigint) IS NULL OR co.product_id = :productId)
+                      AND (CAST(:dueDateFrom AS date) IS NULL OR co.due_date >= CAST(:dueDateFrom AS date))
+                      AND (CAST(:dueDateTo AS date) IS NULL OR co.due_date <= CAST(:dueDateTo AS date))
                     """,
             nativeQuery = true
     )
