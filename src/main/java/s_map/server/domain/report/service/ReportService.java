@@ -122,7 +122,8 @@ public class ReportService {
 
         runAfterCommit(() -> reportAsyncService.generateBusinessReportAsync(
                 reportJob.getJobId(),
-                sourceReport.getReportId()
+                sourceReport.getReportId(),
+                user.getId()
         ));
 
         log.info(

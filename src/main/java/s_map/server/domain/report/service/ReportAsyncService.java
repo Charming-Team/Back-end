@@ -112,6 +112,7 @@ public class ReportAsyncService {
      * Input:
      * - reportJobId / Long / 실행할 비즈니스 보고서 생성 Job ID
      * - sourceReportId / Long / 원본 보고서 ID
+     * - requestedBy / Long / 비즈니스 보고서 생성 요청 사용자 ID
      *
      * Output:
      * - none / void / 성공 시 비즈니스 보고서 저장 및 Job SUCCESS 처리, 실패 시 Job FAILED 처리
@@ -119,7 +120,8 @@ public class ReportAsyncService {
     @Async
     public void generateBusinessReportAsync(
             Long reportJobId,
-            Long sourceReportId
+            Long sourceReportId,
+            Long requestedBy
     ) {
         try {
             markJobRunning(reportJobId);
@@ -142,13 +144,15 @@ public class ReportAsyncService {
             Long businessReportId = saveBusinessReportAndMarkSuccess(
                     reportJobId,
                     sourceReportId,
+                    requestedBy,
                     fastApiResponse
             );
 
             log.info(
-                    "[ReportAsyncService] 비즈니스 보고서 생성 완료 reportJobId={} sourceReportId={} businessReportId={}",
+                    "[ReportAsyncService] 비즈니스 보고서 생성 완료 reportJobId={} sourceReportId={} requestedBy={} businessReportId={}",
                     reportJobId,
                     sourceReportId,
+                    requestedBy,
                     businessReportId
             );
         } catch (Exception exception) {
@@ -189,6 +193,7 @@ public class ReportAsyncService {
     private Long saveBusinessReportAndMarkSuccess(
             Long reportJobId,
             Long sourceReportId,
+            Long requestedBy,
             FastApiBusinessReportGenerateResponse fastApiResponse
     ) {
         return transactionTemplate.execute(status -> {
@@ -198,7 +203,7 @@ public class ReportAsyncService {
             Report sourceReport = reportRepository.findById(sourceReportId)
                     .orElseThrow(() -> new CustomException(ErrorCode.REPORT_NOT_FOUND));
 
-            Report businessReport = saveBusinessReport(sourceReport, fastApiResponse);
+            Report businessReport = saveBusinessReport(sourceReport, requestedBy, fastApiResponse);
             reportJob.markSuccess(businessReport.getReportId());
 
             return businessReport.getReportId();
@@ -255,6 +260,7 @@ public class ReportAsyncService {
 
     private Report saveBusinessReport(
             Report sourceReport,
+            Long requestedBy,
             FastApiBusinessReportGenerateResponse fastApiResponse
     ) {
         JsonNode reportContent = objectMapper.valueToTree(fastApiResponse.getReportContent());
@@ -264,7 +270,7 @@ public class ReportAsyncService {
         Report report = Report.builder()
                 .reportTitle(resolveBusinessReportTitle(sourceReport, fastApiResponse))
                 .reportType(resolveBusinessReportType(fastApiResponse))
-                .authorId(sourceReport.getAuthorId())
+                .authorId(requestedBy)
                 .targetStartDate(resolveTargetStartDate(sourceReport, fastApiResponse))
                 .targetEndDate(resolveTargetEndDate(sourceReport, fastApiResponse))
                 .includedItems(includedItems)
