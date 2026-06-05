@@ -54,6 +54,7 @@ public enum ErrorCode {
     LINE_NOT_FOUND(HttpStatus.NOT_FOUND, "404-501", "라인 정보를 찾을 수 없습니다."),
     REPORT_NOT_FOUND(HttpStatus.NOT_FOUND, "404-401", "보고서 정보를 찾을 수 없습니다."),
     REPORT_JOB_NOT_FOUND(HttpStatus.NOT_FOUND, "404-402", "보고서 생성 작업 정보를 찾을 수 없습니다."),
+    PLAN_SIMULATION_NOT_FOUND(HttpStatus.NOT_FOUND, "404-601", "시뮬레이션 결과를 찾을 수 없습니다."),
 
     // 405 Method Not Allowed
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "405", "지원하지 않는 HTTP 메서드입니다."),
