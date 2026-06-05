@@ -79,6 +79,10 @@ public record DashboardWeeklyScheduleResponse(
         }
 
         private static String toDisplayStatus(String planStatus, String operationStatus) {
+            if ("COMPLETED".equals(planStatus)) {
+                return "완료";
+            }
+
             if ("DELAYED".equals(planStatus)) {
                 return "지연";
             }

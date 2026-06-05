@@ -303,51 +303,38 @@ public class DashboardRepository {
             int limit
     ) {
         String sql = """
-                WITH latest_predictions AS (
-                    SELECT DISTINCT ON (apr.order_id)
-                        apr.prediction_id,
-                        apr.order_id,
-                        apr.product_id,
-                        apr.risk_level::text AS risk_level,
-                        apr.delay_probability,
-                        apr.predicted_delay_days,
-                        apr.predicted_at
-                    FROM ai_prediction_results apr
-                    JOIN customer_orders co ON co.order_id = apr.order_id
-                    WHERE co.order_date >= CAST(:startAt AS date)
-                      AND co.order_date < CAST(:endExclusive AS date)
-                      AND co.order_status <> 'CANCELLED'
-                    ORDER BY apr.order_id, apr.predicted_at DESC
-                )
-                SELECT
-                    lp.prediction_id,
-                    co.order_id,
-                    co.order_no,
-                    p.product_name,
-                    lp.risk_level,
-                    lp.delay_probability,
-                    lp.predicted_delay_days,
-                    COALESCE(
-                        ARRAY_AGG(apc.cause_type::text) FILTER (WHERE apc.cause_type IS NOT NULL),
-                        ARRAY[]::text[]
-                    ) AS causes
-                FROM latest_predictions lp
-                JOIN customer_orders co ON co.order_id = lp.order_id
-                JOIN products p ON p.product_id = lp.product_id
-                LEFT JOIN ai_prediction_causes apc ON apc.prediction_id = lp.prediction_id
-                WHERE lp.risk_level IN ('WARNING', 'CRITICAL')
-                GROUP BY
-                    lp.prediction_id,
-                    co.order_id,
-                    co.order_no,
-                    p.product_name,
-                    lp.risk_level,
-                    lp.delay_probability,
-                    lp.predicted_delay_days,
-                    lp.predicted_at
-                ORDER BY lp.predicted_at DESC
-                LIMIT :limit
-                """;
+            WITH latest_predictions AS (
+                SELECT DISTINCT ON (apr.order_id)
+                    apr.prediction_id,
+                    apr.order_id,
+                    apr.product_id,
+                    apr.risk_level::text AS risk_level,
+                    apr.delay_probability,
+                    apr.predicted_delay_days,
+                    apr.predicted_at
+                FROM ai_prediction_results apr
+                JOIN customer_orders co ON co.order_id = apr.order_id
+                WHERE co.order_date >= CAST(:startAt AS date)
+                  AND co.order_date < CAST(:endExclusive AS date)
+                  AND co.order_status <> 'CANCELLED'
+                ORDER BY apr.order_id, apr.predicted_at DESC
+            )
+            SELECT
+                lp.prediction_id,
+                co.order_id,
+                co.order_no,
+                p.product_name,
+                lp.risk_level,
+                lp.delay_probability,
+                lp.predicted_delay_days,
+                '' AS causes
+            FROM latest_predictions lp
+            JOIN customer_orders co ON co.order_id = lp.order_id
+            JOIN products p ON p.product_id = lp.product_id
+            WHERE lp.risk_level IN ('WARNING', 'CRITICAL')
+            ORDER BY lp.predicted_at DESC
+            LIMIT :limit
+            """;
 
         return jdbcTemplate.query(
                 sql,
@@ -360,7 +347,7 @@ public class DashboardRepository {
                         resultSet.getString("risk_level"),
                         resultSet.getBigDecimal("delay_probability"),
                         resultSet.getBigDecimal("predicted_delay_days"),
-                        List.of((String[]) resultSet.getArray("causes").getArray())
+                        parseCauses(resultSet.getString("causes"))
                 )
         );
     }
@@ -423,6 +410,14 @@ public class DashboardRepository {
     private BigDecimal queryForBigDecimal(String sql, MapSqlParameterSource params) {
         BigDecimal result = jdbcTemplate.queryForObject(sql, params, BigDecimal.class);
         return result == null ? BigDecimal.ZERO : result;
+    }
+
+    private static List<String> parseCauses(String causes) {
+        if (causes == null || causes.isBlank()) {
+            return List.of();
+        }
+
+        return List.of(causes.split(","));
     }
 
     private static LocalDate getLocalDate(ResultSet resultSet, String columnName) throws SQLException {
