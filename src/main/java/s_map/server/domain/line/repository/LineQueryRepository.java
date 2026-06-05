@@ -101,6 +101,22 @@ public interface LineQueryRepository extends Repository<ProductionLine, Long> {
                         WHERE pp.order_id = co.order_id
                           AND pp.plan_status <> CAST('CANCELLED' AS plan_status_enum)
                     ) line_names ON true
+                    LEFT JOIN LATERAL (
+                        SELECT
+                            COUNT(*) AS plan_count,
+                            COUNT(*) FILTER (
+                                WHERE pp.plan_status = CAST('IN_PROGRESS' AS plan_status_enum)
+                            ) AS in_progress_plan_count,
+                            COUNT(*) FILTER (
+                                WHERE pp.plan_status = CAST('DELAYED' AS plan_status_enum)
+                            ) AS delayed_plan_count,
+                            COUNT(pr.result_id) AS result_count
+                        FROM production_plans pp
+                        LEFT JOIN production_results pr
+                            ON pr.plan_id = pp.plan_id
+                        WHERE pp.order_id = co.order_id
+                          AND pp.plan_status <> CAST('CANCELLED' AS plan_status_enum)
+                    ) order_rank ON true
                     WHERE (:keyword IS NULL
                            OR LOWER(co.order_no) LIKE LOWER(CONCAT('%', :keyword, '%'))
                            OR LOWER(p.product_name) LIKE LOWER(CONCAT('%', :keyword, '%'))
@@ -113,7 +129,15 @@ public interface LineQueryRepository extends Repository<ProductionLine, Long> {
                                  AND line_search_plans.plan_status <> CAST('CANCELLED' AS plan_status_enum)
                                  AND LOWER(line_search_lines.line_name) LIKE LOWER(CONCAT('%', :keyword, '%'))
                            ))
-                    ORDER BY co.order_id DESC
+                    ORDER BY
+                        CASE
+                            WHEN order_rank.in_progress_plan_count > 0 THEN 0
+                            WHEN order_rank.delayed_plan_count > 0 THEN 1
+                            WHEN order_rank.result_count > 0 THEN 2
+                            WHEN order_rank.plan_count > 0 THEN 3
+                            ELSE 4
+                        END,
+                        co.order_id DESC
                     """,
             countQuery = """
                     SELECT COUNT(*)
