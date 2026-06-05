@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import s_map.server.domain.report.dto.req.BusinessReportGenerateRequest;
 import s_map.server.domain.report.dto.req.ReportGenerateRequest;
 import s_map.server.domain.report.dto.res.ReportDetailResponse;
 import s_map.server.domain.report.dto.res.ReportGenerateStartResponse;
@@ -83,6 +84,52 @@ public class ReportService {
                 reportJob.getJobId(),
                 user.getId(),
                 request.getReportType()
+        );
+
+        return ReportGenerateStartResponse.from(reportJob);
+    }
+
+    /**
+     * 기능: 기존 보고서를 기반으로 비즈니스 보고서 생성 Job을 접수한다.
+     *
+     * Input:
+     * - authUser / AuthUser / JWT에서 추출한 로그인 사용자 ID, 이메일, Role
+     * - request / BusinessReportGenerateRequest / 원본 보고서 ID
+     *
+     * Output:
+     * - result / ReportGenerateStartResponse / 접수된 비즈니스 보고서 생성 Job ID와 초기 상태
+     */
+    @Transactional
+    public ReportGenerateStartResponse generateBusinessReport(
+            AuthUser authUser,
+            BusinessReportGenerateRequest request
+    ) {
+        User user = getAuthorizedReportUser(authUser);
+        validateBusinessReportGenerateRequest(request);
+
+        Report sourceReport = reportRepository.findById(request.getReportId())
+                .orElseThrow(() -> new CustomException(ErrorCode.REPORT_NOT_FOUND));
+
+        ObjectNode requestPayload = objectMapper.createObjectNode();
+        requestPayload.put("jobType", "BUSINESS_REPORT_GENERATE");
+        requestPayload.put("sourceReportId", sourceReport.getReportId());
+        requestPayload.put("requestedBy", user.getId());
+        requestPayload.put("userRole", user.getRole().name());
+
+        ReportJob reportJob = reportJobRepository.save(
+                ReportJob.createPending(user.getId(), requestPayload)
+        );
+
+        runAfterCommit(() -> reportAsyncService.generateBusinessReportAsync(
+                reportJob.getJobId(),
+                sourceReport.getReportId()
+        ));
+
+        log.info(
+                "[ReportService] 비즈니스 보고서 생성 작업 접수 reportJobId={}, sourceReportId={}, requestedBy={}",
+                reportJob.getJobId(),
+                sourceReport.getReportId(),
+                user.getId()
         );
 
         return ReportGenerateStartResponse.from(reportJob);
@@ -173,6 +220,16 @@ public class ReportService {
 
         if (request.getPeriod().getEndDate().isBefore(request.getPeriod().getStartDate())) {
             throw new CustomException(ErrorCode.INVALID_REPORT_PERIOD, "보고서 종료일은 시작일보다 이전일 수 없습니다.");
+        }
+    }
+
+    private void validateBusinessReportGenerateRequest(BusinessReportGenerateRequest request) {
+        if (request == null) {
+            throw new CustomException(ErrorCode.INVALID_REPORT_REQUEST, "비즈니스 보고서 생성 요청은 필수입니다.");
+        }
+
+        if (request.getReportId() == null || request.getReportId() <= 0) {
+            throw new CustomException(ErrorCode.INVALID_REPORT_REQUEST, "report_id는 1 이상의 값이어야 합니다.");
         }
     }
 

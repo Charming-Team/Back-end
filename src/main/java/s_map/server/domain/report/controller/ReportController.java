@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import s_map.server.domain.report.dto.req.BusinessReportGenerateRequest;
 import s_map.server.domain.report.dto.req.ReportGenerateRequest;
 import s_map.server.domain.report.dto.res.ReportDetailResponse;
 import s_map.server.domain.report.dto.res.ReportGenerateStartResponse;
@@ -50,6 +51,27 @@ public class ReportController {
             @RequestBody ReportGenerateRequest request
     ) {
         return BaseResponse.success(reportService.generateReport(authUser, request));
+    }
+
+    @Operation(
+            summary = "비즈니스 보고서 생성 요청",
+            description = "기존 보고서 ID를 기준으로 경영진용 비즈니스 보고서 생성 Job을 시작합니다. 응답의 reportJobId로 생성 상태를 조회합니다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "비즈니스 보고서 생성 작업 접수 성공"),
+            @ApiResponse(responseCode = "400", description = "비즈니스 보고서 요청 값 오류"),
+            @ApiResponse(responseCode = "401", description = "인증 필요"),
+            @ApiResponse(responseCode = "403", description = "보고서 접근 권한 없음"),
+            @ApiResponse(responseCode = "404", description = "원본 보고서 없음"),
+            @ApiResponse(responseCode = "500", description = "서버 내부 오류")
+    })
+    @PostMapping("/business")
+    public BaseResponse<ReportGenerateStartResponse> generateBusinessReport(
+            @Parameter(hidden = true)
+            @AuthenticationPrincipal AuthUser authUser,
+            @RequestBody BusinessReportGenerateRequest request
+    ) {
+        return BaseResponse.success(reportService.generateBusinessReport(authUser, request));
     }
 
     @Operation(
