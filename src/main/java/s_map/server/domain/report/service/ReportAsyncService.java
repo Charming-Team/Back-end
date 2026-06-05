@@ -24,6 +24,7 @@ import s_map.server.global.error.CustomException;
 import s_map.server.global.error.ErrorCode;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 
 @Slf4j
 @Service
@@ -137,6 +138,17 @@ public class ReportAsyncService {
                 log.warn(
                         "[ReportAsyncService] 비즈니스 보고서 생성 실패 reason=empty_fastapi_response reportJobId={}",
                         reportJobId
+                );
+                return;
+            }
+
+            String invalidResponseMessage = resolveBusinessReportInvalidResponseMessage(fastApiResponse);
+            if (invalidResponseMessage != null) {
+                markJobFailedSafely(reportJobId, invalidResponseMessage);
+                log.warn(
+                        "[ReportAsyncService] 비즈니스 보고서 생성 실패 reason=invalid_fastapi_response reportJobId={} message={}",
+                        reportJobId,
+                        invalidResponseMessage
                 );
                 return;
             }
@@ -280,6 +292,51 @@ public class ReportAsyncService {
                 .build();
 
         return reportRepository.save(report);
+    }
+
+    private String resolveBusinessReportInvalidResponseMessage(
+            FastApiBusinessReportGenerateResponse fastApiResponse
+    ) {
+        if (fastApiResponse.getReportContent() == null) {
+            return ErrorCode.REPORT_FASTAPI_INVALID_RESPONSE.getMessage() + " report_content가 비어 있습니다.";
+        }
+
+        String reportType = fastApiResponse.getReportType();
+        if (reportType != null && !reportType.isBlank() && !isValidReportType(reportType)) {
+            return ErrorCode.REPORT_FASTAPI_INVALID_RESPONSE.getMessage() + " report_type이 올바르지 않습니다.";
+        }
+
+        if (!isValidOptionalDate(fastApiResponse.getTargetStartDate())) {
+            return ErrorCode.REPORT_FASTAPI_INVALID_RESPONSE.getMessage() + " target_start_date 형식이 올바르지 않습니다.";
+        }
+
+        if (!isValidOptionalDate(fastApiResponse.getTargetEndDate())) {
+            return ErrorCode.REPORT_FASTAPI_INVALID_RESPONSE.getMessage() + " target_end_date 형식이 올바르지 않습니다.";
+        }
+
+        return null;
+    }
+
+    private boolean isValidReportType(String reportType) {
+        try {
+            ReportType.valueOf(reportType);
+            return true;
+        } catch (IllegalArgumentException exception) {
+            return false;
+        }
+    }
+
+    private boolean isValidOptionalDate(String value) {
+        if (value == null || value.isBlank()) {
+            return true;
+        }
+
+        try {
+            LocalDate.parse(value);
+            return true;
+        } catch (DateTimeParseException exception) {
+            return false;
+        }
     }
 
     private String resolveReportTitle(
