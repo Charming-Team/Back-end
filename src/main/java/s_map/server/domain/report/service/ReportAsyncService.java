@@ -25,6 +25,7 @@ import s_map.server.global.error.ErrorCode;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
+import java.util.Locale;
 
 @Slf4j
 @Service
@@ -281,7 +282,7 @@ public class ReportAsyncService {
 
         Report report = Report.builder()
                 .reportTitle(resolveBusinessReportTitle(sourceReport, fastApiResponse))
-                .reportType(resolveBusinessReportType(fastApiResponse))
+                .reportType(resolveBusinessReportType(sourceReport, fastApiResponse))
                 .authorId(requestedBy)
                 .targetStartDate(resolveTargetStartDate(sourceReport, fastApiResponse))
                 .targetEndDate(resolveTargetEndDate(sourceReport, fastApiResponse))
@@ -318,12 +319,7 @@ public class ReportAsyncService {
     }
 
     private boolean isValidReportType(String reportType) {
-        try {
-            ReportType.valueOf(reportType);
-            return true;
-        } catch (IllegalArgumentException exception) {
-            return false;
-        }
+        return parseReportType(reportType) != null;
     }
 
     private boolean isValidOptionalDate(String value) {
@@ -375,14 +371,45 @@ public class ReportAsyncService {
         return normalizedTitle.substring(0, MAX_REPORT_TITLE_LENGTH);
     }
 
-    private ReportType resolveBusinessReportType(FastApiBusinessReportGenerateResponse fastApiResponse) {
-        String reportType = fastApiResponse.getReportType();
+    private ReportType resolveBusinessReportType(
+            Report sourceReport,
+            FastApiBusinessReportGenerateResponse fastApiResponse
+    ) {
+        ReportType fastApiReportType = parseReportType(fastApiResponse.getReportType());
 
+        if (fastApiReportType == null) {
+            return toBusinessReportType(sourceReport.getReportType());
+        }
+
+        return toBusinessReportType(fastApiReportType);
+    }
+
+    private ReportType parseReportType(String reportType) {
         if (reportType == null || reportType.isBlank()) {
+            return null;
+        }
+
+        String normalizedReportType = reportType.trim()
+                .toUpperCase(Locale.ROOT)
+                .replace("-", "_")
+                .replace(" ", "_");
+
+        try {
+            return ReportType.valueOf(normalizedReportType);
+        } catch (IllegalArgumentException exception) {
+            return null;
+        }
+    }
+
+    private ReportType toBusinessReportType(ReportType reportType) {
+        if (reportType == null) {
             return ReportType.MONTHLY_BUSINESS;
         }
 
-        return ReportType.valueOf(reportType);
+        return switch (reportType) {
+            case ON_DEMAND, ON_DEMAND_BUSINESS -> ReportType.ON_DEMAND_BUSINESS;
+            case MONTHLY, MONTHLY_BUSINESS -> ReportType.MONTHLY_BUSINESS;
+        };
     }
 
     private String createDefaultReportTitle(ReportGenerateRequest request) {
