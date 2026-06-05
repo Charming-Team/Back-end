@@ -8,6 +8,11 @@ import s_map.server.domain.report.entity.Report;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 @Getter
 @Builder
@@ -53,20 +58,6 @@ public class ReportDetailResponse {
     @Schema(description = "보고서 수정 일시", example = "2026-06-03T10:05:00")
     private LocalDateTime updatedAt;
 
-    private static String extractMarkdown(JsonNode reportContent) {
-        if (reportContent == null || reportContent.isNull()) {
-            return null;
-        }
-
-        JsonNode markdownNode = reportContent.path("markdown");
-
-        if (markdownNode.isMissingNode() || markdownNode.isNull()) {
-            return reportContent.toString();
-        }
-
-        return markdownNode.asText();
-    }
-
     public static ReportDetailResponse from(Report report, String authorName) {
         return ReportDetailResponse.builder()
                 .reportId(report.getReportId())
@@ -76,12 +67,102 @@ public class ReportDetailResponse {
                 .authorName(authorName)
                 .targetStartDate(report.getTargetStartDate())
                 .targetEndDate(report.getTargetEndDate())
-                .sections(report.getIncludedItems())
-                .evidence(report.getReportEvidence())
+                .sections(toJsonValue(report.getIncludedItems()))
+                .evidence(toJsonValue(report.getReportEvidence()))
                 .markdown(extractMarkdown(report.getReportContent()))
                 .relatedSimulationId(report.getRelatedSimulationId())
                 .createdAt(report.getCreatedAt())
                 .updatedAt(report.getUpdatedAt())
                 .build();
+    }
+
+    private static String extractMarkdown(JsonNode reportContent) {
+        if (reportContent == null || reportContent.isNull()) {
+            return null;
+        }
+
+        JsonNode markdownNode = reportContent.path("markdown");
+
+        if (!markdownNode.isMissingNode() && !markdownNode.isNull()) {
+            return markdownNode.asText();
+        }
+
+        JsonNode sectionsNode = reportContent.path("sections");
+
+        if (sectionsNode.isArray()) {
+            StringBuilder markdownBuilder = new StringBuilder();
+
+            for (JsonNode sectionNode : sectionsNode) {
+                JsonNode contentNode = sectionNode.path("content");
+
+                if (!contentNode.isMissingNode() && !contentNode.isNull()) {
+                    if (!markdownBuilder.isEmpty()) {
+                        markdownBuilder.append("\n\n");
+                    }
+
+                    markdownBuilder.append(contentNode.asText());
+                }
+            }
+
+            if (!markdownBuilder.isEmpty()) {
+                return markdownBuilder.toString();
+            }
+        }
+
+        return reportContent.toString();
+    }
+
+    private static Object toJsonValue(JsonNode node) {
+        if (node == null || node.isNull()) {
+            return null;
+        }
+
+        if (node.isObject()) {
+            Map<String, Object> map = new LinkedHashMap<>();
+            Iterator<Map.Entry<String, JsonNode>> fields = node.fields();
+
+            while (fields.hasNext()) {
+                Map.Entry<String, JsonNode> field = fields.next();
+                map.put(field.getKey(), toJsonValue(field.getValue()));
+            }
+
+            return map;
+        }
+
+        if (node.isArray()) {
+            List<Object> list = new ArrayList<>();
+
+            for (JsonNode item : node) {
+                list.add(toJsonValue(item));
+            }
+
+            return list;
+        }
+
+        if (node.isTextual()) {
+            return node.asText();
+        }
+
+        if (node.isBoolean()) {
+            return node.asBoolean();
+        }
+
+        if (node.isInt()) {
+            return node.asInt();
+        }
+
+        if (node.isLong()) {
+            return node.asLong();
+        }
+
+        if (node.isDouble() || node.isFloat() || node.isBigDecimal()) {
+            return node.asDouble();
+        }
+
+        if (node.isNumber()) {
+            return node.numberValue();
+        }
+
+        return node.asText();
     }
 }

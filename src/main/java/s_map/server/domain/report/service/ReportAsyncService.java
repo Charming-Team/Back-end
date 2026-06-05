@@ -3,13 +3,14 @@ package s_map.server.domain.report.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
+import s_map.server.domain.report.dto.fastapi.FastApiBusinessReportGenerateRequest;
+import s_map.server.domain.report.dto.fastapi.FastApiBusinessReportGenerateResponse;
 import s_map.server.domain.report.dto.fastapi.FastApiReportGenerateRequest;
 import s_map.server.domain.report.dto.fastapi.FastApiReportGenerateResponse;
 import s_map.server.domain.report.dto.req.ReportGenerateRequest;
@@ -21,6 +22,10 @@ import s_map.server.domain.report.repository.ReportJobRepository;
 import s_map.server.domain.report.repository.ReportRepository;
 import s_map.server.global.error.CustomException;
 import s_map.server.global.error.ErrorCode;
+
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
+import java.util.Locale;
 
 @Slf4j
 @Service
@@ -103,6 +108,78 @@ public class ReportAsyncService {
         }
     }
 
+    /**
+     * 기능: 기존 보고서를 기반으로 비즈니스 보고서 생성 Job을 실행하고 결과를 새 reports row로 저장한다.
+     *
+     * Input:
+     * - reportJobId / Long / 실행할 비즈니스 보고서 생성 Job ID
+     * - sourceReportId / Long / 원본 보고서 ID
+     * - requestedBy / Long / 비즈니스 보고서 생성 요청 사용자 ID
+     *
+     * Output:
+     * - none / void / 성공 시 비즈니스 보고서 저장 및 Job SUCCESS 처리, 실패 시 Job FAILED 처리
+     */
+    @Async
+    public void generateBusinessReportAsync(
+            Long reportJobId,
+            Long sourceReportId,
+            Long requestedBy
+    ) {
+        try {
+            markJobRunning(reportJobId);
+
+            FastApiBusinessReportGenerateRequest fastApiRequest =
+                    FastApiBusinessReportGenerateRequest.from(sourceReportId);
+
+            FastApiBusinessReportGenerateResponse fastApiResponse =
+                    fastApiReportClient.generateBusinessReport(fastApiRequest);
+
+            if (fastApiResponse == null) {
+                markJobFailedSafely(reportJobId, ErrorCode.REPORT_FASTAPI_INVALID_RESPONSE.getMessage());
+                log.warn(
+                        "[ReportAsyncService] 비즈니스 보고서 생성 실패 reason=empty_fastapi_response reportJobId={}",
+                        reportJobId
+                );
+                return;
+            }
+
+            String invalidResponseMessage = resolveBusinessReportInvalidResponseMessage(fastApiResponse);
+            if (invalidResponseMessage != null) {
+                markJobFailedSafely(reportJobId, invalidResponseMessage);
+                log.warn(
+                        "[ReportAsyncService] 비즈니스 보고서 생성 실패 reason=invalid_fastapi_response reportJobId={} message={}",
+                        reportJobId,
+                        invalidResponseMessage
+                );
+                return;
+            }
+
+            Long businessReportId = saveBusinessReportAndMarkSuccess(
+                    reportJobId,
+                    sourceReportId,
+                    requestedBy,
+                    fastApiResponse
+            );
+
+            log.info(
+                    "[ReportAsyncService] 비즈니스 보고서 생성 완료 reportJobId={} sourceReportId={} requestedBy={} businessReportId={}",
+                    reportJobId,
+                    sourceReportId,
+                    requestedBy,
+                    businessReportId
+            );
+        } catch (Exception exception) {
+            markJobFailedSafely(reportJobId, resolveFailureMessage(exception));
+
+            log.error(
+                    "[ReportAsyncService] 비즈니스 보고서 생성 중 예외 발생 reportJobId={} sourceReportId={}",
+                    reportJobId,
+                    sourceReportId,
+                    exception
+            );
+        }
+    }
+
     private void markJobRunning(Long reportJobId) {
         transactionTemplate.executeWithoutResult(status -> {
             ReportJob reportJob = reportJobRepository.findById(reportJobId)
@@ -123,6 +200,26 @@ public class ReportAsyncService {
             Report report = saveReport(requestedBy, request, fastApiResponse);
             reportJob.markSuccess(report.getReportId());
             return report.getReportId();
+        });
+    }
+
+    private Long saveBusinessReportAndMarkSuccess(
+            Long reportJobId,
+            Long sourceReportId,
+            Long requestedBy,
+            FastApiBusinessReportGenerateResponse fastApiResponse
+    ) {
+        return transactionTemplate.execute(status -> {
+            ReportJob reportJob = reportJobRepository.findById(reportJobId)
+                    .orElseThrow(() -> new CustomException(ErrorCode.REPORT_JOB_NOT_FOUND));
+
+            Report sourceReport = reportRepository.findById(sourceReportId)
+                    .orElseThrow(() -> new CustomException(ErrorCode.REPORT_NOT_FOUND));
+
+            Report businessReport = saveBusinessReport(sourceReport, requestedBy, fastApiResponse);
+            reportJob.markSuccess(businessReport.getReportId());
+
+            return businessReport.getReportId();
         });
     }
 
@@ -174,6 +271,65 @@ public class ReportAsyncService {
         return reportRepository.save(report);
     }
 
+    private Report saveBusinessReport(
+            Report sourceReport,
+            Long requestedBy,
+            FastApiBusinessReportGenerateResponse fastApiResponse
+    ) {
+        JsonNode reportContent = objectMapper.valueToTree(fastApiResponse.getReportContent());
+        JsonNode reportEvidence = objectMapper.valueToTree(fastApiResponse.getReportEvidence());
+        JsonNode includedItems = extractBusinessReportSections(reportContent);
+
+        Report report = Report.builder()
+                .reportTitle(resolveBusinessReportTitle(sourceReport, fastApiResponse))
+                .reportType(resolveBusinessReportType(sourceReport, fastApiResponse))
+                .authorId(requestedBy)
+                .targetStartDate(resolveTargetStartDate(sourceReport, fastApiResponse))
+                .targetEndDate(resolveTargetEndDate(sourceReport, fastApiResponse))
+                .includedItems(includedItems)
+                .reportContent(reportContent)
+                .reportEvidence(reportEvidence)
+                .relatedSimulationId(fastApiResponse.getRelatedSimulationId())
+                .build();
+
+        return reportRepository.save(report);
+    }
+
+    private String resolveBusinessReportInvalidResponseMessage(
+            FastApiBusinessReportGenerateResponse fastApiResponse
+    ) {
+        if (fastApiResponse.getReportContent() == null) {
+            return ErrorCode.REPORT_FASTAPI_INVALID_RESPONSE.getMessage() + " report_content가 비어 있습니다.";
+        }
+
+        String reportType = fastApiResponse.getReportType();
+        if (reportType != null && !reportType.isBlank() && !isValidReportType(reportType)) {
+            return ErrorCode.REPORT_FASTAPI_INVALID_RESPONSE.getMessage() + " report_type이 올바르지 않습니다.";
+        }
+
+        if (!isValidOptionalDate(fastApiResponse.getTargetStartDate())) {
+            return ErrorCode.REPORT_FASTAPI_INVALID_RESPONSE.getMessage() + " target_start_date 형식이 올바르지 않습니다.";
+        }
+
+        if (!isValidOptionalDate(fastApiResponse.getTargetEndDate())) {
+            return ErrorCode.REPORT_FASTAPI_INVALID_RESPONSE.getMessage() + " target_end_date 형식이 올바르지 않습니다.";
+        }
+
+        return null;
+    }
+
+    private boolean isValidReportType(String reportType) {
+        return parseReportType(reportType) != null;
+    }
+
+    private boolean isValidOptionalDate(String value) {
+        if (value == null || value.isBlank()) {
+            return true;
+        }
+
+        return parseOptionalDate(value) != null;
+    }
+
     private String resolveReportTitle(
             ReportGenerateRequest request,
             FastApiReportGenerateResponse fastApiResponse
@@ -184,13 +340,71 @@ public class ReportAsyncService {
             title = createDefaultReportTitle(request);
         }
 
-        title = title.trim();
+        return truncateTitle(title);
+    }
 
-        if (title.length() <= MAX_REPORT_TITLE_LENGTH) {
-            return title;
+    private String resolveBusinessReportTitle(
+            Report sourceReport,
+            FastApiBusinessReportGenerateResponse fastApiResponse
+    ) {
+        String title = fastApiResponse.getReportTitle();
+
+        if (title == null || title.isBlank()) {
+            title = sourceReport.getReportTitle() + " 비즈니스 보고서";
         }
 
-        return title.substring(0, MAX_REPORT_TITLE_LENGTH);
+        return truncateTitle(title);
+    }
+
+    private String truncateTitle(String title) {
+        String normalizedTitle = title == null ? "보고서" : title.trim();
+
+        if (normalizedTitle.length() <= MAX_REPORT_TITLE_LENGTH) {
+            return normalizedTitle;
+        }
+
+        return normalizedTitle.substring(0, MAX_REPORT_TITLE_LENGTH);
+    }
+
+    private ReportType resolveBusinessReportType(
+            Report sourceReport,
+            FastApiBusinessReportGenerateResponse fastApiResponse
+    ) {
+        ReportType fastApiReportType = parseReportType(fastApiResponse.getReportType());
+
+        if (fastApiReportType == null) {
+            return toBusinessReportType(sourceReport.getReportType());
+        }
+
+        return toBusinessReportType(fastApiReportType);
+    }
+
+    private ReportType parseReportType(String reportType) {
+        if (reportType == null || reportType.isBlank()) {
+            return null;
+        }
+
+        String normalizedReportType = reportType.trim()
+                .toUpperCase(Locale.ROOT)
+                .replace("-", "_")
+                .replace(" ", "_");
+
+        try {
+            return ReportType.valueOf(normalizedReportType);
+        } catch (IllegalArgumentException exception) {
+            return null;
+        }
+    }
+
+    private ReportType toBusinessReportType(ReportType reportType) {
+        if (reportType == null) {
+            return ReportType.MONTHLY_BUSINESS;
+        }
+
+        return switch (reportType) {
+            case ON_DEMAND, ON_DEMAND_BUSINESS -> ReportType.ON_DEMAND_BUSINESS;
+            case MONTHLY, MONTHLY_BUSINESS -> ReportType.MONTHLY_BUSINESS;
+        };
     }
 
     private String createDefaultReportTitle(ReportGenerateRequest request) {
@@ -225,17 +439,21 @@ public class ReportAsyncService {
         return ErrorCode.REPORT_FASTAPI_INVALID_RESPONSE.getMessage();
     }
 
-    private Long extractRelatedSimulationId(JsonNode sections) {
+    private JsonNode extractRelatedSimulationIdSource(JsonNode sections) {
         if (sections == null || sections.isNull()) {
             return null;
         }
 
-        JsonNode simulationIdNode = sections
+        return sections
                 .path("economicAnalysis")
                 .path("bestScenario")
                 .path("simulationId");
+    }
 
-        if (simulationIdNode.isMissingNode() || simulationIdNode.isNull()) {
+    private Long extractRelatedSimulationId(JsonNode sections) {
+        JsonNode simulationIdNode = extractRelatedSimulationIdSource(sections);
+
+        if (simulationIdNode == null || simulationIdNode.isMissingNode() || simulationIdNode.isNull()) {
             return null;
         }
 
@@ -244,6 +462,48 @@ public class ReportAsyncService {
         }
 
         return simulationIdNode.asLong();
+    }
+
+    private JsonNode extractBusinessReportSections(JsonNode reportContent) {
+        if (reportContent == null || reportContent.isNull()) {
+            return null;
+        }
+
+        JsonNode sections = reportContent.path("sections");
+
+        if (sections.isMissingNode() || sections.isNull()) {
+            return null;
+        }
+
+        return sections;
+    }
+
+    private LocalDate resolveTargetStartDate(
+            Report sourceReport,
+            FastApiBusinessReportGenerateResponse fastApiResponse
+    ) {
+        LocalDate targetStartDate = parseOptionalDate(fastApiResponse.getTargetStartDate());
+        return targetStartDate != null ? targetStartDate : sourceReport.getTargetStartDate();
+    }
+
+    private LocalDate resolveTargetEndDate(
+            Report sourceReport,
+            FastApiBusinessReportGenerateResponse fastApiResponse
+    ) {
+        LocalDate targetEndDate = parseOptionalDate(fastApiResponse.getTargetEndDate());
+        return targetEndDate != null ? targetEndDate : sourceReport.getTargetEndDate();
+    }
+
+    private LocalDate parseOptionalDate(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+
+        try {
+            return LocalDate.parse(value);
+        } catch (DateTimeParseException exception) {
+            return null;
+        }
     }
 
     private String resolveFailureMessage(Exception exception) {
