@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -69,7 +70,7 @@ public class ReportController {
     public BaseResponse<ReportGenerateStartResponse> generateBusinessReport(
             @Parameter(hidden = true)
             @AuthenticationPrincipal AuthUser authUser,
-            @RequestBody BusinessReportGenerateRequest request
+            @Valid @RequestBody BusinessReportGenerateRequest request
     ) {
         return BaseResponse.success(reportService.generateBusinessReport(authUser, request));
     }
