@@ -327,12 +327,7 @@ public class ReportAsyncService {
             return true;
         }
 
-        try {
-            LocalDate.parse(value);
-            return true;
-        } catch (DateTimeParseException exception) {
-            return false;
-        }
+        return parseOptionalDate(value) != null;
     }
 
     private String resolveReportTitle(
@@ -487,22 +482,28 @@ public class ReportAsyncService {
             Report sourceReport,
             FastApiBusinessReportGenerateResponse fastApiResponse
     ) {
-        if (fastApiResponse.getTargetStartDate() == null || fastApiResponse.getTargetStartDate().isBlank()) {
-            return sourceReport.getTargetStartDate();
-        }
-
-        return LocalDate.parse(fastApiResponse.getTargetStartDate());
+        LocalDate targetStartDate = parseOptionalDate(fastApiResponse.getTargetStartDate());
+        return targetStartDate != null ? targetStartDate : sourceReport.getTargetStartDate();
     }
 
     private LocalDate resolveTargetEndDate(
             Report sourceReport,
             FastApiBusinessReportGenerateResponse fastApiResponse
     ) {
-        if (fastApiResponse.getTargetEndDate() == null || fastApiResponse.getTargetEndDate().isBlank()) {
-            return sourceReport.getTargetEndDate();
+        LocalDate targetEndDate = parseOptionalDate(fastApiResponse.getTargetEndDate());
+        return targetEndDate != null ? targetEndDate : sourceReport.getTargetEndDate();
+    }
+
+    private LocalDate parseOptionalDate(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
         }
 
-        return LocalDate.parse(fastApiResponse.getTargetEndDate());
+        try {
+            return LocalDate.parse(value);
+        } catch (DateTimeParseException exception) {
+            return null;
+        }
     }
 
     private String resolveFailureMessage(Exception exception) {
