@@ -187,6 +187,132 @@ public class DashboardRepository {
         );
     }
 
+    public List<WeeklyScheduleSegmentRow> findWeeklyScheduleSegments(
+            OffsetDateTime startAt,
+            OffsetDateTime endExclusive
+    ) {
+        String sql = """
+                WITH plan_segments AS (
+                    SELECT
+                        pp.plan_id,
+                        co.order_id,
+                        co.order_no,
+                        pl.line_id,
+                        pl.line_name,
+                        p.product_name,
+                        GREATEST(pp.planned_start_at, :startAt) AS segment_start_at,
+                        LEAST(pp.planned_end_at, :endExclusive) AS segment_end_at,
+                        pp.plan_status::text AS plan_status,
+                        NULL::text AS operation_status,
+                        'PLAN' AS segment_type
+                    FROM production_plans pp
+                    JOIN customer_orders co ON co.order_id = pp.order_id
+                    JOIN production_lines pl ON pl.line_id = pp.line_id
+                    JOIN products p ON p.product_id = pp.product_id
+                    WHERE pp.planned_start_at < :endExclusive
+                      AND pp.planned_end_at >= :startAt
+                      AND pp.plan_status <> 'CANCELLED'
+                ),
+                ranged_status AS (
+                    SELECT
+                        ls.line_status_id,
+                        ls.line_id,
+                        ls.plan_id,
+                        ls.product_id,
+                        ls.recorded_at,
+                        ls.operation_status::text AS operation_status
+                    FROM line_status ls
+                    WHERE ls.recorded_at >= :startAt
+                      AND ls.recorded_at < :endExclusive
+
+                    UNION ALL
+
+                    SELECT
+                        latest_before_range.line_status_id,
+                        latest_before_range.line_id,
+                        latest_before_range.plan_id,
+                        latest_before_range.product_id,
+                        latest_before_range.recorded_at,
+                        latest_before_range.operation_status
+                    FROM (
+                        SELECT DISTINCT ON (ls.line_id)
+                            ls.line_status_id,
+                            ls.line_id,
+                            ls.plan_id,
+                            ls.product_id,
+                            ls.recorded_at,
+                            ls.operation_status::text AS operation_status
+                        FROM line_status ls
+                        WHERE ls.recorded_at < :startAt
+                        ORDER BY ls.line_id, ls.recorded_at DESC
+                    ) latest_before_range
+                ),
+                status_events AS (
+                    SELECT
+                        rs.line_id,
+                        rs.plan_id,
+                        rs.product_id,
+                        rs.operation_status,
+                        rs.recorded_at,
+                        LEAD(rs.recorded_at) OVER (
+                            PARTITION BY rs.line_id
+                            ORDER BY rs.recorded_at ASC, rs.line_status_id ASC
+                        ) AS next_recorded_at
+                    FROM ranged_status rs
+                ),
+                line_status_segments AS (
+                    SELECT
+                        se.plan_id,
+                        pp.order_id,
+                        co.order_no,
+                        pl.line_id,
+                        pl.line_name,
+                        p.product_name,
+                        GREATEST(se.recorded_at, :startAt) AS segment_start_at,
+                        LEAST(COALESCE(se.next_recorded_at, :endExclusive), :endExclusive) AS segment_end_at,
+                        pp.plan_status::text AS plan_status,
+                        se.operation_status,
+                        'LINE_STATUS' AS segment_type
+                    FROM status_events se
+                    JOIN production_lines pl ON pl.line_id = se.line_id
+                    LEFT JOIN production_plans pp ON pp.plan_id = se.plan_id
+                    LEFT JOIN customer_orders co ON co.order_id = pp.order_id
+                    LEFT JOIN products p ON p.product_id = COALESCE(pp.product_id, se.product_id)
+                    WHERE COALESCE(se.next_recorded_at, :endExclusive) > :startAt
+                      AND se.recorded_at < :endExclusive
+                )
+                SELECT *
+                FROM plan_segments
+                WHERE segment_start_at < segment_end_at
+
+                UNION ALL
+
+                SELECT *
+                FROM line_status_segments
+                WHERE segment_start_at < segment_end_at
+
+                ORDER BY line_id ASC, segment_start_at ASC, segment_type ASC
+                """;
+
+        return jdbcTemplate.query(
+                sql,
+                params(startAt, endExclusive),
+                (resultSet, rowNum) -> new WeeklyScheduleSegmentRow(
+                        getNullableLong(resultSet, "plan_id"),
+                        getNullableLong(resultSet, "order_id"),
+                        resultSet.getString("order_no"),
+                        resultSet.getLong("line_id"),
+                        resultSet.getString("line_name"),
+                        resultSet.getString("product_name"),
+                        getOffsetDateTime(resultSet, "segment_start_at"),
+                        getOffsetDateTime(resultSet, "segment_end_at"),
+                        resultSet.getString("plan_status"),
+                        resultSet.getString("operation_status"),
+                        resultSet.getString("segment_type")
+                )
+        );
+    }
+
     public OrderDeliveryStatusQueryResult findCurrentOrderDeliveryStatuses(
             int limit,
             LocalDate today,
@@ -567,6 +693,21 @@ public class DashboardRepository {
             OffsetDateTime plannedEndAt,
             String planStatus,
             String operationStatus
+    ) {
+    }
+
+    public record WeeklyScheduleSegmentRow(
+            Long planId,
+            Long orderId,
+            String orderNo,
+            Long lineId,
+            String lineName,
+            String productName,
+            OffsetDateTime segmentStartAt,
+            OffsetDateTime segmentEndAt,
+            String planStatus,
+            String operationStatus,
+            String segmentType
     ) {
     }
 

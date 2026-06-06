@@ -65,7 +65,8 @@ public class DashboardService {
         return DashboardWeeklyScheduleResponse.of(
                 resolvedStartDate,
                 resolvedEndDate,
-                dashboardRepository.findWeeklySchedules(startAt, endExclusive)
+                dashboardRepository.findWeeklySchedules(startAt, endExclusive),
+                dashboardRepository.findWeeklyScheduleSegments(startAt, endExclusive)
         );
     }
 
