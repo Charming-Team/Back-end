@@ -74,14 +74,10 @@ public class DashboardRepository {
                 SELECT COUNT(DISTINCT ppm.material_id)
                 FROM production_plan_materials ppm
                 JOIN production_plans pp ON pp.plan_id = ppm.plan_id
-                LEFT JOIN material_inventories mi ON mi.material_id = ppm.material_id
                 WHERE pp.planned_start_at < :endExclusive
                   AND pp.planned_end_at >= :startAt
                   AND pp.plan_status <> 'CANCELLED'
-                  AND (
-                        ppm.material_plan_status IN ('SHORTAGE', 'PARTIAL_RESERVED')
-                        OR mi.inventory_status IN ('LOW', 'SHORTAGE')
-                  )
+                  AND ppm.material_plan_status IN ('SHORTAGE', 'PARTIAL_RESERVED')
                 """;
 
         return queryForLong(sql, params(startAt, endExclusive));
