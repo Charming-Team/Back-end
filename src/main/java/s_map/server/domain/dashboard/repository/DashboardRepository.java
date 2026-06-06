@@ -23,13 +23,15 @@ public class DashboardRepository {
 
     private final NamedParameterJdbcTemplate jdbcTemplate;
 
-    public long countMonthlyOrders(OffsetDateTime startAt, OffsetDateTime endExclusive) {
+    public long countMonthlyProductionTargetOrders(OffsetDateTime startAt, OffsetDateTime endExclusive) {
         String sql = """
-                SELECT COUNT(*)
-                FROM customer_orders
-                WHERE order_date >= CAST(:startAt AS date)
-                  AND order_date < CAST(:endExclusive AS date)
-                  AND order_status <> 'CANCELLED'
+                SELECT COUNT(DISTINCT co.order_id)
+                FROM customer_orders co
+                JOIN production_plans pp ON pp.order_id = co.order_id
+                WHERE pp.planned_start_at < :endExclusive
+                  AND pp.planned_end_at >= :startAt
+                  AND pp.plan_status <> 'CANCELLED'
+                  AND co.order_status NOT IN ('COMPLETED', 'CANCELLED')
                 """;
 
         return queryForLong(sql, params(startAt, endExclusive));
@@ -37,15 +39,21 @@ public class DashboardRepository {
 
     public long countMonthlyDelayRiskOrders(OffsetDateTime startAt, OffsetDateTime endExclusive) {
         String sql = """
-                WITH latest_predictions AS (
+                WITH target_orders AS (
+                    SELECT DISTINCT co.order_id
+                    FROM customer_orders co
+                    JOIN production_plans pp ON pp.order_id = co.order_id
+                    WHERE pp.planned_start_at < :endExclusive
+                      AND pp.planned_end_at >= :startAt
+                      AND pp.plan_status <> 'CANCELLED'
+                      AND co.order_status NOT IN ('COMPLETED', 'CANCELLED')
+                ),
+                latest_predictions AS (
                     SELECT DISTINCT ON (apr.order_id)
                         apr.order_id,
                         apr.risk_level
                     FROM ai_prediction_results apr
-                    JOIN customer_orders co ON co.order_id = apr.order_id
-                    WHERE co.order_date >= CAST(:startAt AS date)
-                      AND co.order_date < CAST(:endExclusive AS date)
-                      AND co.order_status <> 'CANCELLED'
+                    JOIN target_orders target ON target.order_id = apr.order_id
                     ORDER BY apr.order_id, apr.predicted_at DESC
                 )
                 SELECT COUNT(*)
@@ -488,15 +496,21 @@ public class DashboardRepository {
             String riskLevel
     ) {
         String sql = """
-                WITH latest_predictions AS (
+                WITH target_orders AS (
+                    SELECT DISTINCT co.order_id
+                    FROM customer_orders co
+                    JOIN production_plans pp ON pp.order_id = co.order_id
+                    WHERE pp.planned_start_at < :endExclusive
+                      AND pp.planned_end_at >= :startAt
+                      AND pp.plan_status <> 'CANCELLED'
+                      AND co.order_status NOT IN ('COMPLETED', 'CANCELLED')
+                ),
+                latest_predictions AS (
                     SELECT DISTINCT ON (apr.order_id)
                         apr.order_id,
                         apr.risk_level
                     FROM ai_prediction_results apr
-                    JOIN customer_orders co ON co.order_id = apr.order_id
-                    WHERE co.order_date >= CAST(:startAt AS date)
-                      AND co.order_date < CAST(:endExclusive AS date)
-                      AND co.order_status <> 'CANCELLED'
+                    JOIN target_orders target ON target.order_id = apr.order_id
                     ORDER BY apr.order_id, apr.predicted_at DESC
                 )
                 SELECT COUNT(*)
@@ -516,7 +530,16 @@ public class DashboardRepository {
             int limit
     ) {
         String sql = """
-            WITH latest_predictions AS (
+            WITH target_orders AS (
+                SELECT DISTINCT co.order_id
+                FROM customer_orders co
+                JOIN production_plans pp ON pp.order_id = co.order_id
+                WHERE pp.planned_start_at < :endExclusive
+                  AND pp.planned_end_at >= :startAt
+                  AND pp.plan_status <> 'CANCELLED'
+                  AND co.order_status NOT IN ('COMPLETED', 'CANCELLED')
+            ),
+            latest_predictions AS (
                 SELECT DISTINCT ON (apr.order_id)
                     apr.prediction_id,
                     apr.order_id,
@@ -526,10 +549,7 @@ public class DashboardRepository {
                     apr.predicted_delay_days,
                     apr.predicted_at
                 FROM ai_prediction_results apr
-                JOIN customer_orders co ON co.order_id = apr.order_id
-                WHERE co.order_date >= CAST(:startAt AS date)
-                  AND co.order_date < CAST(:endExclusive AS date)
-                  AND co.order_status <> 'CANCELLED'
+                JOIN target_orders target ON target.order_id = apr.order_id
                 ORDER BY apr.order_id, apr.predicted_at DESC
             )
             SELECT

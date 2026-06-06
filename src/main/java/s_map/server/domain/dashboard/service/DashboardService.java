@@ -32,7 +32,7 @@ public class DashboardService {
         return DashboardSummaryResponse.of(
                 monthlyRange.startDate(),
                 monthlyRange.endDate(),
-                dashboardRepository.countMonthlyOrders(monthlyRange.startAt(), monthlyRange.endExclusive()),
+                dashboardRepository.countMonthlyProductionTargetOrders(monthlyRange.startAt(), monthlyRange.endExclusive()),
                 dashboardRepository.countMonthlyDelayRiskOrders(monthlyRange.startAt(), monthlyRange.endExclusive()),
                 dashboardRepository.countMonthlyMaterialTargets(monthlyRange.startAt(), monthlyRange.endExclusive()),
                 dashboardRepository.countMonthlyMaterialShortages(monthlyRange.startAt(), monthlyRange.endExclusive()),
