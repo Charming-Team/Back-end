@@ -473,18 +473,19 @@ public class DashboardRepository {
         );
     }
 
-    public long countMonthlyLineRisks() {
+    public long countCurrentLineRisks() {
         String sql = """
-                WITH latest_line_status AS (
-                    SELECT DISTINCT ON (ls.line_id)
-                        ls.line_id,
-                        ls.operation_status
-                    FROM line_status ls
-                    ORDER BY ls.line_id, ls.recorded_at DESC
-                )
                 SELECT COUNT(*)
-                FROM latest_line_status
-                WHERE operation_status IN ('STOPPED', 'ERROR', 'MAINTENANCE')
+                FROM production_lines pl
+                JOIN LATERAL (
+                    SELECT ls.operation_status
+                    FROM line_status ls
+                    WHERE ls.line_id = pl.line_id
+                    ORDER BY ls.recorded_at DESC
+                    LIMIT 1
+                ) latest_status ON true
+                WHERE pl.is_active = true
+                  AND latest_status.operation_status IN ('STOPPED', 'ERROR', 'MAINTENANCE')
                 """;
 
         return queryForLong(sql, new MapSqlParameterSource());

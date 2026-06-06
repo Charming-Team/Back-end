@@ -94,7 +94,7 @@ public class DashboardService {
                 monthlyRange.endDate(),
                 dashboardRepository.countMonthlyDelayRiskOrders(monthlyRange.startAt(), monthlyRange.endExclusive()),
                 dashboardRepository.countMonthlyMaterialShortages(monthlyRange.startAt(), monthlyRange.endExclusive()),
-                dashboardRepository.countMonthlyLineRisks(),
+                dashboardRepository.countCurrentLineRisks(),
                 dashboardRepository.countMonthlyRiskLevel(monthlyRange.startAt(), monthlyRange.endExclusive(), "CRITICAL"),
                 dashboardRepository.countMonthlyRiskLevel(monthlyRange.startAt(), monthlyRange.endExclusive(), "WARNING"),
                 dashboardRepository.findRecentRisks(monthlyRange.startAt(), monthlyRange.endExclusive(), 5)
