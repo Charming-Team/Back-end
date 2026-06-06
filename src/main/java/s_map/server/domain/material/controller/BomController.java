@@ -5,6 +5,7 @@ import s_map.server.domain.material.dto.req.BomUpdateRequest;
 import s_map.server.domain.material.dto.res.BomResponse;
 import s_map.server.domain.material.service.BomService;
 import s_map.server.global.common.BaseResponse;
+import s_map.server.global.common.PageResponse;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -13,7 +14,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -65,13 +65,13 @@ public class BomController {
             @ApiResponse(responseCode = "500", description = "서버 내부 오류")
     })
     @GetMapping
-    public BaseResponse<Page<BomResponse>> getBoms(
+    public BaseResponse<PageResponse<BomResponse>> getBoms(
             @Parameter(description = "페이지 번호, 0부터 시작", example = "0")
             @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "페이지 크기, 최대 100", example = "20")
             @RequestParam(defaultValue = "20") int size
     ) {
-        return BaseResponse.success(bomService.getBoms(page, size));
+        return BaseResponse.success(PageResponse.from(bomService.getBoms(page, size)));
     }
 
     @Operation(

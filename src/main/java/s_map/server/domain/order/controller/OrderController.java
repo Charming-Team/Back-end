@@ -7,7 +7,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -24,6 +23,7 @@ import s_map.server.domain.order.dto.res.OrderNoPreviewResponse;
 import s_map.server.domain.order.entity.OrderStatus;
 import s_map.server.domain.order.service.OrderService;
 import s_map.server.global.common.BaseResponse;
+import s_map.server.global.common.PageResponse;
 
 import java.time.LocalDate;
 
@@ -46,7 +46,7 @@ public class OrderController {
             @ApiResponse(responseCode = "500", description = "서버 내부 오류")
     })
     @GetMapping
-    public BaseResponse<Page<OrderListResponse>> getOrders(
+    public BaseResponse<PageResponse<OrderListResponse>> getOrders(
             @Parameter(description = "페이지 번호, 0부터 시작", example = "0")
             @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "페이지 크기, 최대 100", example = "10")
@@ -66,7 +66,7 @@ public class OrderController {
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
             @RequestParam(required = false) LocalDate dueDateTo
     ) {
-        return BaseResponse.success(orderService.getOrders(
+        return BaseResponse.success(PageResponse.from(orderService.getOrders(
                 page,
                 size,
                 keyword,
@@ -75,7 +75,7 @@ public class OrderController {
                 productId,
                 dueDateFrom,
                 dueDateTo
-        ));
+        )));
     }
 
     @Operation(

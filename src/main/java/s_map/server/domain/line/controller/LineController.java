@@ -6,7 +6,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -19,6 +18,7 @@ import s_map.server.domain.line.dto.res.LineOrderSearchResponse;
 import s_map.server.domain.line.entity.OperationStatus;
 import s_map.server.domain.line.service.LineService;
 import s_map.server.global.common.BaseResponse;
+import s_map.server.global.common.PageResponse;
 
 import java.util.List;
 
@@ -42,7 +42,7 @@ public class LineController {
             @ApiResponse(responseCode = "500", description = "라인 가동 현황 조회 실패")
     })
     @GetMapping("/operation-statuses")
-    public BaseResponse<Page<LineOperationStatusResponse>> getLineOperationStatuses(
+    public BaseResponse<PageResponse<LineOperationStatusResponse>> getLineOperationStatuses(
             @Parameter(description = "페이지 번호, 0부터 시작", example = "0")
             @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "페이지 크기, 최대 100", example = "5")
@@ -52,12 +52,12 @@ public class LineController {
             @Parameter(description = "라인 상태 필터", example = "RUNNING")
             @RequestParam(required = false) OperationStatus status
     ) {
-        return BaseResponse.success(lineService.getLineOperationStatuses(
+        return BaseResponse.success(PageResponse.from(lineService.getLineOperationStatuses(
                 page,
                 size,
                 lineId,
                 status
-        ));
+        )));
     }
 
     @Operation(
@@ -90,7 +90,7 @@ public class LineController {
             @ApiResponse(responseCode = "500", description = "주문 검색 실패")
     })
     @GetMapping("/orders/search")
-    public BaseResponse<Page<LineOrderSearchResponse>> searchOrders(
+    public BaseResponse<PageResponse<LineOrderSearchResponse>> searchOrders(
             @Parameter(description = "페이지 번호, 0부터 시작", example = "0")
             @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "페이지 크기, 최대 100", example = "5")
@@ -98,11 +98,11 @@ public class LineController {
             @Parameter(description = "주문번호, 제품명, 라인명 검색어", example = "ABS-BLACK")
             @RequestParam(required = false) String keyword
     ) {
-        return BaseResponse.success(lineService.searchOrders(
+        return BaseResponse.success(PageResponse.from(lineService.searchOrders(
                 page,
                 size,
                 keyword
-        ));
+        )));
     }
 
     @Operation(

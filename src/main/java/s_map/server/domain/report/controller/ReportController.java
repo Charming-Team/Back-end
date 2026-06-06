@@ -7,7 +7,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -24,6 +23,7 @@ import s_map.server.domain.report.dto.res.ReportJobResponse;
 import s_map.server.domain.report.dto.res.ReportListResponse;
 import s_map.server.domain.report.service.ReportService;
 import s_map.server.global.common.BaseResponse;
+import s_map.server.global.common.PageResponse;
 import s_map.server.global.security.AuthUser;
 
 @Tag(name = "Report", description = "보고서 API")
@@ -108,7 +108,7 @@ public class ReportController {
             @ApiResponse(responseCode = "500", description = "서버 내부 오류")
     })
     @GetMapping
-    public BaseResponse<Page<ReportListResponse>> getReports(
+    public BaseResponse<PageResponse<ReportListResponse>> getReports(
             @Parameter(hidden = true)
             @AuthenticationPrincipal AuthUser authUser,
             @Parameter(description = "페이지 번호, 0부터 시작", example = "0")
@@ -116,7 +116,7 @@ public class ReportController {
             @Parameter(description = "페이지 크기, 최대 100", example = "10")
             @RequestParam(defaultValue = "10") int size
     ) {
-        return BaseResponse.success(reportService.getReports(authUser, page, size));
+        return BaseResponse.success(PageResponse.from(reportService.getReports(authUser, page, size)));
     }
 
     @Operation(
