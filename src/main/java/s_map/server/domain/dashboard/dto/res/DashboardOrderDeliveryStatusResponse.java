@@ -1,5 +1,6 @@
 package s_map.server.domain.dashboard.dto.res;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import s_map.server.domain.dashboard.repository.DashboardRepository.OrderDeliveryStatusRow;
 
 import java.math.BigDecimal;
@@ -7,8 +8,12 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
 
+@Schema(description = "대시보드 주문 및 납기 현황 응답")
 public record DashboardOrderDeliveryStatusResponse(
+        @Schema(description = "현재 진행 중 또는 지연 상태인 전체 주문의 평균 진행률", example = "58.0")
         BigDecimal averageProgressRate,
+
+        @Schema(description = "화면에 표시할 주문 및 납기 현황 목록")
         List<OrderDeliveryStatusItem> orders
 ) {
 
@@ -32,13 +37,28 @@ public record DashboardOrderDeliveryStatusResponse(
     }
 
     public record OrderDeliveryStatusItem(
+            @Schema(description = "주문 ID", example = "1")
             Long orderId,
+
+            @Schema(description = "주문 번호", example = "PO-240520-001")
             String orderNo,
+
+            @Schema(description = "납기일", example = "2026-06-21")
             LocalDate dueDate,
+
+            @Schema(description = "주문 수량", example = "1000")
             Integer orderQuantity,
+
+            @Schema(description = "실제 생산 수량", example = "720")
             Integer actualQuantity,
+
+            @Schema(description = "주문 진행률. 실제 생산 수량 / 주문 수량 기준 퍼센트", example = "72.0")
             BigDecimal progressRate,
+
+            @Schema(description = "현재 시점 기준 주문 상태", example = "IN_PROGRESS")
             String orderStatus,
+
+            @Schema(description = "주문 상태 한글 표시", example = "진행 중", allowableValues = {"진행 중", "지연", "완료", "대기", "취소", "확인 필요"})
             String displayStatus
     ) {
 

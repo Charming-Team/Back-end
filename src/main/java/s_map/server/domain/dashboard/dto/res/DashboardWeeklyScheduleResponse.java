@@ -1,5 +1,6 @@
 package s_map.server.domain.dashboard.dto.res;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import s_map.server.domain.dashboard.repository.DashboardRepository.WeeklyScheduleRow;
 import s_map.server.domain.dashboard.repository.DashboardRepository.WeeklyScheduleSegmentRow;
 
@@ -13,9 +14,15 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+@Schema(description = "주간 생산 스케줄 응답")
 public record DashboardWeeklyScheduleResponse(
+        @Schema(description = "조회 시작일", example = "2026-06-01")
         LocalDate startDate,
+
+        @Schema(description = "조회 종료일", example = "2026-06-07")
         LocalDate endDate,
+
+        @Schema(description = "라인별 주간 생산 스케줄")
         List<WeeklyLineSchedule> lines
 ) {
 
@@ -47,9 +54,16 @@ public record DashboardWeeklyScheduleResponse(
     }
 
     public record WeeklyLineSchedule(
+            @Schema(description = "라인 ID", example = "1")
             Long lineId,
+
+            @Schema(description = "라인명", example = "Line A")
             String lineName,
+
+            @Schema(description = "생산계획 단위 스케줄 목록. 기존 계획 막대 표시에 사용합니다.")
             List<WeeklyScheduleItem> schedules,
+
+            @Schema(description = "차트 표시용 상태 구간 목록. PLAN은 계획 기준 구간, LINE_STATUS는 라인 상태 기록 기준 구간입니다.")
             List<WeeklyScheduleSegment> segments
     ) {
 
@@ -91,14 +105,31 @@ public record DashboardWeeklyScheduleResponse(
     }
 
     public record WeeklyScheduleItem(
+            @Schema(description = "생산계획 ID", example = "1001")
             Long planId,
+
+            @Schema(description = "주문 ID", example = "2001")
             Long orderId,
+
+            @Schema(description = "주문 번호", example = "PO-240520-001")
             String orderNo,
+
+            @Schema(description = "제품명", example = "ABS-Black")
             String productName,
+
+            @Schema(description = "계획 시작 시각", example = "2026-06-01T09:00:00+09:00")
             OffsetDateTime plannedStartAt,
+
+            @Schema(description = "계획 종료 시각", example = "2026-06-01T18:00:00+09:00")
             OffsetDateTime plannedEndAt,
+
+            @Schema(description = "생산계획 상태", example = "IN_PROGRESS")
             String planStatus,
+
+            @Schema(description = "해당 계획의 최신 라인 가동 상태. 상태 기록이 없으면 null", example = "RUNNING", nullable = true)
             String operationStatus,
+
+            @Schema(description = "화면 표시 상태", example = "생산 중")
             String displayStatus
     ) {
 
@@ -149,15 +180,34 @@ public record DashboardWeeklyScheduleResponse(
     }
 
     public record WeeklyScheduleSegment(
+            @Schema(description = "생산계획 ID. 라인 상태 구간이 특정 계획과 연결되지 않으면 null", example = "1001", nullable = true)
             Long planId,
+
+            @Schema(description = "주문 ID. 연결된 생산계획이 없으면 null", example = "2001", nullable = true)
             Long orderId,
+
+            @Schema(description = "주문 번호. 연결된 생산계획이 없으면 null", example = "PO-240520-001", nullable = true)
             String orderNo,
+
+            @Schema(description = "제품명. 연결된 생산계획 또는 라인 상태 제품 정보가 없으면 null", example = "ABS-Black", nullable = true)
             String productName,
+
+            @Schema(description = "구간 시작 시각", example = "2026-06-01T09:00:00+09:00")
             OffsetDateTime segmentStartAt,
+
+            @Schema(description = "구간 종료 시각", example = "2026-06-01T11:00:00+09:00")
             OffsetDateTime segmentEndAt,
+
+            @Schema(description = "생산계획 상태. PLAN 구간 또는 계획과 연결된 LINE_STATUS 구간에서 제공", example = "IN_PROGRESS", nullable = true)
             String planStatus,
+
+            @Schema(description = "라인 가동 상태. LINE_STATUS 구간에서 제공", example = "RUNNING", nullable = true)
             String operationStatus,
+
+            @Schema(description = "구간 유형", example = "LINE_STATUS", allowableValues = {"PLAN", "LINE_STATUS"})
             String segmentType,
+
+            @Schema(description = "화면 표시 상태", example = "생산 중", allowableValues = {"생산 중", "예정", "셋업", "지연", "비가동", "완료", "확인 필요"})
             String displayStatus
     ) {
 
