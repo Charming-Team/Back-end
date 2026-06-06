@@ -187,34 +187,125 @@ public class DashboardRepository {
         );
     }
 
-    public List<OrderDeliveryStatusRow> findCurrentOrderDeliveryStatuses(int limit) {
+    public OrderDeliveryStatusQueryResult findCurrentOrderDeliveryStatuses(
+            int limit,
+            LocalDate today,
+            OffsetDateTime now
+    ) {
         String sql = """
+                WITH order_base AS (
+                    SELECT
+                        co.order_id,
+                        co.order_no,
+                        co.due_date,
+                        co.order_quantity,
+                        co.order_status::text AS stored_order_status
+                    FROM customer_orders co
+                ),
+                result_totals AS (
+                    SELECT
+                        pr.order_id,
+                        COALESCE(SUM(pr.actual_quantity), 0) AS actual_quantity
+                    FROM production_results pr
+                    GROUP BY pr.order_id
+                ),
+                order_statuses AS (
+                    SELECT
+                        ob.order_id,
+                        CASE
+                            WHEN ob.stored_order_status IN ('COMPLETED', 'CANCELLED') THEN ob.stored_order_status
+                            WHEN ob.due_date < CAST(:today AS date) THEN 'DELAYED'
+                            WHEN COALESCE(MAX(
+                                    CASE
+                                        WHEN pp.plan_id IS NOT NULL
+                                         AND pp.plan_status::text NOT IN ('COMPLETED', 'CANCELLED')
+                                         AND (
+                                                pp.plan_status::text = 'DELAYED'
+                                                OR pp.planned_end_at < :now
+                                             )
+                                        THEN 1
+                                        ELSE 0
+                                    END
+                                 ), 0) = 1 THEN 'DELAYED'
+                            WHEN COALESCE(MAX(
+                                    CASE
+                                        WHEN pp.plan_id IS NOT NULL
+                                         AND pp.plan_status::text NOT IN ('COMPLETED', 'CANCELLED')
+                                         AND (
+                                                pp.plan_status::text = 'IN_PROGRESS'
+                                                OR pp.planned_start_at <= :now
+                                             )
+                                        THEN 1
+                                        ELSE 0
+                                    END
+                                 ), 0) = 1 THEN 'IN_PROGRESS'
+                            ELSE 'WAITING'
+                        END AS order_status
+                    FROM order_base ob
+                    LEFT JOIN production_plans pp ON pp.order_id = ob.order_id
+                    GROUP BY ob.order_id, ob.stored_order_status, ob.due_date
+                ),
+                target_orders AS (
+                    SELECT
+                        ob.order_id,
+                        ob.order_no,
+                        ob.due_date,
+                        ob.order_quantity,
+                        COALESCE(rt.actual_quantity, 0) AS actual_quantity,
+                        os.order_status,
+                        CASE
+                            WHEN ob.order_quantity <= 0 THEN 0
+                            ELSE COALESCE(rt.actual_quantity, 0) * 100.0 / ob.order_quantity
+                        END AS progress_rate
+                    FROM order_base ob
+                    JOIN order_statuses os ON os.order_id = ob.order_id
+                    LEFT JOIN result_totals rt ON rt.order_id = ob.order_id
+                    WHERE os.order_status IN ('IN_PROGRESS', 'DELAYED')
+                )
                 SELECT
-                    co.order_id,
-                    co.order_no,
-                    co.due_date,
-                    co.order_quantity,
-                    COALESCE(SUM(pr.actual_quantity), 0) AS actual_quantity,
-                    co.order_status::text AS order_status
-                FROM customer_orders co
-                LEFT JOIN production_results pr ON pr.order_id = co.order_id
-                WHERE co.order_status IN ('IN_PROGRESS', 'DELAYED')
-                GROUP BY co.order_id, co.order_no, co.due_date, co.order_quantity, co.order_status
-                ORDER BY co.due_date ASC, co.order_id ASC
+                    order_id,
+                    order_no,
+                    due_date,
+                    order_quantity,
+                    actual_quantity,
+                    order_status,
+                    AVG(progress_rate) OVER () AS average_progress_rate
+                FROM target_orders
+                ORDER BY
+                    CASE WHEN order_status = 'DELAYED' THEN 0 ELSE 1 END,
+                    due_date ASC,
+                    order_id ASC
                 LIMIT :limit
                 """;
 
-        return jdbcTemplate.query(
+        List<OrderDeliveryStatusRowWithAverage> rows = jdbcTemplate.query(
                 sql,
-                new MapSqlParameterSource("limit", limit),
-                (resultSet, rowNum) -> new OrderDeliveryStatusRow(
-                        resultSet.getLong("order_id"),
-                        resultSet.getString("order_no"),
-                        getLocalDate(resultSet, "due_date"),
-                        resultSet.getInt("order_quantity"),
-                        resultSet.getInt("actual_quantity"),
-                        resultSet.getString("order_status")
+                new MapSqlParameterSource()
+                        .addValue("limit", limit)
+                        .addValue("today", today)
+                        .addValue("now", now),
+                (resultSet, rowNum) -> new OrderDeliveryStatusRowWithAverage(
+                        resultSet.getBigDecimal("average_progress_rate"),
+                        new OrderDeliveryStatusRow(
+                                resultSet.getLong("order_id"),
+                                resultSet.getString("order_no"),
+                                getLocalDate(resultSet, "due_date"),
+                                resultSet.getInt("order_quantity"),
+                                resultSet.getInt("actual_quantity"),
+                                resultSet.getString("order_status")
+                        )
                 )
+        );
+
+        BigDecimal averageProgressRate = rows.isEmpty()
+                ? BigDecimal.ZERO
+                : rows.get(0).averageProgressRate();
+
+        return new OrderDeliveryStatusQueryResult(
+                averageProgressRate,
+                rows.stream()
+                        .map(OrderDeliveryStatusRowWithAverage::order)
+                        .toList()
         );
     }
 
@@ -233,7 +324,7 @@ public class DashboardRepository {
                     pl.line_id,
                     pl.line_name,
                     COALESCE(lls.utilization_rate, 0) AS utilization_rate,
-                    COALESCE(lls.operation_status, 'IDLE') AS operation_status
+                    lls.operation_status AS operation_status
                 FROM production_lines pl
                 LEFT JOIN latest_line_status lls ON lls.line_id = pl.line_id
                 WHERE pl.is_active = true
@@ -486,6 +577,18 @@ public class DashboardRepository {
             Integer orderQuantity,
             Integer actualQuantity,
             String orderStatus
+    ) {
+    }
+
+    public record OrderDeliveryStatusQueryResult(
+            BigDecimal averageProgressRate,
+            List<OrderDeliveryStatusRow> orders
+    ) {
+    }
+
+    private record OrderDeliveryStatusRowWithAverage(
+            BigDecimal averageProgressRate,
+            OrderDeliveryStatusRow order
     ) {
     }
 

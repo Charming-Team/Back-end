@@ -48,31 +48,33 @@ public record DashboardLineUtilizationResponse(
         }
 
         private static String toDisplayStatus(String operationStatus, BigDecimal utilizationRate) {
+            if (operationStatus == null || operationStatus.isBlank()) {
+                return "상태 확인 필요";
+            }
+
             if ("ERROR".equals(operationStatus)
                     || "STOPPED".equals(operationStatus)
                     || "MAINTENANCE".equals(operationStatus)) {
-                return "비가동";
+                return "가동 지연";
             }
 
             if ("SETUP".equals(operationStatus)) {
-                return "셋업";
+                return "가동 지연";
             }
 
             if ("IDLE".equals(operationStatus)) {
-                return "대기";
+                return "가동 지연";
             }
 
-            // 화면상 36%, 42%가 가동 저조로 표시되어 있어 50% 미만을 임시 기준으로 둠.
-            // 팀 기준이 따로 생기면 이 값은 수정 필요.
             if (utilizationRate.compareTo(BigDecimal.valueOf(50)) < 0) {
-                return "가동 저조";
+                return "가동 지연";
             }
 
             if ("RUNNING".equals(operationStatus)) {
                 return "가동 중";
             }
 
-            return "확인 필요";
+            return "상태 확인 필요";
         }
     }
 }

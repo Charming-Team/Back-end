@@ -71,10 +71,12 @@ public class DashboardService {
 
     public DashboardOrderDeliveryStatusResponse getOrderDeliveryStatus(int limit) {
         int safeLimit = normalizeLimit(limit);
+        LocalDate today = LocalDate.now(DEFAULT_PRODUCTION_ZONE);
+        OffsetDateTime now = OffsetDateTime.now(DEFAULT_PRODUCTION_ZONE);
+        DashboardRepository.OrderDeliveryStatusQueryResult result =
+                dashboardRepository.findCurrentOrderDeliveryStatuses(safeLimit, today, now);
 
-        return DashboardOrderDeliveryStatusResponse.from(
-                dashboardRepository.findCurrentOrderDeliveryStatuses(safeLimit)
-        );
+        return DashboardOrderDeliveryStatusResponse.from(result.averageProgressRate(), result.orders());
     }
 
     public DashboardLineUtilizationResponse getLineUtilization() {

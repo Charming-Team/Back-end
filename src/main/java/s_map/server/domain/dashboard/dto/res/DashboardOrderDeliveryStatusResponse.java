@@ -12,19 +12,23 @@ public record DashboardOrderDeliveryStatusResponse(
         List<OrderDeliveryStatusItem> orders
 ) {
 
-    public static DashboardOrderDeliveryStatusResponse from(List<OrderDeliveryStatusRow> rows) {
+    public static DashboardOrderDeliveryStatusResponse from(
+            BigDecimal averageProgressRate,
+            List<OrderDeliveryStatusRow> rows
+    ) {
         List<OrderDeliveryStatusItem> orders = rows.stream()
                 .map(OrderDeliveryStatusItem::from)
                 .toList();
 
-        BigDecimal averageProgressRate = orders.isEmpty()
-                ? BigDecimal.ZERO.setScale(1, RoundingMode.HALF_UP)
-                : orders.stream()
-                .map(OrderDeliveryStatusItem::progressRate)
-                .reduce(BigDecimal.ZERO, BigDecimal::add)
-                .divide(BigDecimal.valueOf(orders.size()), 1, RoundingMode.HALF_UP);
+        return new DashboardOrderDeliveryStatusResponse(normalizeRate(averageProgressRate), orders);
+    }
 
-        return new DashboardOrderDeliveryStatusResponse(averageProgressRate, orders);
+    private static BigDecimal normalizeRate(BigDecimal rate) {
+        if (rate == null) {
+            return BigDecimal.ZERO.setScale(1, RoundingMode.HALF_UP);
+        }
+
+        return rate.setScale(1, RoundingMode.HALF_UP);
     }
 
     public record OrderDeliveryStatusItem(
