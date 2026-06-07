@@ -273,13 +273,23 @@ public class DashboardRepository {
                         pl.line_name,
                         p.product_name,
                         GREATEST(se.recorded_at, :startAt) AS segment_start_at,
-                        LEAST(COALESCE(se.next_recorded_at, :endExclusive), :endExclusive) AS segment_end_at,
+                        CASE
+                            WHEN se.next_recorded_at IS NOT NULL AND pp.planned_end_at IS NOT NULL
+                                THEN LEAST(se.next_recorded_at, pp.planned_end_at, :endExclusive)
+                            WHEN se.next_recorded_at IS NOT NULL
+                                THEN LEAST(se.next_recorded_at, :endExclusive)
+                            WHEN pp.planned_end_at IS NOT NULL
+                                THEN LEAST(pp.planned_end_at, :endExclusive)
+                            ELSE se.recorded_at
+                        END AS segment_end_at,
                         pp.plan_status::text AS plan_status,
                         se.operation_status,
                         'LINE_STATUS' AS segment_type
                     FROM status_events se
                     JOIN production_lines pl ON pl.line_id = se.line_id
-                    LEFT JOIN production_plans pp ON pp.plan_id = se.plan_id
+                    LEFT JOIN production_plans pp
+                        ON pp.plan_id = se.plan_id
+                       AND pp.plan_status <> 'CANCELLED'
                     LEFT JOIN customer_orders co ON co.order_id = pp.order_id
                     LEFT JOIN products p ON p.product_id = COALESCE(pp.product_id, se.product_id)
                     WHERE COALESCE(se.next_recorded_at, :endExclusive) > :startAt
