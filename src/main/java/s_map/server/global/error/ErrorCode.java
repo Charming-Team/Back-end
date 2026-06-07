@@ -22,6 +22,7 @@ public enum ErrorCode {
     ORDER_SCHEDULE_EXCEEDS_DUE_DATE(HttpStatus.BAD_REQUEST, "400-303", "생산계획 종료일은 납기일을 초과할 수 없습니다."),
     INVALID_REPORT_REQUEST(HttpStatus.BAD_REQUEST, "400-401", "보고서 요청 값이 올바르지 않습니다."),
     INVALID_REPORT_PERIOD(HttpStatus.BAD_REQUEST, "400-402", "보고서 기간 조건이 올바르지 않습니다."),
+    INVALID_PLAN_FILE(HttpStatus.BAD_REQUEST, "400-601", "생산계획 파일 형식 또는 컬럼 구성이 올바르지 않습니다."),
 
     // 401 Unauthorized
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "401", "인증이 필요합니다."),

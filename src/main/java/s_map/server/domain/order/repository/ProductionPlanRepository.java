@@ -3,10 +3,13 @@ package s_map.server.domain.order.repository;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import s_map.server.domain.order.entity.PlanStatus;
 import s_map.server.domain.order.entity.ProductionPlan;
 
 import java.time.OffsetDateTime;
+import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 public interface ProductionPlanRepository extends JpaRepository<ProductionPlan, Long> {
 
@@ -16,6 +19,10 @@ public interface ProductionPlanRepository extends JpaRepository<ProductionPlan, 
             OffsetDateTime endExclusive,
             OffsetDateTime startInclusive
     );
+
+    long countByPlanStatusIn(Collection<PlanStatus> planStatuses);
+
+    List<ProductionPlan> findByPlanStatusIn(Collection<PlanStatus> planStatuses);
 
     boolean existsByLineIdAndPlanIdNotAndPlannedStartAtLessThanAndPlannedEndAtGreaterThan(
             Long lineId,
@@ -52,6 +59,32 @@ public interface ProductionPlanRepository extends JpaRepository<ProductionPlan, 
             nativeQuery = true
     )
     boolean existsActiveLineCapability(
+            @Param("lineId") Long lineId,
+            @Param("productId") Long productId
+    );
+
+    @Query(
+            value = """
+                    SELECT
+                        plc.capacity_per_day AS "capacityPerDay",
+                        plc.standard_production_time_hr AS "standardProductionTimeHr"
+                    FROM product_line_capabilities plc
+                    JOIN production_lines pl
+                        ON pl.line_id = plc.line_id
+                    WHERE plc.line_id = :lineId
+                      AND plc.product_id = :productId
+                      AND pl.is_active = true
+                      AND (
+                            (plc.capacity_per_day IS NOT NULL AND plc.capacity_per_day > 0)
+                            OR (
+                                plc.standard_production_time_hr IS NOT NULL
+                                AND plc.standard_production_time_hr > 0
+                            )
+                          )
+                    """,
+            nativeQuery = true
+    )
+    Optional<LineCapabilityProjection> findActiveLineCapabilityDetail(
             @Param("lineId") Long lineId,
             @Param("productId") Long productId
     );

@@ -152,4 +152,8 @@ public class ProductionPlan extends BaseEntity {
         this.plannedStartAt = plannedStartAt;
         this.plannedEndAt = plannedEndAt;
     }
+
+    public void cancel() {
+        this.planStatus = PlanStatus.CANCELLED;
+    }
 }
