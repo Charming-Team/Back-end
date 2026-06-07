@@ -8,36 +8,24 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ContentDisposition;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.ResponseEntity;
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.multipart.MultipartFile;
-import s_map.server.domain.plan.dto.req.PlanFileApplyMode;
 import s_map.server.domain.plan.dto.req.PlanScheduleUpdateRequest;
 import s_map.server.domain.plan.dto.req.PlanUpdateRequest;
-import s_map.server.domain.plan.dto.res.PlanFileApplyResponse;
-import s_map.server.domain.plan.dto.res.PlanFileDownload;
-import s_map.server.domain.plan.dto.res.PlanFileValidationResponse;
 import s_map.server.domain.plan.dto.res.PlanUpdateResponse;
 import s_map.server.domain.plan.dto.res.CurrentPlanResponse;
 import s_map.server.domain.plan.dto.res.PlanDetailResponse;
 import s_map.server.domain.plan.dto.res.PlanListResponse;
-import s_map.server.domain.plan.service.PlanFileService;
 import s_map.server.domain.plan.service.PlanService;
 import s_map.server.global.common.BaseResponse;
 
 import java.time.OffsetDateTime;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 @Tag(name = "Plan", description = "생산계획 API")
@@ -47,7 +35,6 @@ import java.util.List;
 public class PlanController {
 
     private final PlanService planService;
-    private final PlanFileService planFileService;
 
     @Operation(
             summary = "생산계획 목록 조회",
@@ -176,88 +163,5 @@ public class PlanController {
             @Valid @RequestBody PlanScheduleUpdateRequest request
     ) {
         return BaseResponse.success(planService.movePlanSchedule(planId, request));
-    }
-
-    @Operation(
-            summary = "생산계획 파일 Export",
-            description = """
-                    현재 생산계획을 CSV 또는 XLSX 파일로 다운로드합니다.
-                    업로드 반영 시 plan_id, 제품/라인/담당자명, estimated_duration_hr, plan_status는 참고용이며 사용자 입력값으로 반영하지 않습니다.
-                    """
-    )
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "생산계획 파일 다운로드 성공"),
-            @ApiResponse(responseCode = "400", description = "지원하지 않는 파일 형식"),
-            @ApiResponse(responseCode = "401", description = "인증 필요"),
-            @ApiResponse(responseCode = "500", description = "서버 내부 오류")
-    })
-    @GetMapping("/files/export")
-    public ResponseEntity<byte[]> exportPlanFile(
-            @Parameter(description = "파일 형식. csv 또는 xlsx", example = "csv")
-            @RequestParam(defaultValue = "csv") String format
-    ) {
-        PlanFileDownload file = planFileService.exportPlans(format);
-
-        return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType(file.contentType()))
-                .header(
-                        HttpHeaders.CONTENT_DISPOSITION,
-                        ContentDisposition.attachment()
-                                .filename(file.fileName(), StandardCharsets.UTF_8)
-                                .build()
-                                .toString()
-                )
-                .body(file.content());
-    }
-
-    @Operation(
-            summary = "생산계획 파일 검증",
-            description = """
-                    CSV 또는 XLSX 생산계획 파일의 컬럼, 필수값, 주문/제품/라인/담당자 매칭, 일정 충돌을 검증합니다.
-                    mode는 INITIAL_REGISTER 또는 FULL_REPLACE 중 하나입니다.
-                    이 API는 DB에 반영하지 않고 검증 결과만 반환합니다.
-                    """
-    )
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "생산계획 파일 검증 완료"),
-            @ApiResponse(responseCode = "400", description = "파일 형식 또는 컬럼 구성 오류"),
-            @ApiResponse(responseCode = "401", description = "인증 필요"),
-            @ApiResponse(responseCode = "500", description = "서버 내부 오류")
-    })
-    @PostMapping(value = "/files/validate", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public BaseResponse<PlanFileValidationResponse> validatePlanFile(
-            @Parameter(description = "반영 방식", example = "FULL_REPLACE")
-            @RequestParam PlanFileApplyMode mode,
-            @Parameter(description = "CSV 또는 XLSX 파일")
-            @RequestParam MultipartFile file
-    ) {
-        return BaseResponse.success(planFileService.validatePlanFile(file, mode));
-    }
-
-    @Operation(
-            summary = "생산계획 파일 반영",
-            description = """
-                    CSV 또는 XLSX 생산계획 파일을 검증한 뒤 production_plans에 반영합니다.
-                    검증 오류가 있으면 DB에 반영하지 않고 applied=false 응답을 반환합니다.
-                    INITIAL_REGISTER는 현재 운영 생산계획이 없을 때 신규 등록합니다.
-                    FULL_REPLACE는 현재 운영 생산계획을 이력으로 백업하고 운영 해제한 뒤 업로드 파일 기준 신규 계획을 생성합니다.
-                    성공한 FULL_REPLACE 응답에는 롤백 기준 스냅샷 ID가 포함됩니다.
-                    estimated_duration_hr와 plan_status 파일 값은 반영하지 않고, 예상 소요 시간은 기준 데이터로 계산하며 상태는 SCHEDULED로 등록합니다.
-                    """
-    )
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "생산계획 파일 반영 처리 완료"),
-            @ApiResponse(responseCode = "400", description = "파일 형식 또는 컬럼 구성 오류"),
-            @ApiResponse(responseCode = "401", description = "인증 필요"),
-            @ApiResponse(responseCode = "500", description = "서버 내부 오류")
-    })
-    @PostMapping(value = "/files/apply", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public BaseResponse<PlanFileApplyResponse> applyPlanFile(
-            @Parameter(description = "반영 방식", example = "FULL_REPLACE")
-            @RequestParam PlanFileApplyMode mode,
-            @Parameter(description = "CSV 또는 XLSX 파일")
-            @RequestParam MultipartFile file
-    ) {
-        return BaseResponse.success(planFileService.applyPlanFile(file, mode));
     }
 }

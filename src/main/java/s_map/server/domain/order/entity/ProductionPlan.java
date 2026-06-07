@@ -8,7 +8,6 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
-import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
@@ -76,9 +75,6 @@ public class ProductionPlan extends BaseEntity {
     @Column(name = "plan_status", nullable = false, columnDefinition = "plan_status_enum")
     private PlanStatus planStatus;
 
-    @Column(name = "is_current", nullable = false)
-    private boolean current;
-
     @Builder
     private ProductionPlan(
             Long orderId,
@@ -102,7 +98,6 @@ public class ProductionPlan extends BaseEntity {
         this.plannedQuantity = plannedQuantity;
         this.planSequence = planSequence;
         this.planStatus = planStatus;
-        this.current = true;
     }
 
     public static ProductionPlan create(
@@ -160,24 +155,5 @@ public class ProductionPlan extends BaseEntity {
 
     public void cancel() {
         this.planStatus = PlanStatus.CANCELLED;
-    }
-
-    public void archiveForReplacement() {
-        this.planStatus = PlanStatus.CANCELLED;
-        this.current = false;
-        this.planSequence = archivedSequence();
-    }
-
-    @PrePersist
-    public void prePersist() {
-        this.current = true;
-    }
-
-    private Integer archivedSequence() {
-        if (planId == null) {
-            return planSequence;
-        }
-
-        return Math.negateExact(Math.toIntExact(planId));
     }
 }

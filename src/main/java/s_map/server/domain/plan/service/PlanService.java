@@ -183,7 +183,7 @@ public class PlanService {
 
         List<ProductionPlan> plans =
                 productionPlanRepository
-                        .findByCurrentTrueAndPlannedStartAtLessThanAndPlannedEndAtGreaterThanOrderByPlannedStartAtAsc(
+                        .findByPlannedStartAtLessThanAndPlannedEndAtGreaterThanOrderByPlannedStartAtAsc(
                                 endExclusive,
                                 startOfDay
                         )
@@ -359,7 +359,7 @@ public class PlanService {
 
     private void validateLineSequence(Long planId, Long lineId, Integer planSequence) {
         boolean existsSameLineSequence =
-                productionPlanRepository.existsByCurrentTrueAndLineIdAndPlanIdNotAndPlanSequence(
+                productionPlanRepository.existsByLineIdAndPlanIdNotAndPlanSequence(
                         lineId,
                         planId,
                         planSequence
@@ -399,8 +399,7 @@ public class PlanService {
      */
     private void validateEditablePlan(ProductionPlan plan) {
         if (plan.getPlanStatus() == PlanStatus.COMPLETED
-                || plan.getPlanStatus() == PlanStatus.CANCELLED
-                || !plan.isCurrent()) {
+                || plan.getPlanStatus() == PlanStatus.CANCELLED) {
             throw new CustomException(ErrorCode.BAD_REQUEST);
         }
     }
@@ -481,7 +480,7 @@ public class PlanService {
     ) {
         boolean existsConflict =
                 productionPlanRepository
-                        .existsByCurrentTrueAndLineIdAndPlanIdNotAndPlannedStartAtLessThanAndPlannedEndAtGreaterThan(
+                        .existsByLineIdAndPlanIdNotAndPlannedStartAtLessThanAndPlannedEndAtGreaterThan(
                                 lineId,
                                 planId,
                                 plannedEndAt,
