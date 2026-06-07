@@ -67,6 +67,7 @@ public enum ErrorCode {
     CONCURRENT_INVENTORY_UPDATE(HttpStatus.CONFLICT, "409-103", "재고 정보가 동시에 수정되었습니다. 다시 조회 후 시도해주세요."),
     USER_ALREADY_DELETED(HttpStatus.CONFLICT, "409-201", "이미 삭제된 사용자입니다."),
     CONCURRENT_ORDER_CREATION(HttpStatus.CONFLICT, "409-301", "주문 또는 생산계획이 동시에 생성되었습니다. 다시 조회 후 시도해주세요."),
+    PLAN_SCHEDULE_CONFLICT(HttpStatus.CONFLICT, "409-601", "해당 라인에 중복된 생산계획이 있습니다. AI 분석이 필요합니다."),
 
     // 500 Internal Server Error
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "500", "서버 내부 오류가 발생했습니다."),

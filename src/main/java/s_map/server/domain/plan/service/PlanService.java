@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import s_map.server.domain.material.entity.ProductionPlanMaterial;
 import s_map.server.domain.material.repository.ProductionPlanMaterialRepository;
+import s_map.server.domain.plan.dto.req.PlanScheduleUpdateRequest;
 import s_map.server.domain.plan.dto.req.PlanUpdateRequest;
 import s_map.server.domain.plan.dto.res.CurrentPlanResponse;
 import s_map.server.domain.plan.dto.res.PlanDetailResponse;
@@ -238,42 +239,96 @@ public class PlanService {
      * - 생산계획이 없으면 PRODUCTION_PLAN_NOT_FOUND 예외를 발생시킨다.
      * - 완료 또는 취소 상태의 생산계획이면 수정할 수 없도록 차단한다.
      * - 요청값의 필수값, 기간, 수량, 순서를 검증한다.
+     * - 변경 라인에서 해당 제품을 생산할 수 있는지 검증한다.
+     * - 담당자가 지정된 경우 활성 작업자인지 검증한다.
+     * - 동일 라인의 라인 내 순서 중복 여부를 검증한다.
      * - 동일 라인에 겹치는 일정이 있는지 검증한다.
-     * - 실제 production_plans 변경은 아직 반영하지 않는다.
-     * - 추후 시뮬레이션 분석 결과 생성 후 승인/반영 플로우와 연결한다.
+     * - production_plans 테이블에 수정 내용을 반영한다.
      *
      * [Output]
      * - PlanUpdateResponse
-     * - 현재 구현에서는 실제 반영 여부가 false인 수정 요청 검증 결과를 반환한다.
+     * - 실제 반영 여부가 true인 수정 결과를 반환한다.
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public PlanUpdateResponse updatePlan(Long planId, PlanUpdateRequest request) {
         ProductionPlan plan = productionPlanRepository.findById(planId)
                 .orElseThrow(() -> new CustomException(ErrorCode.PRODUCTION_PLAN_NOT_FOUND));
 
         validateEditablePlan(plan);
         validateUpdateRequest(request);
-        validateLineCapability(plan, request);
+        validateLineCapability(plan, request.getLineId());
         validateOperator(request);
+        validateLineSequence(planId, request);
         validateScheduleConflict(planId, request);
 
-        // 바로 DB 반영하면 비교시 롤백을 못할 거 같으니 일단 보류
-//        plan.updatePlan(
-//                request.getLineId(),
-//                request.getOperatorId(),
-//                request.getPlannedStartAt(),
-//                request.getPlannedEndAt(),
-//                request.getPlannedQuantity(),
-//                request.getPlanSequence(),
-//                request.getPlanStatus()
-//        );
+        plan.updatePlan(
+                request.getLineId(),
+                request.getOperatorId(),
+                request.getPlannedStartAt(),
+                request.getPlannedEndAt(),
+                request.getPlannedQuantity(),
+                request.getPlanSequence(),
+                request.getPlanStatus()
+        );
 
-        return PlanUpdateResponse.validationOnly(plan);
+        return PlanUpdateResponse.from(plan);
     }
 
-    private void validateLineCapability(ProductionPlan plan, PlanUpdateRequest request) {
+    /**
+     * [기능]
+     * 캘린더 드래그 앤 드롭으로 생산계획 일정을 이동한다.
+     *
+     * [Input]
+     * - planId: 이동할 생산계획 ID
+     * - request: 이동 후 라인 ID와 계획 시작/종료 일시
+     *
+     * [Process]
+     * - 생산계획이 없으면 PRODUCTION_PLAN_NOT_FOUND 예외를 발생시킨다.
+     * - 완료 또는 취소 상태의 생산계획이면 이동할 수 없도록 차단한다.
+     * - 요청 기간이 유효한지 검증한다.
+     * - lineId가 없으면 기존 라인을 유지한다.
+     * - 변경 라인에서 해당 제품을 생산할 수 있는지 검증한다.
+     * - 같은 라인에 일정이 겹치면 PLAN_SCHEDULE_CONFLICT 예외를 발생시킨다.
+     * - 일정이 비어 있으면 production_plans의 라인과 계획 시작/종료 일시만 수정한다.
+     *
+     * [Output]
+     * - PlanUpdateResponse
+     * - 실제 반영 여부가 true인 일정 이동 결과를 반환한다.
+     */
+    @Transactional
+    public PlanUpdateResponse movePlanSchedule(Long planId, PlanScheduleUpdateRequest request) {
+        ProductionPlan plan = productionPlanRepository.findById(planId)
+                .orElseThrow(() -> new CustomException(ErrorCode.PRODUCTION_PLAN_NOT_FOUND));
+
+        validateEditablePlan(plan);
+        validateScheduleMoveRequest(request);
+
+        Long targetLineId = request.getLineId() == null ? plan.getLineId() : request.getLineId();
+        validateLineCapability(plan, targetLineId);
+
+        if (!targetLineId.equals(plan.getLineId())) {
+            validateLineSequence(planId, targetLineId, plan.getPlanSequence());
+        }
+
+        validateScheduleConflict(
+                planId,
+                targetLineId,
+                request.getPlannedStartAt(),
+                request.getPlannedEndAt()
+        );
+
+        plan.moveSchedule(
+                targetLineId,
+                request.getPlannedStartAt(),
+                request.getPlannedEndAt()
+        );
+
+        return PlanUpdateResponse.from(plan);
+    }
+
+    private void validateLineCapability(ProductionPlan plan, Long lineId) {
         boolean existsActiveLineCapability = productionPlanRepository.existsActiveLineCapability(
-                request.getLineId(),
+                lineId,
                 plan.getProductId()
         );
 
@@ -295,6 +350,34 @@ public class PlanService {
 
         if (!existsActiveOperator) {
             throw new CustomException(ErrorCode.OPERATOR_NOT_FOUND);
+        }
+    }
+
+    private void validateLineSequence(Long planId, PlanUpdateRequest request) {
+        validateLineSequence(planId, request.getLineId(), request.getPlanSequence());
+    }
+
+    private void validateLineSequence(Long planId, Long lineId, Integer planSequence) {
+        boolean existsSameLineSequence =
+                productionPlanRepository.existsByLineIdAndPlanIdNotAndPlanSequence(
+                        lineId,
+                        planId,
+                        planSequence
+                );
+
+        if (existsSameLineSequence) {
+            throw new CustomException(ErrorCode.BAD_REQUEST);
+        }
+    }
+
+    private void validateScheduleMoveRequest(PlanScheduleUpdateRequest request) {
+        if (request.getPlannedStartAt() == null
+                || request.getPlannedEndAt() == null) {
+            throw new CustomException(ErrorCode.BAD_REQUEST);
+        }
+
+        if (!request.getPlannedStartAt().isBefore(request.getPlannedEndAt())) {
+            throw new CustomException(ErrorCode.BAD_REQUEST);
         }
     }
 
@@ -381,17 +464,31 @@ public class PlanService {
      * - 일정 충돌이 있으면 BAD_REQUEST 예외를 발생시킨다.
      */
     private void validateScheduleConflict(Long planId, PlanUpdateRequest request) {
+        validateScheduleConflict(
+                planId,
+                request.getLineId(),
+                request.getPlannedStartAt(),
+                request.getPlannedEndAt()
+        );
+    }
+
+    private void validateScheduleConflict(
+            Long planId,
+            Long lineId,
+            OffsetDateTime plannedStartAt,
+            OffsetDateTime plannedEndAt
+    ) {
         boolean existsConflict =
                 productionPlanRepository
                         .existsByLineIdAndPlanIdNotAndPlannedStartAtLessThanAndPlannedEndAtGreaterThan(
-                                request.getLineId(),
+                                lineId,
                                 planId,
-                                request.getPlannedEndAt(),
-                                request.getPlannedStartAt()
+                                plannedEndAt,
+                                plannedStartAt
                         );
 
         if (existsConflict) {
-            throw new CustomException(ErrorCode.BAD_REQUEST);
+            throw new CustomException(ErrorCode.PLAN_SCHEDULE_CONFLICT);
         }
     }
 }

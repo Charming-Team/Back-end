@@ -24,6 +24,12 @@ public interface ProductionPlanRepository extends JpaRepository<ProductionPlan, 
             OffsetDateTime plannedStartAt
     );
 
+    boolean existsByLineIdAndPlanIdNotAndPlanSequence(
+            Long lineId,
+            Long planId,
+            Integer planSequence
+    );
+
     @Query(
             value = """
                     SELECT EXISTS (

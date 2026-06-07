@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
+import s_map.server.domain.plan.dto.req.PlanScheduleUpdateRequest;
 import s_map.server.domain.plan.dto.req.PlanUpdateRequest;
 import s_map.server.domain.plan.dto.res.PlanUpdateResponse;
 import s_map.server.domain.plan.dto.res.CurrentPlanResponse;
@@ -114,14 +115,19 @@ public class PlanController {
     }
 
     @Operation(
-            summary = "생산계획 수정 요청 검증",
-            description = "생산계획 변경 요청값의 라인 생산 가능 여부, 담당자, 시간 충돌을 검증합니다. 현재 구현은 실제 DB 반영 없이 검증 결과만 반환합니다."
+            summary = "생산계획 수정",
+            description = """
+                    생산계획의 라인, 담당자, 계획 시작/종료 일시, 계획 수량, 라인 내 순서, 상태를 수정합니다.
+                    계획 ID, 주문 ID, 제품 ID, 생성일시는 수정할 수 없습니다.
+                    저장 전 라인 생산 가능 여부, 담당자, 라인 내 순서 중복, 시간 충돌을 검증합니다.
+                    """
     )
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "생산계획 수정 요청 검증 성공"),
-            @ApiResponse(responseCode = "400", description = "요청 값 검증 실패 또는 일정 충돌"),
+            @ApiResponse(responseCode = "200", description = "생산계획 수정 성공"),
+            @ApiResponse(responseCode = "400", description = "요청 값 검증 실패, 수정 불가능 상태 또는 라인 내 순서 중복"),
             @ApiResponse(responseCode = "401", description = "인증 필요"),
             @ApiResponse(responseCode = "404", description = "생산계획, 담당자 또는 생산 가능 라인 없음"),
+            @ApiResponse(responseCode = "409", description = "동일 라인 일정 충돌. 프론트엔드는 AI 분석 안내 창을 표시할 수 있습니다."),
             @ApiResponse(responseCode = "500", description = "서버 내부 오류")
     })
     @PatchMapping("/{planId}")
@@ -131,5 +137,31 @@ public class PlanController {
             @Valid @RequestBody PlanUpdateRequest request
     ) {
         return BaseResponse.success(planService.updatePlan(planId, request));
+    }
+
+    @Operation(
+            summary = "생산계획 일정 이동",
+            description = """
+                    캘린더 드래그 앤 드롭으로 생산계획의 라인과 계획 시작/종료 일시만 이동합니다.
+                    lineId를 전달하지 않으면 기존 라인을 유지합니다.
+                    이동 위치에 동일 라인의 다른 생산계획이 겹치면 저장하지 않고 409-601 충돌 응답을 반환합니다.
+                    프론트엔드는 이 충돌 응답을 기준으로 AI 분석 안내 창을 표시합니다.
+                    """
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "생산계획 일정 이동 성공"),
+            @ApiResponse(responseCode = "400", description = "요청 값 검증 실패 또는 수정 불가능 상태"),
+            @ApiResponse(responseCode = "401", description = "인증 필요"),
+            @ApiResponse(responseCode = "404", description = "생산계획 또는 생산 가능 라인 없음"),
+            @ApiResponse(responseCode = "409", description = "동일 라인 일정 충돌. AI 분석 안내 필요"),
+            @ApiResponse(responseCode = "500", description = "서버 내부 오류")
+    })
+    @PatchMapping("/{planId}/schedule")
+    public BaseResponse<PlanUpdateResponse> movePlanSchedule(
+            @Parameter(description = "생산계획 ID", example = "1")
+            @PathVariable Long planId,
+            @Valid @RequestBody PlanScheduleUpdateRequest request
+    ) {
+        return BaseResponse.success(planService.movePlanSchedule(planId, request));
     }
 }
