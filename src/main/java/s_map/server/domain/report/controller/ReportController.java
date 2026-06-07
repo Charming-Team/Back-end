@@ -5,8 +5,8 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import s_map.server.domain.report.dto.req.BusinessReportGenerateRequest;
 import s_map.server.domain.report.dto.req.ReportGenerateRequest;
 import s_map.server.domain.report.dto.res.ReportDetailResponse;
 import s_map.server.domain.report.dto.res.ReportGenerateStartResponse;
@@ -22,6 +23,7 @@ import s_map.server.domain.report.dto.res.ReportJobResponse;
 import s_map.server.domain.report.dto.res.ReportListResponse;
 import s_map.server.domain.report.service.ReportService;
 import s_map.server.global.common.BaseResponse;
+import s_map.server.global.common.PageResponse;
 import s_map.server.global.security.AuthUser;
 
 @Tag(name = "Report", description = "보고서 API")
@@ -50,6 +52,27 @@ public class ReportController {
             @RequestBody ReportGenerateRequest request
     ) {
         return BaseResponse.success(reportService.generateReport(authUser, request));
+    }
+
+    @Operation(
+            summary = "비즈니스 보고서 생성 요청",
+            description = "기존 보고서 ID를 기준으로 경영진용 비즈니스 보고서 생성 Job을 시작합니다. 응답의 reportJobId로 생성 상태를 조회합니다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "비즈니스 보고서 생성 작업 접수 성공"),
+            @ApiResponse(responseCode = "400", description = "비즈니스 보고서 요청 값 오류"),
+            @ApiResponse(responseCode = "401", description = "인증 필요"),
+            @ApiResponse(responseCode = "403", description = "보고서 접근 권한 없음"),
+            @ApiResponse(responseCode = "404", description = "원본 보고서 없음"),
+            @ApiResponse(responseCode = "500", description = "서버 내부 오류")
+    })
+    @PostMapping("/business")
+    public BaseResponse<ReportGenerateStartResponse> generateBusinessReport(
+            @Parameter(hidden = true)
+            @AuthenticationPrincipal AuthUser authUser,
+            @Valid @RequestBody BusinessReportGenerateRequest request
+    ) {
+        return BaseResponse.success(reportService.generateBusinessReport(authUser, request));
     }
 
     @Operation(
@@ -85,7 +108,7 @@ public class ReportController {
             @ApiResponse(responseCode = "500", description = "서버 내부 오류")
     })
     @GetMapping
-    public BaseResponse<Page<ReportListResponse>> getReports(
+    public BaseResponse<PageResponse<ReportListResponse>> getReports(
             @Parameter(hidden = true)
             @AuthenticationPrincipal AuthUser authUser,
             @Parameter(description = "페이지 번호, 0부터 시작", example = "0")
@@ -93,7 +116,7 @@ public class ReportController {
             @Parameter(description = "페이지 크기, 최대 100", example = "10")
             @RequestParam(defaultValue = "10") int size
     ) {
-        return BaseResponse.success(reportService.getReports(authUser, page, size));
+        return BaseResponse.success(PageResponse.from(reportService.getReports(authUser, page, size)));
     }
 
     @Operation(

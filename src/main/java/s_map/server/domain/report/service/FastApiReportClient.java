@@ -5,6 +5,8 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
+import s_map.server.domain.report.dto.fastapi.FastApiBusinessReportGenerateRequest;
+import s_map.server.domain.report.dto.fastapi.FastApiBusinessReportGenerateResponse;
 import s_map.server.domain.report.dto.fastapi.FastApiReportGenerateRequest;
 import s_map.server.domain.report.dto.fastapi.FastApiReportGenerateResponse;
 import s_map.server.global.error.CustomException;
@@ -14,8 +16,11 @@ import s_map.server.global.error.ErrorCode;
 @Component
 public class FastApiReportClient {
 
+    private static final String BUSINESS_REPORT_GENERATE_PATH = "/api/v1/business-reports/generate";
+
     private final RestTemplate restTemplate;
     private final String reportGenerateUrl;
+    private final String businessReportGenerateUrl;
 
     public FastApiReportClient(FastApiReportProperties properties) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
@@ -24,6 +29,7 @@ public class FastApiReportClient {
 
         this.restTemplate = new RestTemplate(factory);
         this.reportGenerateUrl = resolveUrl(properties.getBaseUrl(), properties.getReportGeneratePath());
+        this.businessReportGenerateUrl = resolveUrl(properties.getBaseUrl(), BUSINESS_REPORT_GENERATE_PATH);
     }
 
     /**
@@ -68,6 +74,59 @@ public class FastApiReportClient {
         } catch (RestClientException exception) {
             log.error(
                     "[FastApiReportClient] FastAPI 보고서 생성 요청 실패 reason=rest_client_exception",
+                    exception
+            );
+            throw new CustomException(ErrorCode.REPORT_FASTAPI_CALL_FAILED, resolveRestClientMessage(exception));
+        }
+    }
+
+    /**
+     * 기능: FastAPI 비즈니스 보고서 생성 API를 호출하고 응답 DTO로 변환한다.
+     *
+     * Input:
+     * - request / FastApiBusinessReportGenerateRequest / 원본 보고서 ID
+     *
+     * Output:
+     * - response / FastApiBusinessReportGenerateResponse / FastAPI 비즈니스 보고서 생성 결과
+     */
+    public FastApiBusinessReportGenerateResponse generateBusinessReport(
+            FastApiBusinessReportGenerateRequest request
+    ) {
+        if (request == null || request.getReportId() == null) {
+            throw new CustomException(ErrorCode.INVALID_REPORT_REQUEST, "FastAPI 비즈니스 보고서 생성 요청은 필수입니다.");
+        }
+
+        try {
+            log.info(
+                    "[FastApiReportClient] FastAPI 비즈니스 보고서 생성 요청 시작 sourceReportId={} url={}",
+                    request.getReportId(),
+                    businessReportGenerateUrl
+            );
+
+            FastApiBusinessReportGenerateResponse response =
+                    restTemplate.postForObject(
+                            businessReportGenerateUrl,
+                            request,
+                            FastApiBusinessReportGenerateResponse.class
+                    );
+
+            if (response == null) {
+                throw new CustomException(
+                        ErrorCode.REPORT_FASTAPI_INVALID_RESPONSE,
+                        "AI 서버 비즈니스 보고서 응답이 비어 있습니다."
+                );
+            }
+
+            log.info(
+                    "[FastApiReportClient] FastAPI 비즈니스 보고서 생성 응답 수신 sourceReportId={} reportType={}",
+                    request.getReportId(),
+                    response.getReportType()
+            );
+
+            return response;
+        } catch (RestClientException exception) {
+            log.error(
+                    "[FastApiReportClient] FastAPI 비즈니스 보고서 생성 요청 실패 reason=rest_client_exception",
                     exception
             );
             throw new CustomException(ErrorCode.REPORT_FASTAPI_CALL_FAILED, resolveRestClientMessage(exception));

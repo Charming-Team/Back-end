@@ -48,6 +48,18 @@ public class LineService {
     private final ProductionMachineRepository productionMachineRepository;
     private final MachineStatusRepository machineStatusRepository;
 
+    /**
+     * 기능: 라인별 최신 가동 상태 목록을 페이지 단위로 조회한다.
+     *
+     * Input:
+     * - page / int / 조회할 페이지 번호
+     * - size / int / 한 페이지에 조회할 라인 수
+     * - lineId / Long / 특정 라인 ID, 없으면 전체 라인 조회
+     * - status / OperationStatus / 조회할 라인 가동 상태, 없으면 전체 상태 조회
+     *
+     * Output:
+     * - result / Page<LineOperationStatusResponse> / 라인별 가동률, 상태, 최신 상태 시각 목록 페이지
+     */
     public Page<LineOperationStatusResponse> getLineOperationStatuses(
             int page,
             int size,
@@ -68,6 +80,15 @@ public class LineService {
         }
     }
 
+    /**
+     * 기능: 특정 라인 또는 전체 라인의 설비별 최신 가동 상태를 조회한다.
+     *
+     * Input:
+     * - lineId / Long / 조회할 라인 ID, 없으면 전체 라인의 설비 상태 조회
+     *
+     * Output:
+     * - result / List<LineMachineOperationStatusResponse> / 라인별 설비 가동 상태 목록
+     */
     public List<LineMachineOperationStatusResponse> getMachineOperationStatuses(Long lineId) {
         try {
             validateLineExists(lineId);
@@ -108,6 +129,17 @@ public class LineService {
         }
     }
 
+    /**
+     * 기능: 라인 현황에서 생산 주문을 검색한다.
+     *
+     * Input:
+     * - page / int / 조회할 페이지 번호
+     * - size / int / 한 페이지에 조회할 주문 수
+     * - keyword / String / 주문번호, 고객명, 제품명 검색어
+     *
+     * Output:
+     * - result / Page<LineOrderSearchResponse> / 라인 배정 현황 확인용 주문 검색 결과 페이지
+     */
     public Page<LineOrderSearchResponse> searchOrders(
             int page,
             int size,
@@ -124,6 +156,15 @@ public class LineService {
         }
     }
 
+    /**
+     * 기능: 특정 주문의 라인별 생산 배분 현황을 조회한다.
+     *
+     * Input:
+     * - orderId / Long / 조회할 주문 고유 ID
+     *
+     * Output:
+     * - result / LineOrderDistributionResponse / 주문 요약과 라인별 생산 계획, 진행률, 상태 목록
+     */
     public LineOrderDistributionResponse getOrderDistribution(Long orderId) {
         try {
             LineOrderDistributionSummaryProjection summary =

@@ -8,6 +8,7 @@ import s_map.server.domain.material.dto.res.MaterialUsageResponse;
 import s_map.server.domain.material.dto.req.MaterialInventoryUpdateRequest;
 import s_map.server.domain.material.service.MaterialService;
 import s_map.server.global.common.BaseResponse;
+import s_map.server.global.common.PageResponse;
 import s_map.server.domain.material.dto.res.MaterialShortageResponse;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -18,7 +19,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
-import org.springframework.data.domain.Page;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -69,13 +69,13 @@ public class MaterialController {
             @ApiResponse(responseCode = "500", description = "서버 내부 오류")
     })
     @GetMapping
-    public BaseResponse<Page<MaterialResponse>> getMaterials(
+    public BaseResponse<PageResponse<MaterialResponse>> getMaterials(
             @Parameter(description = "페이지 번호, 0부터 시작", example = "0")
             @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "페이지 크기, 최대 100", example = "10")
             @RequestParam(defaultValue = "10") int size
     ) {
-        return BaseResponse.success(materialService.getMaterials(page, size));
+        return BaseResponse.success(PageResponse.from(materialService.getMaterials(page, size)));
     }
 
     @Operation(

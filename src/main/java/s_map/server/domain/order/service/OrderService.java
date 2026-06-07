@@ -70,6 +70,22 @@ public class OrderService {
     private final OrderNoSequenceRepository orderNoSequenceRepository;
     private final UserRepository userRepository;
 
+    /**
+     * 기능: 주문 목록을 검색 조건과 페이지 조건에 맞춰 조회한다.
+     *
+     * Input:
+     * - page / int / 조회할 페이지 번호
+     * - size / int / 한 페이지에 조회할 주문 수
+     * - keyword / String / 주문번호, 제품명, 고객명 검색어
+     * - status / OrderStatus / 주문 상태 필터
+     * - customerName / String / 고객사명 필터
+     * - productId / Long / 제품 고유 ID 필터
+     * - dueDateFrom / LocalDate / 납기 시작일 필터
+     * - dueDateTo / LocalDate / 납기 종료일 필터
+     *
+     * Output:
+     * - result / Page<OrderListResponse> / 주문 목록과 진행률, 납기 상태를 포함한 페이지 응답
+     */
     public Page<OrderListResponse> getOrders(
             int page,
             int size,
@@ -131,6 +147,15 @@ public class OrderService {
                 .map(OrderListResponse::from);
     }
 
+    /**
+     * 기능: 특정 주문의 상세 정보와 생산계획 진행 현황을 조회한다.
+     *
+     * Input:
+     * - orderId / Long / 조회할 주문 고유 ID
+     *
+     * Output:
+     * - result / OrderDetailResponse / 주문 기본 정보, 제품 정보, 생산계획, 진행률, 상태 정보
+     */
     public OrderDetailResponse getOrder(Long orderId) {
         LocalDate today = LocalDate.now(DEFAULT_PRODUCTION_ZONE);
         OffsetDateTime now = OffsetDateTime.now(DEFAULT_PRODUCTION_ZONE);
@@ -140,6 +165,15 @@ public class OrderService {
                 .orElseThrow(() -> new CustomException(ErrorCode.ORDER_NOT_FOUND));
     }
 
+    /**
+     * 기능: 오늘 날짜 기준 다음 주문번호를 미리 생성해 반환한다.
+     *
+     * Input:
+     * - 없음
+     *
+     * Output:
+     * - result / OrderNoPreviewResponse / 저장 전 화면 표시용 다음 주문번호
+     */
     public OrderNoPreviewResponse getNextOrderNoPreview() {
         LocalDate today = LocalDate.now(DEFAULT_PRODUCTION_ZONE);
         int latestPersistedSequence = findLatestPersistedOrderNoSequence(today);
@@ -150,6 +184,26 @@ public class OrderService {
         return OrderNoPreviewResponse.preview(formatOrderNo(today, previewSequence));
     }
 
+    /**
+     * 기능: 신규 주문을 등록하고 생산 가능한 최적 라인에 초기 생산계획을 생성한다.
+     *
+     * Input:
+     * - request / OrderCreateRequest / 주문 생성 요청 값
+     * - request.productId / Long / 생산할 제품 고유 ID
+     * - request.orderQuantity / Integer / 주문 수량
+     * - request.customerName / String / 고객사명
+     * - request.customerContactName / String / 고객 담당자명
+     * - request.dueDate / LocalDate / 납기일
+     * - request.contractAmount / BigDecimal / 계약 금액
+     * - request.latePenaltyAmount / BigDecimal / 지연 패널티 금액
+     * - request.operatorId / Long / 담당 작업자 ID
+     * - request.operatorName / String / 담당 작업자명
+     * - request.desiredStartAt / OffsetDateTime / 희망 생산 시작 시각
+     * - request.productionStartDate / LocalDate / 희망 생산 시작일
+     *
+     * Output:
+     * - result / OrderCreateResponse / 생성된 주문과 초기 생산계획 정보
+     */
     @Transactional
     public OrderCreateResponse createOrder(OrderCreateRequest request) {
         try {

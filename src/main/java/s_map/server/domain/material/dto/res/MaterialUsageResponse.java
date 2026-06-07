@@ -1,10 +1,11 @@
 package s_map.server.domain.material.dto.res;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import org.springframework.data.domain.Page;
 import s_map.server.domain.material.entity.Material;
 import s_map.server.domain.material.entity.MaterialInventory;
 import s_map.server.domain.material.entity.ProductionPlanMaterial;
+import s_map.server.global.common.PageResponse;
+import org.springframework.data.domain.Page;
 
 import java.math.BigDecimal;
 
@@ -47,7 +48,7 @@ public record MaterialUsageResponse(
         BigDecimal totalShortageQuantity,
 
         @Schema(description = "생산계획별 자재 사용량 페이지")
-        Page<MaterialUsageItemResponse> usages
+        PageResponse<MaterialUsageItemResponse> usages
 ) {
 
     public static MaterialUsageResponse from(
@@ -56,7 +57,9 @@ public record MaterialUsageResponse(
             MaterialUsageTotals totals,
             Page<ProductionPlanMaterial> planMaterials
     ) {
-        Page<MaterialUsageItemResponse> usages = planMaterials.map(MaterialUsageItemResponse::from);
+        PageResponse<MaterialUsageItemResponse> usages = PageResponse.from(
+                planMaterials.map(MaterialUsageItemResponse::from)
+        );
 
         return new MaterialUsageResponse(
                 material.getMaterialId(),
