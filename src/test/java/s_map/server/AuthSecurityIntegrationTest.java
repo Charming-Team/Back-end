@@ -894,6 +894,41 @@ class AuthSecurityIntegrationTest {
     }
 
     @Nested
+    @DisplayName("생산계획 변경 권한")
+    class PlanMutationAuthorization {
+
+        @ParameterizedTest
+        @EnumSource(value = Role.class, names = {"OPERATOR"}, mode = Mode.EXCLUDE)
+        @DisplayName("작업자가 아닌 사용자는 생산계획 수정 API에 접근할 수 있다")
+        void nonOperatorCanReachPlanUpdateValidation(Role role) throws Exception {
+            String accessToken = loginAndGetAccessToken(saveUser(role, role.name().toLowerCase() + "@sk.com", PASSWORD));
+
+            mockMvc.perform(MockMvcRequestBuilders.patch("/api/plans/{planId}", 1L)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{}"))
+                    .andExpect(MockMvcResultMatchers.status().isBadRequest())
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(false))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("400-001"));
+        }
+
+        @Test
+        @DisplayName("작업자는 생산계획 수정 API에 접근할 수 없다")
+        void operatorCannotAccessPlanUpdate() throws Exception {
+            String accessToken = loginAndGetAccessToken(saveUser(Role.OPERATOR, "operator@sk.com", PASSWORD));
+
+            mockMvc.perform(MockMvcRequestBuilders.patch("/api/plans/{planId}", 1L)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{}"))
+                    .andExpect(MockMvcResultMatchers.status().isForbidden())
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(false))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("403"));
+        }
+
+    }
+
+    @Nested
     @DisplayName("자재 변경 권한")
     class MaterialMutationAuthorization {
 

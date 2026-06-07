@@ -56,6 +56,12 @@ public class SecurityConfig {
             "/api/materials/**"
     };
 
+    private static final String[] PLAN_WRITE_ROLES = {
+            "ADMIN",
+            "EXECUTIVE",
+            "MANUFACTURING_MANAGER"
+    };
+
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
     private final JwtAccessDeniedHandler jwtAccessDeniedHandler;
@@ -88,6 +94,10 @@ public class SecurityConfig {
                         .hasAnyRole("ADMIN", "EXECUTIVE", "MANUFACTURING_MANAGER")
                         .requestMatchers(HttpMethod.POST, "/api/orders")
                         .hasRole("MANUFACTURING_MANAGER")
+                        .requestMatchers(HttpMethod.POST, "/api/plans/simulations/**")
+                        .hasAnyRole(PLAN_WRITE_ROLES)
+                        .requestMatchers(HttpMethod.PATCH, "/api/plans/**")
+                        .hasAnyRole(PLAN_WRITE_ROLES)
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
