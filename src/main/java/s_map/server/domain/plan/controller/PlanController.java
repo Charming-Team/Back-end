@@ -240,7 +240,8 @@ public class PlanController {
                     CSV 또는 XLSX 생산계획 파일을 검증한 뒤 production_plans에 반영합니다.
                     검증 오류가 있으면 DB에 반영하지 않고 applied=false 응답을 반환합니다.
                     INITIAL_REGISTER는 현재 운영 생산계획이 없을 때 신규 등록합니다.
-                    FULL_REPLACE는 현재 운영 생산계획을 CANCELLED로 변경한 뒤 업로드 파일 기준 신규 계획을 생성합니다.
+                    FULL_REPLACE는 현재 운영 생산계획을 이력으로 백업하고 운영 해제한 뒤 업로드 파일 기준 신규 계획을 생성합니다.
+                    성공한 FULL_REPLACE 응답에는 롤백 기준 스냅샷 ID가 포함됩니다.
                     estimated_duration_hr와 plan_status 파일 값은 반영하지 않고, 예상 소요 시간은 기준 데이터로 계산하며 상태는 SCHEDULED로 등록합니다.
                     """
     )

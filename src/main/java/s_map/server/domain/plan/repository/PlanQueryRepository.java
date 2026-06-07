@@ -31,6 +31,7 @@ public class PlanQueryRepository {
     ) {
         MapSqlParameterSource params = new MapSqlParameterSource();
         List<String> conditions = new ArrayList<>();
+        conditions.add("pp.is_current = true");
 
         if (status != null) {
             conditions.add("CAST(pp.plan_status AS varchar) = :status");
@@ -75,7 +76,8 @@ public class PlanQueryRepository {
 
     public Optional<PlanRow> findPlanById(Long planId) {
         String sql = baseSelectSql()
-                + " WHERE pp.plan_id = :planId";
+                + " WHERE pp.plan_id = :planId"
+                + " AND pp.is_current = true";
 
         List<PlanRow> rows = jdbcTemplate.query(
                 sql,

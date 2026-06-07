@@ -1,11 +1,13 @@
 package s_map.server.domain.order.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import s_map.server.domain.order.entity.PlanStatus;
 import s_map.server.domain.order.entity.ProductionPlan;
 
+import jakarta.persistence.LockModeType;
 import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.List;
@@ -13,25 +15,26 @@ import java.util.Optional;
 
 public interface ProductionPlanRepository extends JpaRepository<ProductionPlan, Long> {
 
-    List<ProductionPlan> findAllByOrderByPlannedStartAtAsc();
+    List<ProductionPlan> findByCurrentTrueOrderByPlannedStartAtAsc();
 
-    List<ProductionPlan> findByPlannedStartAtLessThanAndPlannedEndAtGreaterThanOrderByPlannedStartAtAsc(
+    List<ProductionPlan> findByCurrentTrueAndPlannedStartAtLessThanAndPlannedEndAtGreaterThanOrderByPlannedStartAtAsc(
             OffsetDateTime endExclusive,
             OffsetDateTime startInclusive
     );
 
-    long countByPlanStatusIn(Collection<PlanStatus> planStatuses);
+    long countByCurrentTrueAndPlanStatusIn(Collection<PlanStatus> planStatuses);
 
-    List<ProductionPlan> findByPlanStatusIn(Collection<PlanStatus> planStatuses);
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    List<ProductionPlan> findByCurrentTrueAndPlanStatusInOrderByPlanIdAsc(Collection<PlanStatus> planStatuses);
 
-    boolean existsByLineIdAndPlanIdNotAndPlannedStartAtLessThanAndPlannedEndAtGreaterThan(
+    boolean existsByCurrentTrueAndLineIdAndPlanIdNotAndPlannedStartAtLessThanAndPlannedEndAtGreaterThan(
             Long lineId,
             Long planId,
             OffsetDateTime plannedEndAt,
             OffsetDateTime plannedStartAt
     );
 
-    boolean existsByLineIdAndPlanIdNotAndPlanSequence(
+    boolean existsByCurrentTrueAndLineIdAndPlanIdNotAndPlanSequence(
             Long lineId,
             Long planId,
             Integer planSequence
@@ -140,7 +143,8 @@ public interface ProductionPlanRepository extends JpaRepository<ProductionPlan, 
                         FROM production_plans pp
                         JOIN assignable_lines al
                             ON al.line_id = pp.line_id
-                        WHERE CAST(pp.plan_status AS varchar) <> 'CANCELLED'
+                        WHERE pp.is_current = true
+                          AND CAST(pp.plan_status AS varchar) <> 'CANCELLED'
                         GROUP BY pp.line_id
                     ),
                     last_sequences AS (
@@ -150,6 +154,7 @@ public interface ProductionPlanRepository extends JpaRepository<ProductionPlan, 
                         FROM production_plans pp
                         JOIN assignable_lines al
                             ON al.line_id = pp.line_id
+                        WHERE pp.is_current = true
                         GROUP BY pp.line_id
                     )
                     SELECT

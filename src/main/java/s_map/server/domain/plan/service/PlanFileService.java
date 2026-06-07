@@ -18,8 +18,12 @@ import s_map.server.domain.plan.dto.res.PlanFileApplyResponse;
 import s_map.server.domain.plan.dto.res.PlanFileDownload;
 import s_map.server.domain.plan.dto.res.PlanFileValidationErrorResponse;
 import s_map.server.domain.plan.dto.res.PlanFileValidationResponse;
+import s_map.server.domain.plan.entity.PlanFileApplyHistory;
+import s_map.server.domain.plan.entity.ProductionPlanHistory;
+import s_map.server.domain.plan.repository.PlanFileApplyHistoryRepository;
 import s_map.server.domain.plan.repository.PlanQueryRepository;
 import s_map.server.domain.plan.repository.PlanRow;
+import s_map.server.domain.plan.repository.ProductionPlanHistoryRepository;
 import s_map.server.domain.user.entity.Role;
 import s_map.server.domain.user.entity.UserStatus;
 import s_map.server.domain.user.repository.UserRepository;
@@ -52,6 +56,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.UUID;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
@@ -109,6 +114,8 @@ public class PlanFileService {
     private final ProductionPlanRepository productionPlanRepository;
     private final CustomerOrderRepository customerOrderRepository;
     private final UserRepository userRepository;
+    private final PlanFileApplyHistoryRepository planFileApplyHistoryRepository;
+    private final ProductionPlanHistoryRepository productionPlanHistoryRepository;
 
     /**
      * [기능]
@@ -182,7 +189,8 @@ public class PlanFileService {
      * [Process]
      * - 파일 검증 결과 오류가 있으면 DB에 반영하지 않는다.
      * - 최초 등록은 현재 운영 계획이 없을 때만 신규 생산계획을 저장한다.
-     * - 전체 교체는 기존 운영 계획을 CANCELLED로 변경한 뒤 업로드 파일 기준 신규 생산계획을 저장한다.
+     * - 전체 교체는 기존 운영 계획을 이력 스냅샷으로 저장한 뒤 운영 해제하고 신규 생산계획을 저장한다.
+     * - 반영 성공/실패와 롤백 기준점은 파일 반영 이력으로 저장한다.
      * - 예상 소요 시간은 product_line_capabilities 기준으로 계산한다.
      * - 계획 상태는 사용자 입력값을 무시하고 SCHEDULED로 등록한다.
      *
@@ -193,13 +201,37 @@ public class PlanFileService {
     @Transactional
     public PlanFileApplyResponse applyPlanFile(MultipartFile file, PlanFileApplyMode mode) {
         ValidationResult validation = validate(file, mode);
+        PlanFileApplyMode resolvedMode = validation.response().getMode();
         if (!validation.response().isCanApply()) {
-            return PlanFileApplyResponse.notApplied(mode, validation.response());
+            PlanFileApplyHistory history = planFileApplyHistoryRepository.saveAndFlush(
+                    PlanFileApplyHistory.notApplied(resolvedMode, validation.response())
+            );
+            return PlanFileApplyResponse.notApplied(resolvedMode, validation.response(), history);
         }
 
-        if (mode == PlanFileApplyMode.FULL_REPLACE) {
-            productionPlanRepository.findByPlanStatusIn(OPERATING_STATUSES)
-                    .forEach(ProductionPlan::cancel);
+        PlanFileApplyHistory history = planFileApplyHistoryRepository.saveAndFlush(
+                PlanFileApplyHistory.pending(resolvedMode, validation.response())
+        );
+        String rollbackSnapshotId = null;
+        int backedUpRows = 0;
+
+        if (resolvedMode == PlanFileApplyMode.FULL_REPLACE) {
+            List<ProductionPlan> operatingPlans =
+                    productionPlanRepository.findByCurrentTrueAndPlanStatusInOrderByPlanIdAsc(OPERATING_STATUSES);
+            String snapshotId = UUID.randomUUID().toString();
+            List<ProductionPlanHistory> snapshots = operatingPlans.stream()
+                    .map(plan -> ProductionPlanHistory.snapshotOf(
+                            history.getApplyHistoryId(),
+                            snapshotId,
+                            plan
+                    ))
+                    .toList();
+
+            rollbackSnapshotId = snapshotId;
+            productionPlanHistoryRepository.saveAll(snapshots);
+            operatingPlans.forEach(ProductionPlan::archiveForReplacement);
+            productionPlanRepository.flush();
+            backedUpRows = snapshots.size();
         }
 
         List<ProductionPlan> plans = validation.rows()
@@ -208,8 +240,9 @@ public class PlanFileService {
                 .toList();
 
         productionPlanRepository.saveAll(plans);
+        history.complete(rollbackSnapshotId, backedUpRows, plans.size());
 
-        return PlanFileApplyResponse.applied(mode, validation.response(), plans.size());
+        return PlanFileApplyResponse.applied(resolvedMode, validation.response(), plans.size(), history);
     }
 
     private ValidationResult validate(MultipartFile file, PlanFileApplyMode mode) {
@@ -259,7 +292,7 @@ public class PlanFileService {
             PlanFileApplyMode mode,
             List<PlanFileValidationErrorResponse> errors
     ) {
-        long operatingPlanCount = productionPlanRepository.countByPlanStatusIn(OPERATING_STATUSES);
+        long operatingPlanCount = productionPlanRepository.countByCurrentTrueAndPlanStatusIn(OPERATING_STATUSES);
 
         if (mode == PlanFileApplyMode.INITIAL_REGISTER && operatingPlanCount > 0) {
             errors.add(createError(
