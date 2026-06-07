@@ -56,6 +56,18 @@ public class SecurityConfig {
             "/api/materials/**"
     };
 
+    private static final String[] PLAN_FILE_PATHS = {
+            "/api/plans/files/export",
+            "/api/plans/files/validate",
+            "/api/plans/files/apply"
+    };
+
+    private static final String[] PLAN_WRITE_ROLES = {
+            "ADMIN",
+            "EXECUTIVE",
+            "MANUFACTURING_MANAGER"
+    };
+
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
     private final JwtAccessDeniedHandler jwtAccessDeniedHandler;
@@ -88,6 +100,14 @@ public class SecurityConfig {
                         .hasAnyRole("ADMIN", "EXECUTIVE", "MANUFACTURING_MANAGER")
                         .requestMatchers(HttpMethod.POST, "/api/orders")
                         .hasRole("MANUFACTURING_MANAGER")
+                        .requestMatchers(HttpMethod.GET, PLAN_FILE_PATHS)
+                        .hasAnyRole(PLAN_WRITE_ROLES)
+                        .requestMatchers(HttpMethod.POST, PLAN_FILE_PATHS)
+                        .hasAnyRole(PLAN_WRITE_ROLES)
+                        .requestMatchers(HttpMethod.POST, "/api/plans/simulations/**")
+                        .hasAnyRole(PLAN_WRITE_ROLES)
+                        .requestMatchers(HttpMethod.PATCH, "/api/plans/**")
+                        .hasAnyRole(PLAN_WRITE_ROLES)
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
