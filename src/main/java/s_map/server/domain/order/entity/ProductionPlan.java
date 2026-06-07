@@ -124,4 +124,36 @@ public class ProductionPlan extends BaseEntity {
                 .planStatus(PlanStatus.SCHEDULED)
                 .build();
     }
+
+    public void updatePlan(
+            Long lineId,
+            Long operatorId,
+            OffsetDateTime plannedStartAt,
+            OffsetDateTime plannedEndAt,
+            Integer plannedQuantity,
+            Integer planSequence,
+            PlanStatus planStatus
+    ) {
+        this.lineId = lineId;
+        this.operatorId = operatorId;
+        this.plannedStartAt = plannedStartAt;
+        this.plannedEndAt = plannedEndAt;
+        this.plannedQuantity = plannedQuantity;
+        this.planSequence = planSequence;
+        this.planStatus = planStatus;
+    }
+
+    public void moveSchedule(
+            Long lineId,
+            OffsetDateTime plannedStartAt,
+            OffsetDateTime plannedEndAt
+    ) {
+        this.lineId = lineId;
+        this.plannedStartAt = plannedStartAt;
+        this.plannedEndAt = plannedEndAt;
+    }
+
+    public void cancel() {
+        this.planStatus = PlanStatus.CANCELLED;
+    }
 }
