@@ -21,6 +21,17 @@ public class PlanSimulationService {
     /**
      * [기능]
      * 생산계획 시뮬레이션 결과 목록을 조회한다.
+     *
+     * [Input]
+     * - 없음
+     *
+     * [Process]
+     * - schedule_simulation_results 테이블에서 시뮬레이션 결과 목록을 조회한다.
+     * - 조회 결과를 시뮬레이션 목록 응답 DTO로 반환한다.
+     *
+     * [Output]
+     * - List<PlanSimulationListResponse>
+     * - 시뮬레이션 ID, 적용 전후 지표, 생성 시각 등 목록 표시 정보를 반환한다.
      */
     public List<PlanSimulationListResponse> getSimulations() {
         return planSimulationRepository.findAllSimulations();
