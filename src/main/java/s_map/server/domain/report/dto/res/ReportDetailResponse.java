@@ -83,6 +83,16 @@ public class ReportDetailResponse {
         String markdown = extractMarkdown(report.getReportContent());
         ReportStructuredData structuredData = ReportStructuredData.from(report, markdown);
 
+        return from(report, authorName, structuredData);
+    }
+
+    public static ReportDetailResponse from(
+            Report report,
+            String authorName,
+            ReportStructuredData structuredData
+    ) {
+        String markdown = extractMarkdown(report.getReportContent());
+
         return ReportDetailResponse.builder()
                 .reportId(report.getReportId())
                 .title(report.getReportTitle())

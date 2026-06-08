@@ -140,4 +140,26 @@ public class ReportController {
     ) {
         return BaseResponse.success(reportService.getReport(authUser, reportId));
     }
+
+    @Operation(
+            summary = "보고서 상세 화면 구조화 데이터 보정",
+            description = "기존 보고서에 상세 화면용 구조화 데이터가 없을 때 현재 DB 집계 기준으로 생성하여 저장합니다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "보고서 구조화 데이터 보정 성공"),
+            @ApiResponse(responseCode = "400", description = "보고서 ID 오류"),
+            @ApiResponse(responseCode = "401", description = "인증 필요"),
+            @ApiResponse(responseCode = "403", description = "보고서 접근 권한 없음"),
+            @ApiResponse(responseCode = "404", description = "보고서 없음"),
+            @ApiResponse(responseCode = "500", description = "서버 내부 오류")
+    })
+    @PostMapping("/{reportId}/structured-data/backfill")
+    public BaseResponse<ReportDetailResponse> backfillReportStructuredData(
+            @Parameter(hidden = true)
+            @AuthenticationPrincipal AuthUser authUser,
+            @Parameter(description = "보고서 ID", example = "1")
+            @PathVariable Long reportId
+    ) {
+        return BaseResponse.success(reportService.backfillReportStructuredData(authUser, reportId));
+    }
 }

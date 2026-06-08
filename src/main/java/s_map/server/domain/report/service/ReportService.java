@@ -19,6 +19,7 @@ import s_map.server.domain.report.dto.res.ReportDetailResponse;
 import s_map.server.domain.report.dto.res.ReportGenerateStartResponse;
 import s_map.server.domain.report.dto.res.ReportJobResponse;
 import s_map.server.domain.report.dto.res.ReportListResponse;
+import s_map.server.domain.report.dto.res.ReportStructuredData;
 import s_map.server.domain.report.entity.Report;
 import s_map.server.domain.report.entity.ReportJob;
 import s_map.server.domain.report.entity.ReportType;
@@ -50,6 +51,7 @@ public class ReportService {
     private final ReportJobRepository reportJobRepository;
     private final UserRepository userRepository;
     private final ReportAsyncService reportAsyncService;
+    private final ReportStructuredDataService reportStructuredDataService;
     private final ObjectMapper objectMapper;
 
     /**
@@ -199,8 +201,33 @@ public class ReportService {
         Report report = reportRepository.findById(reportId)
                 .orElseThrow(() -> new CustomException(ErrorCode.REPORT_NOT_FOUND));
         String authorName = findAuthorName(report.getAuthorId());
+        ReportStructuredData structuredData = reportStructuredDataService.resolve(report);
 
-        return ReportDetailResponse.from(report, authorName);
+        return ReportDetailResponse.from(report, authorName, structuredData);
+    }
+
+    /**
+     * 기능: 기존 레거시 보고서의 상세 화면 구조화 데이터를 DB 현재 집계 기준으로 생성하여 저장한다.
+     *
+     * Input:
+     * - authUser / AuthUser / JWT에서 추출한 로그인 사용자 ID, 이메일, Role
+     * - reportId / Long / 구조화 데이터를 보정할 보고서 ID
+     *
+     * Output:
+     * - result / ReportDetailResponse / 보정 후 상세 응답
+     */
+    @Transactional
+    public ReportDetailResponse backfillReportStructuredData(AuthUser authUser, Long reportId) {
+        getAuthorizedReportUser(authUser);
+        validatePositiveId(reportId, "reportId");
+
+        Report report = reportRepository.findById(reportId)
+                .orElseThrow(() -> new CustomException(ErrorCode.REPORT_NOT_FOUND));
+        ReportStructuredData structuredData = reportStructuredDataService.createFromCurrentDatabase(report);
+        report.updateIncludedItems(objectMapper.valueToTree(structuredData));
+
+        String authorName = findAuthorName(report.getAuthorId());
+        return ReportDetailResponse.from(report, authorName, structuredData);
     }
 
     private void validateGenerateRequest(ReportGenerateRequest request) {
