@@ -8,6 +8,7 @@ import s_map.server.domain.report.entity.Report;
 import s_map.server.domain.report.entity.ReportJob;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @Getter
 @Builder
@@ -38,6 +39,18 @@ public class ReportGenerateResponse {
     @Schema(description = "보고서 상세 화면 섹션 데이터")
     private Object sections;
 
+    @Schema(description = "주요 요약 표 행 목록")
+    private List<ReportStructuredData.SummaryRow> summaryRows;
+
+    @Schema(description = "라인별 성과 표 행 목록")
+    private List<ReportStructuredData.LineRow> lineRows;
+
+    @Schema(description = "주요 설비 현황 표 행 목록")
+    private List<ReportStructuredData.EquipmentRow> equipmentRows;
+
+    @Schema(description = "보고서 요약 및 분석 데이터")
+    private ReportStructuredData.Analysis analysis;
+
     @Schema(description = "보고서 생성 근거 데이터")
     private Object evidence;
 
@@ -59,6 +72,9 @@ public class ReportGenerateResponse {
     }
 
     public static ReportGenerateResponse of(Report report, ReportJob reportJob) {
+        String markdown = extractMarkdown(report.getReportContent());
+        ReportStructuredData structuredData = ReportStructuredData.from(report, markdown);
+
         return ReportGenerateResponse.builder()
                 .reportId(report.getReportId())
                 .reportJobId(reportJob.getJobId())
@@ -68,8 +84,12 @@ public class ReportGenerateResponse {
                 .targetStartDate(report.getTargetStartDate())
                 .targetEndDate(report.getTargetEndDate())
                 .sections(report.getIncludedItems())
+                .summaryRows(structuredData.summaryRows())
+                .lineRows(structuredData.lineRows())
+                .equipmentRows(structuredData.equipmentRows())
+                .analysis(structuredData.analysis())
                 .evidence(report.getReportEvidence())
-                .markdown(extractMarkdown(report.getReportContent()))
+                .markdown(markdown)
                 .build();
     }
 }

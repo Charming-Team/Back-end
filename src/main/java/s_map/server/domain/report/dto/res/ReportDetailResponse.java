@@ -43,6 +43,18 @@ public class ReportDetailResponse {
     @Schema(description = "보고서 상세 화면 섹션 데이터")
     private Object sections;
 
+    @Schema(description = "주요 요약 표 행 목록")
+    private List<ReportStructuredData.SummaryRow> summaryRows;
+
+    @Schema(description = "라인별 성과 표 행 목록")
+    private List<ReportStructuredData.LineRow> lineRows;
+
+    @Schema(description = "주요 설비 현황 표 행 목록")
+    private List<ReportStructuredData.EquipmentRow> equipmentRows;
+
+    @Schema(description = "보고서 요약 및 분석 데이터")
+    private ReportStructuredData.Analysis analysis;
+
     @Schema(description = "보고서 생성 근거 데이터")
     private Object evidence;
 
@@ -59,6 +71,9 @@ public class ReportDetailResponse {
     private LocalDateTime updatedAt;
 
     public static ReportDetailResponse from(Report report, String authorName) {
+        String markdown = extractMarkdown(report.getReportContent());
+        ReportStructuredData structuredData = ReportStructuredData.from(report, markdown);
+
         return ReportDetailResponse.builder()
                 .reportId(report.getReportId())
                 .title(report.getReportTitle())
@@ -68,8 +83,12 @@ public class ReportDetailResponse {
                 .targetStartDate(report.getTargetStartDate())
                 .targetEndDate(report.getTargetEndDate())
                 .sections(toJsonValue(report.getIncludedItems()))
+                .summaryRows(structuredData.summaryRows())
+                .lineRows(structuredData.lineRows())
+                .equipmentRows(structuredData.equipmentRows())
+                .analysis(structuredData.analysis())
                 .evidence(toJsonValue(report.getReportEvidence()))
-                .markdown(extractMarkdown(report.getReportContent()))
+                .markdown(markdown)
                 .relatedSimulationId(report.getRelatedSimulationId())
                 .createdAt(report.getCreatedAt())
                 .updatedAt(report.getUpdatedAt())
