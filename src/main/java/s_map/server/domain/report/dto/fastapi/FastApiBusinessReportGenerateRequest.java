@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import lombok.Builder;
 import lombok.Getter;
 import s_map.server.domain.report.entity.Report;
+import s_map.server.domain.report.entity.ReportType;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -73,7 +74,7 @@ public class FastApiBusinessReportGenerateRequest {
             return SourceReport.builder()
                     .reportId(report.getReportId())
                     .reportTitle(report.getReportTitle())
-                    .reportType(report.getReportType().name())
+                    .reportType(toFastApiReportType(report.getReportType()))
                     .authorId(report.getAuthorId())
                     .targetStartDate(format(report.getTargetStartDate()))
                     .targetEndDate(format(report.getTargetEndDate()))
@@ -107,5 +108,16 @@ public class FastApiBusinessReportGenerateRequest {
 
     private static String format(LocalDateTime value) {
         return value != null ? value.toString() : null;
+    }
+
+    private static String toFastApiReportType(ReportType reportType) {
+        if (reportType == null) {
+            return null;
+        }
+
+        return switch (reportType) {
+            case ON_DEMAND, ON_DEMAND_BUSINESS -> "AD_HOC";
+            case MONTHLY, MONTHLY_BUSINESS -> "MONTHLY";
+        };
     }
 }

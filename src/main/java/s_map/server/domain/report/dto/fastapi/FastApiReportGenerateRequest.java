@@ -4,6 +4,9 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 import lombok.Getter;
 import s_map.server.domain.report.dto.req.ReportGenerateRequest;
+import s_map.server.domain.report.entity.ReportType;
+
+import java.util.Locale;
 
 @Getter
 @Builder
@@ -40,8 +43,8 @@ public class FastApiReportGenerateRequest {
         return FastApiReportGenerateRequest.builder()
                 .reportJobId(reportJobId)
                 .requestedBy(requestedBy)
-                .userRole(userRole)
-                .reportType(request.getReportType().name())
+                .userRole(toFastApiUserRole(userRole))
+                .reportType(toFastApiReportType(request.getReportType()))
                 .period(FastApiReportPeriodRequest.builder()
                         .startDate(request.getPeriod().getStartDate())
                         .endDate(request.getPeriod().getEndDate())
@@ -53,5 +56,33 @@ public class FastApiReportGenerateRequest {
 
     private static Boolean defaultTrue(Boolean value) {
         return value != null ? value : Boolean.TRUE;
+    }
+
+    private static String toFastApiReportType(ReportType reportType) {
+        if (reportType == null) {
+            return null;
+        }
+
+        return switch (reportType) {
+            case ON_DEMAND, ON_DEMAND_BUSINESS -> "AD_HOC";
+            case MONTHLY, MONTHLY_BUSINESS -> "MONTHLY";
+        };
+    }
+
+    private static String toFastApiUserRole(String userRole) {
+        if (userRole == null || userRole.isBlank()) {
+            return userRole;
+        }
+
+        String normalizedUserRole = userRole.trim()
+                .toUpperCase(Locale.ROOT)
+                .replace("-", "_")
+                .replace(" ", "_");
+
+        return switch (normalizedUserRole) {
+            case "MANUFACTURING_MANAGER" -> "PRODUCTION_MANAGER";
+            case "OPERATOR" -> "WORKER";
+            default -> normalizedUserRole;
+        };
     }
 }

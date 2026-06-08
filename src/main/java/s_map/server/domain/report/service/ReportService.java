@@ -239,6 +239,14 @@ public class ReportService {
             throw new CustomException(ErrorCode.INVALID_REPORT_REQUEST, "reportType은 필수입니다.");
         }
 
+        if (request.getReportType() == ReportType.ON_DEMAND_BUSINESS
+                || request.getReportType() == ReportType.MONTHLY_BUSINESS) {
+            throw new CustomException(
+                    ErrorCode.INVALID_REPORT_REQUEST,
+                    "보고서 생성 API에서는 수시/월간 보고서만 생성할 수 있습니다. 경영진용 보고서는 비즈니스 보고서 생성 API를 사용하세요."
+            );
+        }
+
         if (request.getPeriod() == null) {
             throw new CustomException(ErrorCode.INVALID_REPORT_PERIOD, "period는 필수입니다.");
         }
