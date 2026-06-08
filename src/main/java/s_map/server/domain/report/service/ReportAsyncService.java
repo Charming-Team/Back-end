@@ -502,6 +502,17 @@ public class ReportAsyncService {
                 .replace("-", "_")
                 .replace(" ", "_");
 
+        if ("AD_HOC".equals(normalizedReportType) || "ADHOC".equals(normalizedReportType)) {
+            return ReportType.ON_DEMAND;
+        }
+
+        if ("AD_HOC_BUSINESS".equals(normalizedReportType)
+                || "ADHOC_BUSINESS".equals(normalizedReportType)
+                || "BUSINESS_AD_HOC".equals(normalizedReportType)
+                || "BUSINESS_ADHOC".equals(normalizedReportType)) {
+            return ReportType.ON_DEMAND_BUSINESS;
+        }
+
         try {
             return ReportType.valueOf(normalizedReportType);
         } catch (IllegalArgumentException exception) {

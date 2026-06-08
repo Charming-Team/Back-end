@@ -54,7 +54,7 @@ class FastApiBusinessReportGenerateRequestTest {
         assertThat(request.getReportId()).isEqualTo(10L);
         assertThat(request.getSourceReport().getReportId()).isEqualTo(10L);
         assertThat(request.getSourceReport().getReportTitle()).isEqualTo("2026년 6월 수시 보고서");
-        assertThat(request.getSourceReport().getReportType()).isEqualTo("ON_DEMAND");
+        assertThat(request.getSourceReport().getReportType()).isEqualTo("AD_HOC");
         assertThat(request.getSourceReport().getTargetStartDate()).isEqualTo("2026-06-01");
         assertThat(request.getSourceReport().getTargetEndDate()).isEqualTo("2026-06-14");
         assertThat(request.getSourceReport().getMarkdown()).contains("생산 흐름은 안정적입니다.");
