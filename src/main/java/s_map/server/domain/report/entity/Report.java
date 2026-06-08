@@ -76,4 +76,8 @@ public class Report extends BaseEntity {
     @Column(name = "related_simulation_id")
     @Schema(description = "보고서와 연결된 시뮬레이션 ID", example = "1001", nullable = true)
     private Long relatedSimulationId;
+
+    public void updateIncludedItems(JsonNode includedItems) {
+        this.includedItems = includedItems;
+    }
 }
