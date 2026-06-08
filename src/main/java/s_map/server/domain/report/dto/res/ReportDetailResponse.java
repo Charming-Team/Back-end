@@ -64,6 +64,15 @@ public class ReportDetailResponse {
     @Schema(description = "연결된 시뮬레이션 ID", example = "1001", nullable = true)
     private Long relatedSimulationId;
 
+    @Schema(description = "경영진용 보고서 생성 기준 원본 보고서 ID", example = "10", nullable = true)
+    private Long sourceReportId;
+
+    @Schema(description = "경영진용 보고서 생성 기준 원본 보고서 제목", example = "2026년 6월 수시 보고서", nullable = true)
+    private String sourceReportTitle;
+
+    @Schema(description = "경영진용 보고서 생성 기준 원본 보고서 유형", example = "ON_DEMAND", nullable = true)
+    private String sourceReportType;
+
     @Schema(description = "보고서 생성 일시", example = "2026-06-03T10:00:00")
     private LocalDateTime createdAt;
 
@@ -90,6 +99,9 @@ public class ReportDetailResponse {
                 .evidence(toJsonValue(report.getReportEvidence()))
                 .markdown(markdown)
                 .relatedSimulationId(report.getRelatedSimulationId())
+                .sourceReportId(extractLong(report.getReportContent(), "source_report_id"))
+                .sourceReportTitle(extractText(report.getReportContent(), "source_report_title"))
+                .sourceReportType(extractText(report.getReportContent(), "source_report_type"))
                 .createdAt(report.getCreatedAt())
                 .updatedAt(report.getUpdatedAt())
                 .build();
@@ -129,6 +141,32 @@ public class ReportDetailResponse {
         }
 
         return reportContent.toString();
+    }
+
+    private static Long extractLong(JsonNode node, String fieldName) {
+        if (node == null || node.isNull()) {
+            return null;
+        }
+
+        JsonNode value = node.path(fieldName);
+        if (value.isMissingNode() || value.isNull() || !value.canConvertToLong()) {
+            return null;
+        }
+
+        return value.asLong();
+    }
+
+    private static String extractText(JsonNode node, String fieldName) {
+        if (node == null || node.isNull()) {
+            return null;
+        }
+
+        JsonNode value = node.path(fieldName);
+        if (value.isMissingNode() || value.isNull()) {
+            return null;
+        }
+
+        return value.asText();
     }
 
     private static Object toJsonValue(JsonNode node) {

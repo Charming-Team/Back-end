@@ -63,9 +63,25 @@ class ReportStructuredDataTest {
                 "## 주요 요약\n- 기존 본문"
         );
 
-        assertThat(structuredData.summaryRows()).containsExactly(
+        assertThat(structuredData.summaryRows()).startsWith(
                 new ReportStructuredData.SummaryRow("보고서 기간", "2026.06.01 ~ 2026.06.14", "-")
         );
+        assertThat(structuredData.summaryRows())
+                .extracting(ReportStructuredData.SummaryRow::label)
+                .contains(
+                        "보고서 유형",
+                        "총 생산 계획 수량",
+                        "총 생산 완료 수량",
+                        "생산 계획 대비 실적",
+                        "라인 가동률",
+                        "평균 Cycle Time",
+                        "불량 수량",
+                        "불량률",
+                        "설비 다운 타임",
+                        "작업자 투입 시간",
+                        "안전 사고 건수",
+                        "납기 준수율"
+                );
         assertThat(structuredData.lineRows()).containsExactly(
                 new ReportStructuredData.LineRow("PP 범용 생산 Line", "91%", "12,000", "1.2%", "정상")
         );
@@ -93,12 +109,27 @@ class ReportStructuredDataTest {
 
         assertThat(structuredData.summaryRows()).containsExactly(
                 new ReportStructuredData.SummaryRow("보고서 기간", "2026.06.01 ~ 2026.06.14", "-"),
-                new ReportStructuredData.SummaryRow("보고서 유형", "수시", "-")
+                new ReportStructuredData.SummaryRow("보고서 유형", "수시", "-"),
+                new ReportStructuredData.SummaryRow("총 생산 계획 수량", "확인 필요", "-"),
+                new ReportStructuredData.SummaryRow("총 생산 완료 수량", "확인 필요", "-"),
+                new ReportStructuredData.SummaryRow("생산 계획 대비 실적", "확인 필요", "-"),
+                new ReportStructuredData.SummaryRow("라인 가동률", "확인 필요", "-"),
+                new ReportStructuredData.SummaryRow("평균 Cycle Time", "확인 필요", "-"),
+                new ReportStructuredData.SummaryRow("불량 수량", "확인 필요", "-"),
+                new ReportStructuredData.SummaryRow("불량률", "확인 필요", "-"),
+                new ReportStructuredData.SummaryRow("설비 다운 타임", "확인 필요", "-"),
+                new ReportStructuredData.SummaryRow("작업자 투입 시간", "확인 필요", "-"),
+                new ReportStructuredData.SummaryRow("안전 사고 건수", "확인 필요", "-"),
+                new ReportStructuredData.SummaryRow("납기 준수율", "확인 필요", "-")
         );
-        assertThat(structuredData.lineRows()).isEmpty();
-        assertThat(structuredData.equipmentRows()).isEmpty();
+        assertThat(structuredData.lineRows()).containsExactly(
+                new ReportStructuredData.LineRow("확인 필요", "확인 필요", "확인 필요", "확인 필요", "확인 필요")
+        );
+        assertThat(structuredData.equipmentRows()).containsExactly(
+                new ReportStructuredData.EquipmentRow("확인 필요", "확인 필요", "확인 필요", "확인 필요")
+        );
         assertThat(structuredData.analysis()).isEqualTo(
-                new ReportStructuredData.Analysis("전체 생산 흐름은 안정적입니다.", List.of(), null)
+                new ReportStructuredData.Analysis("전체 생산 흐름은 안정적입니다.", List.of(), "생성 필요")
         );
     }
 

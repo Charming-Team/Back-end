@@ -21,6 +21,7 @@ import s_map.server.domain.report.dto.res.ReportJobResponse;
 import s_map.server.domain.report.dto.res.ReportListResponse;
 import s_map.server.domain.report.entity.Report;
 import s_map.server.domain.report.entity.ReportJob;
+import s_map.server.domain.report.entity.ReportType;
 import s_map.server.domain.report.repository.ReportJobRepository;
 import s_map.server.domain.report.repository.ReportRepository;
 import s_map.server.domain.user.entity.Role;
@@ -109,6 +110,7 @@ public class ReportService {
 
         Report sourceReport = reportRepository.findById(request.getReportId())
                 .orElseThrow(() -> new CustomException(ErrorCode.REPORT_NOT_FOUND));
+        validateBusinessReportSource(sourceReport);
 
         ObjectNode requestPayload = objectMapper.createObjectNode();
         requestPayload.put("jobType", "BUSINESS_REPORT_GENERATE");
@@ -231,6 +233,16 @@ public class ReportService {
 
         if (request.getReportId() == null || request.getReportId() <= 0) {
             throw new CustomException(ErrorCode.INVALID_REPORT_REQUEST, "report_id는 1 이상의 값이어야 합니다.");
+        }
+    }
+
+    private void validateBusinessReportSource(Report sourceReport) {
+        if (sourceReport.getReportType() == ReportType.ON_DEMAND_BUSINESS
+                || sourceReport.getReportType() == ReportType.MONTHLY_BUSINESS) {
+            throw new CustomException(
+                    ErrorCode.INVALID_REPORT_REQUEST,
+                    "이미 경영진용 보고서입니다. 원본 수시/월간 보고서에서만 비즈니스 보고서를 생성할 수 있습니다."
+            );
         }
     }
 

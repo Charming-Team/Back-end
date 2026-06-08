@@ -46,8 +46,12 @@ public class FastApiReportGenerateRequest {
                         .startDate(request.getPeriod().getStartDate())
                         .endDate(request.getPeriod().getEndDate())
                         .build())
-                .includeExecutiveSummary(request.getIncludeExecutiveSummary())
-                .includeEvidence(request.getIncludeEvidence())
+                .includeExecutiveSummary(defaultTrue(request.getIncludeExecutiveSummary()))
+                .includeEvidence(defaultTrue(request.getIncludeEvidence()))
                 .build();
+    }
+
+    private static Boolean defaultTrue(Boolean value) {
+        return value != null ? value : Boolean.TRUE;
     }
 }

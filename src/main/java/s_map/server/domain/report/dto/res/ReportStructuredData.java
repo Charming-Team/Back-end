@@ -7,7 +7,10 @@ import s_map.server.domain.report.entity.ReportType;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.Spliterator;
 import java.util.Spliterators;
@@ -24,6 +27,8 @@ public record ReportStructuredData(
 
     private static final DateTimeFormatter DISPLAY_DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy.MM.dd");
     private static final int MAX_OVERVIEW_LENGTH = 180;
+    private static final String MISSING_VALUE = "확인 필요";
+    private static final String DEFAULT_RECOMMENDATION = "생성 필요";
     private static final Set<String> MARKDOWN_SECTION_HEADINGS = Set.of(
             "주요 요약",
             "라인별 성과",
@@ -34,10 +39,13 @@ public record ReportStructuredData(
     public static ReportStructuredData from(Report report, String markdown) {
         JsonNode structuredSource = findStructuredSource(report);
 
-        List<SummaryRow> summaryRows = parseSummaryRows(field(structuredSource, "summaryRows", "summary_rows"));
-        if (summaryRows.isEmpty()) {
-            summaryRows = createDefaultSummaryRows(report);
-        }
+        List<SummaryRow> summaryRows = completeSummaryRows(
+                parseSummaryRows(field(structuredSource, "summaryRows", "summary_rows")),
+                report
+        );
+        List<LineRow> lineRows = completeLineRows(parseLineRows(field(structuredSource, "lineRows", "line_rows")));
+        List<EquipmentRow> equipmentRows =
+                completeEquipmentRows(parseEquipmentRows(field(structuredSource, "equipmentRows", "equipment_rows")));
 
         Analysis analysis = parseAnalysis(field(structuredSource, "analysis"));
         if (analysis == null) {
@@ -49,8 +57,8 @@ public record ReportStructuredData(
 
         return new ReportStructuredData(
                 summaryRows,
-                parseLineRows(field(structuredSource, "lineRows", "line_rows")),
-                parseEquipmentRows(field(structuredSource, "equipmentRows", "equipment_rows")),
+                lineRows,
+                equipmentRows,
                 analysis
         );
     }
@@ -153,14 +161,14 @@ public record ReportStructuredData(
         }
 
         List<AnalysisSection> sections = parseAnalysisSections(field(analysisNode, "sections"));
-        String overview = text(analysisNode, "overview");
-        String recommendation = text(analysisNode, "recommendation");
+        String overview = emptyToNull(text(analysisNode, "overview"));
+        String recommendation = emptyToNull(text(analysisNode, "recommendation"));
 
         if (!hasText(overview) && sections.isEmpty() && !hasText(recommendation)) {
             return null;
         }
 
-        return new Analysis(overview, sections, recommendation);
+        return new Analysis(overview, sections, defaultText(recommendation, DEFAULT_RECOMMENDATION));
     }
 
     private static List<AnalysisSection> parseAnalysisSections(JsonNode sectionsNode) {
@@ -200,8 +208,76 @@ public record ReportStructuredData(
 
         return List.of(
                 new SummaryRow("보고서 기간", formatPeriod(report.getTargetStartDate(), report.getTargetEndDate()), "-"),
-                new SummaryRow("보고서 유형", reportTypeLabel(report.getReportType()), "-")
+                new SummaryRow("보고서 유형", reportTypeLabel(report.getReportType()), "-"),
+                new SummaryRow("총 생산 계획 수량", MISSING_VALUE, "-"),
+                new SummaryRow("총 생산 완료 수량", MISSING_VALUE, "-"),
+                new SummaryRow("생산 계획 대비 실적", MISSING_VALUE, "-"),
+                new SummaryRow("라인 가동률", MISSING_VALUE, "-"),
+                new SummaryRow("평균 Cycle Time", MISSING_VALUE, "-"),
+                new SummaryRow("불량 수량", MISSING_VALUE, "-"),
+                new SummaryRow("불량률", MISSING_VALUE, "-"),
+                new SummaryRow("설비 다운 타임", MISSING_VALUE, "-"),
+                new SummaryRow("작업자 투입 시간", MISSING_VALUE, "-"),
+                new SummaryRow("안전 사고 건수", MISSING_VALUE, "-"),
+                new SummaryRow("납기 준수율", MISSING_VALUE, "-")
         );
+    }
+
+    private static List<SummaryRow> completeSummaryRows(List<SummaryRow> rows, Report report) {
+        List<SummaryRow> defaultRows = createDefaultSummaryRows(report);
+        if (rows.isEmpty()) {
+            return defaultRows;
+        }
+
+        List<SummaryRow> completedRows = new ArrayList<>(rows.stream()
+                .map(row -> new SummaryRow(
+                        defaultText(row.label(), MISSING_VALUE),
+                        defaultText(row.value(), MISSING_VALUE),
+                        defaultText(row.change(), "-")
+                ))
+                .toList());
+
+        Set<String> labels = completedRows.stream()
+                .map(SummaryRow::label)
+                .filter(Objects::nonNull)
+                .collect(LinkedHashSet::new, LinkedHashSet::add, LinkedHashSet::addAll);
+
+        defaultRows.stream()
+                .filter(row -> !labels.contains(row.label()))
+                .forEach(completedRows::add);
+
+        return completedRows;
+    }
+
+    private static List<LineRow> completeLineRows(List<LineRow> rows) {
+        if (rows.isEmpty()) {
+            return List.of(new LineRow(MISSING_VALUE, MISSING_VALUE, MISSING_VALUE, MISSING_VALUE, MISSING_VALUE));
+        }
+
+        return rows.stream()
+                .map(row -> new LineRow(
+                        defaultText(row.line(), MISSING_VALUE),
+                        defaultText(row.utilization(), MISSING_VALUE),
+                        defaultText(row.completed(), MISSING_VALUE),
+                        defaultText(row.defectRate(), MISSING_VALUE),
+                        defaultText(row.note(), MISSING_VALUE)
+                ))
+                .toList();
+    }
+
+    private static List<EquipmentRow> completeEquipmentRows(List<EquipmentRow> rows) {
+        if (rows.isEmpty()) {
+            return List.of(new EquipmentRow(MISSING_VALUE, MISSING_VALUE, MISSING_VALUE, MISSING_VALUE));
+        }
+
+        return rows.stream()
+                .map(row -> new EquipmentRow(
+                        defaultText(row.name(), MISSING_VALUE),
+                        defaultText(row.utilization(), MISSING_VALUE),
+                        defaultText(row.downTime(), MISSING_VALUE),
+                        defaultText(row.status(), MISSING_VALUE)
+                ))
+                .toList();
     }
 
     private static Analysis createDefaultAnalysis(Report report, String markdown) {
@@ -209,8 +285,11 @@ public record ReportStructuredData(
         if (!hasText(overview) && report != null) {
             overview = report.getReportTitle();
         }
+        if (!hasText(overview)) {
+            overview = "분석 내용이 없습니다.";
+        }
 
-        return new Analysis(overview, List.of(), null);
+        return new Analysis(overview, List.of(), DEFAULT_RECOMMENDATION);
     }
 
     private static String extractOverview(String markdown) {
@@ -273,10 +352,8 @@ public record ReportStructuredData(
         }
 
         return switch (reportType) {
-            case MONTHLY -> "월간";
-            case ON_DEMAND -> "수시";
-            case MONTHLY_BUSINESS -> "월간 비즈니스";
-            case ON_DEMAND_BUSINESS -> "수시 비즈니스";
+            case MONTHLY, MONTHLY_BUSINESS -> "월간";
+            case ON_DEMAND, ON_DEMAND_BUSINESS -> "수시";
         };
     }
 
@@ -323,6 +400,10 @@ public record ReportStructuredData(
 
     private static String defaultText(String value, String defaultValue) {
         return hasText(value) ? value : defaultValue;
+    }
+
+    private static String emptyToNull(String value) {
+        return hasText(value) ? value : null;
     }
 
     private static boolean hasText(String value) {
