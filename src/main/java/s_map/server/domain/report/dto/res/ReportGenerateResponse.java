@@ -57,6 +57,15 @@ public class ReportGenerateResponse {
     @Schema(description = "보고서 본문 Markdown", example = "## 주요 요약\\n- 총 생산량이 계획 대비 98%를 달성했습니다.")
     private String markdown;
 
+    @Schema(description = "경영진용 보고서 생성 기준 원본 보고서 ID", example = "10", nullable = true)
+    private Long sourceReportId;
+
+    @Schema(description = "경영진용 보고서 생성 기준 원본 보고서 제목", example = "2026년 6월 수시 보고서", nullable = true)
+    private String sourceReportTitle;
+
+    @Schema(description = "경영진용 보고서 생성 기준 원본 보고서 유형", example = "ON_DEMAND", nullable = true)
+    private String sourceReportType;
+
     private static String extractMarkdown(JsonNode reportContent) {
         if (reportContent == null || reportContent.isNull()) {
             return null;
@@ -69,6 +78,32 @@ public class ReportGenerateResponse {
         }
 
         return markdownNode.asText();
+    }
+
+    private static Long extractLong(JsonNode node, String fieldName) {
+        if (node == null || node.isNull()) {
+            return null;
+        }
+
+        JsonNode value = node.path(fieldName);
+        if (value.isMissingNode() || value.isNull() || !value.canConvertToLong()) {
+            return null;
+        }
+
+        return value.asLong();
+    }
+
+    private static String extractText(JsonNode node, String fieldName) {
+        if (node == null || node.isNull()) {
+            return null;
+        }
+
+        JsonNode value = node.path(fieldName);
+        if (value.isMissingNode() || value.isNull()) {
+            return null;
+        }
+
+        return value.asText();
     }
 
     public static ReportGenerateResponse of(Report report, ReportJob reportJob) {
@@ -90,6 +125,9 @@ public class ReportGenerateResponse {
                 .analysis(structuredData.analysis())
                 .evidence(report.getReportEvidence())
                 .markdown(markdown)
+                .sourceReportId(extractLong(report.getReportContent(), "source_report_id"))
+                .sourceReportTitle(extractText(report.getReportContent(), "source_report_title"))
+                .sourceReportType(extractText(report.getReportContent(), "source_report_type"))
                 .build();
     }
 }

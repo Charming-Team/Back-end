@@ -33,6 +33,7 @@ import java.util.Locale;
 public class ReportAsyncService {
 
     private static final int MAX_REPORT_TITLE_LENGTH = 200;
+    private static final int MIN_SUMMARY_ROWS = 3;
 
     private final ReportRepository reportRepository;
     private final ReportJobRepository reportJobRepository;
@@ -90,6 +91,17 @@ public class ReportAsyncService {
                 return;
             }
 
+            String invalidResponseMessage = resolveReportInvalidResponseMessage(fastApiResponse);
+            if (invalidResponseMessage != null) {
+                markJobFailedSafely(reportJobId, invalidResponseMessage);
+                log.warn(
+                        "[ReportAsyncService] 보고서 생성 실패 reason=incomplete_fastapi_response reportJobId={} message={}",
+                        reportJobId,
+                        invalidResponseMessage
+                );
+                return;
+            }
+
             Long reportId = saveReportAndMarkSuccess(reportJobId, requestedBy, request, fastApiResponse);
 
             log.info(
@@ -128,8 +140,11 @@ public class ReportAsyncService {
         try {
             markJobRunning(reportJobId);
 
+            Report sourceReport = reportRepository.findById(sourceReportId)
+                    .orElseThrow(() -> new CustomException(ErrorCode.REPORT_NOT_FOUND));
+
             FastApiBusinessReportGenerateRequest fastApiRequest =
-                    FastApiBusinessReportGenerateRequest.from(sourceReportId);
+                    FastApiBusinessReportGenerateRequest.from(sourceReport);
 
             FastApiBusinessReportGenerateResponse fastApiResponse =
                     fastApiReportClient.generateBusinessReport(fastApiRequest);
@@ -276,7 +291,10 @@ public class ReportAsyncService {
             Long requestedBy,
             FastApiBusinessReportGenerateResponse fastApiResponse
     ) {
-        JsonNode reportContent = objectMapper.valueToTree(fastApiResponse.getReportContent());
+        JsonNode reportContent = enrichBusinessReportContent(
+                sourceReport,
+                objectMapper.valueToTree(fastApiResponse.getReportContent())
+        );
         JsonNode reportEvidence = objectMapper.valueToTree(fastApiResponse.getReportEvidence());
         JsonNode includedItems = extractBusinessReportSections(reportContent);
 
@@ -293,6 +311,25 @@ public class ReportAsyncService {
                 .build();
 
         return reportRepository.save(report);
+    }
+
+    private JsonNode enrichBusinessReportContent(Report sourceReport, JsonNode reportContent) {
+        if (reportContent == null || reportContent.isNull() || !reportContent.isObject()) {
+            ObjectNode content = objectMapper.createObjectNode();
+            content.set("value", reportContent);
+            addSourceReportMetadata(content, sourceReport);
+            return content;
+        }
+
+        ObjectNode content = (ObjectNode) reportContent;
+        addSourceReportMetadata(content, sourceReport);
+        return content;
+    }
+
+    private void addSourceReportMetadata(ObjectNode reportContent, Report sourceReport) {
+        reportContent.put("source_report_id", sourceReport.getReportId());
+        reportContent.put("source_report_title", sourceReport.getReportTitle());
+        reportContent.put("source_report_type", sourceReport.getReportType().name());
     }
 
     private String resolveBusinessReportInvalidResponseMessage(
@@ -316,6 +353,82 @@ public class ReportAsyncService {
         }
 
         return null;
+    }
+
+    private String resolveReportInvalidResponseMessage(FastApiReportGenerateResponse fastApiResponse) {
+        if (!hasText(fastApiResponse.getMarkdown())) {
+            return ErrorCode.REPORT_FASTAPI_INVALID_RESPONSE.getMessage() + " markdown이 비어 있습니다.";
+        }
+
+        JsonNode sections = objectMapper.valueToTree(fastApiResponse.getSections());
+        JsonNode structuredSections = findStructuredSections(sections);
+
+        if (structuredSections == null) {
+            return ErrorCode.REPORT_FASTAPI_INVALID_RESPONSE.getMessage()
+                    + " sections 구조화 데이터가 비어 있습니다.";
+        }
+
+        if (!hasEnoughRows(structuredSections.path("summaryRows"), MIN_SUMMARY_ROWS)
+                && !hasEnoughRows(structuredSections.path("summary_rows"), MIN_SUMMARY_ROWS)) {
+            return ErrorCode.REPORT_FASTAPI_INVALID_RESPONSE.getMessage()
+                    + " summaryRows에는 보고서 기간/유형 외 주요 지표가 필요합니다.";
+        }
+
+        if (!hasAnyRow(structuredSections.path("lineRows"))
+                && !hasAnyRow(structuredSections.path("line_rows"))) {
+            return ErrorCode.REPORT_FASTAPI_INVALID_RESPONSE.getMessage()
+                    + " lineRows가 비어 있습니다.";
+        }
+
+        if (!hasAnyRow(structuredSections.path("equipmentRows"))
+                && !hasAnyRow(structuredSections.path("equipment_rows"))) {
+            return ErrorCode.REPORT_FASTAPI_INVALID_RESPONSE.getMessage()
+                    + " equipmentRows가 비어 있습니다.";
+        }
+
+        JsonNode analysis = structuredSections.path("analysis");
+        if (!analysis.isObject()
+                || (!hasText(analysis.path("overview").asText(null))
+                && !hasAnyRow(analysis.path("sections"))
+                && !hasText(analysis.path("recommendation").asText(null)))) {
+            return ErrorCode.REPORT_FASTAPI_INVALID_RESPONSE.getMessage()
+                    + " analysis가 비어 있습니다.";
+        }
+
+        return null;
+    }
+
+    private JsonNode findStructuredSections(JsonNode sections) {
+        if (hasStructuredFields(sections)) {
+            return sections;
+        }
+
+        JsonNode nestedSections = sections != null ? sections.path("sections") : null;
+        if (hasStructuredFields(nestedSections)) {
+            return nestedSections;
+        }
+
+        return null;
+    }
+
+    private boolean hasStructuredFields(JsonNode node) {
+        return node != null
+                && node.isObject()
+                && (node.has("summaryRows")
+                || node.has("summary_rows")
+                || node.has("lineRows")
+                || node.has("line_rows")
+                || node.has("equipmentRows")
+                || node.has("equipment_rows")
+                || node.has("analysis"));
+    }
+
+    private boolean hasEnoughRows(JsonNode rows, int minRows) {
+        return rows != null && rows.isArray() && rows.size() >= minRows;
+    }
+
+    private boolean hasAnyRow(JsonNode rows) {
+        return rows != null && rows.isArray() && rows.size() > 0;
     }
 
     private boolean isValidReportType(String reportType) {
@@ -437,6 +550,10 @@ public class ReportAsyncService {
         }
 
         return ErrorCode.REPORT_FASTAPI_INVALID_RESPONSE.getMessage();
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     private JsonNode extractRelatedSimulationIdSource(JsonNode sections) {
