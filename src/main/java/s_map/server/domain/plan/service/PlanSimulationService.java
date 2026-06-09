@@ -25,7 +25,6 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -74,7 +73,7 @@ public class PlanSimulationService {
      * [Process]
      * - 요청값을 검증한다.
      * - 요청 plans의 주문, 제품, 생산 라인, 담당자, 일정 충돌 여부를 검증한다.
-     * - 기존 생산계획이 있는 주문은 해당 계획을 수정하고, 없는 주문은 새 계획을 저장한다.
+     * - planId가 있는 요청은 해당 생산계획 row를 수정하고, planId가 없으면 새 계획을 저장한다.
      * - 시뮬레이션 요약을 schedule_simulation_results에 저장한다.
      * - 시뮬레이션 상세 변경 내역을 schedule_simulation_details에 저장한다.
      */
@@ -114,16 +113,16 @@ public class PlanSimulationService {
 
         validateSaveRequest(request);
         Map<Long, CustomerOrder> ordersById = loadOrdersById(request);
-        Map<Long, ProductionPlan> plansByOrderId = loadEditablePlansByOrderId(ordersById.keySet());
-        validateSelectedPlans(request, ordersById, plansByOrderId);
+        Map<Long, ProductionPlan> plansByPlanId = loadEditablePlansByPlanId(request);
+        validateSelectedPlans(request, ordersById, plansByPlanId);
 
         List<Long> savedPlanIds = new ArrayList<>();
-        releasePlanSequencesTemporarily(plansByOrderId.values());
+        releasePlanSequencesTemporarily(plansByPlanId.values());
 
         for (SelectedPlanSimulationSaveRequest.SelectedPlan selectedPlan : request.getPlans()) {
             ProductionPlan savedPlan = applySelectedPlan(
                     selectedPlan,
-                    plansByOrderId.get(selectedPlan.getOrderId())
+                    plansByPlanId.get(selectedPlan.resolvePlanId())
             );
 
             savedPlanIds.add(savedPlan.getPlanId());
@@ -182,6 +181,11 @@ public class PlanSimulationService {
             if (plan.getAfterDelayed() == null) {
                 throw new CustomException(ErrorCode.BAD_REQUEST);
             }
+
+            Long planId = plan.resolvePlanId();
+            if (planId != null && planId <= 0) {
+                throw new CustomException(ErrorCode.BAD_REQUEST);
+            }
         }
     }
 
@@ -189,11 +193,8 @@ public class PlanSimulationService {
         List<Long> orderIds = request.getPlans()
                 .stream()
                 .map(SelectedPlanSimulationSaveRequest.SelectedPlan::getOrderId)
+                .distinct()
                 .toList();
-
-        if (new HashSet<>(orderIds).size() != orderIds.size()) {
-            throw new CustomException(ErrorCode.BAD_REQUEST);
-        }
 
         Map<Long, CustomerOrder> ordersById = customerOrderRepository.findAllById(orderIds)
                 .stream()
@@ -206,41 +207,59 @@ public class PlanSimulationService {
         return ordersById;
     }
 
-    private Map<Long, ProductionPlan> loadEditablePlansByOrderId(Set<Long> orderIds) {
-        List<ProductionPlan> plans = productionPlanRepository.findByOrderIdInAndPlanStatusNot(
-                new ArrayList<>(orderIds),
-                PlanStatus.CANCELLED.name()
-        );
+    private Map<Long, ProductionPlan> loadEditablePlansByPlanId(SelectedPlanSimulationSaveRequest request) {
+        List<Long> planIds = request.getPlans()
+                .stream()
+                .map(SelectedPlanSimulationSaveRequest.SelectedPlan::resolvePlanId)
+                .filter(java.util.Objects::nonNull)
+                .toList();
 
-        Map<Long, ProductionPlan> plansByOrderId = new HashMap<>();
+        if (planIds.isEmpty()) {
+            return Map.of();
+        }
 
-        for (ProductionPlan plan : plans) {
-            if (plan.getPlanStatus() == PlanStatus.COMPLETED) {
-                throw new CustomException(ErrorCode.BAD_REQUEST);
-            }
+        if (new HashSet<>(planIds).size() != planIds.size()) {
+            throw new CustomException(ErrorCode.BAD_REQUEST);
+        }
 
-            ProductionPlan previous = plansByOrderId.put(plan.getOrderId(), plan);
-            if (previous != null) {
+        Map<Long, ProductionPlan> plansByPlanId = productionPlanRepository.findAllById(planIds)
+                .stream()
+                .collect(Collectors.toMap(ProductionPlan::getPlanId, Function.identity()));
+
+        if (plansByPlanId.size() != planIds.size()) {
+            throw new CustomException(ErrorCode.PRODUCTION_PLAN_NOT_FOUND);
+        }
+
+        for (ProductionPlan plan : plansByPlanId.values()) {
+            if (plan.getPlanStatus() == PlanStatus.COMPLETED
+                    || plan.getPlanStatus() == PlanStatus.CANCELLED) {
                 throw new CustomException(ErrorCode.BAD_REQUEST);
             }
         }
 
-        return plansByOrderId;
+        return plansByPlanId;
     }
 
     private void validateSelectedPlans(
             SelectedPlanSimulationSaveRequest request,
             Map<Long, CustomerOrder> ordersById,
-            Map<Long, ProductionPlan> plansByOrderId
+            Map<Long, ProductionPlan> plansByPlanId
     ) {
-        List<Long> excludedPlanIds = excludedPlanIds(plansByOrderId.values());
+        List<Long> excludedPlanIds = excludedPlanIds(plansByPlanId.values());
         validateDuplicateLineSequences(request.getPlans());
         validateScheduleOverlapsInRequest(request.getPlans());
 
         for (SelectedPlanSimulationSaveRequest.SelectedPlan plan : request.getPlans()) {
             CustomerOrder order = ordersById.get(plan.getOrderId());
+            ProductionPlan existingPlan = plansByPlanId.get(plan.resolvePlanId());
 
             if (!order.getProductId().equals(plan.getProductId())) {
+                throw new CustomException(ErrorCode.BAD_REQUEST);
+            }
+
+            if (existingPlan != null
+                    && (!existingPlan.getOrderId().equals(plan.getOrderId())
+                    || !existingPlan.getProductId().equals(plan.getProductId()))) {
                 throw new CustomException(ErrorCode.BAD_REQUEST);
             }
 
