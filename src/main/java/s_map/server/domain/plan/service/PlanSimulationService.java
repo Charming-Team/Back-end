@@ -385,11 +385,12 @@ public class PlanSimulationService {
             return productionPlanRepository.save(newPlan);
         }
 
-        existingPlan.updatePlan(
+        existingPlan.applySelectedSimulationPlan(
                 selectedPlan.getLineId(),
                 selectedPlan.getOperatorId(),
                 selectedPlan.getPlannedStartAt(),
                 selectedPlan.getPlannedEndAt(),
+                selectedPlan.getEstimatedDurationHr(),
                 selectedPlan.getPlannedQuantity(),
                 selectedPlan.getPlanSequence(),
                 selectedPlan.resolvePlanStatus()

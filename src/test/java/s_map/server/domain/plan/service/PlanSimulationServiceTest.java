@@ -94,6 +94,7 @@ class PlanSimulationServiceTest {
         assertThat(existingPlan.getOperatorId()).isEqualTo(7L);
         assertThat(existingPlan.getPlannedStartAt()).isEqualTo(startAt);
         assertThat(existingPlan.getPlannedEndAt()).isEqualTo(startAt.plusHours(4));
+        assertThat(existingPlan.getEstimatedDurationHr()).isEqualByComparingTo("4");
         assertThat(existingPlan.getPlannedQuantity()).isEqualTo(500);
         assertThat(existingPlan.getPlanSequence()).isEqualTo(5);
         assertThat(existingPlan.getPlanStatus()).isEqualTo(PlanStatus.SCHEDULED);
@@ -198,8 +199,8 @@ class PlanSimulationServiceTest {
                 1L,
                 3L,
                 OffsetDateTime.of(2026, 6, 9, 9, 0, 0, 0, ZoneOffset.ofHours(9)),
-                OffsetDateTime.of(2026, 6, 9, 13, 0, 0, 0, ZoneOffset.ofHours(9)),
-                BigDecimal.valueOf(4),
+                OffsetDateTime.of(2026, 6, 9, 11, 0, 0, 0, ZoneOffset.ofHours(9)),
+                BigDecimal.valueOf(2),
                 500,
                 1
         );
