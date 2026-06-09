@@ -95,7 +95,8 @@ public class PlanSimulationService {
                 simulationGroupId,
                 simulationType,
                 baselineSelection ? null : appliedBy,
-                baselineSelection ? null : selectedAt
+                baselineSelection ? null : selectedAt,
+                selectedAt
         );
 
         if (baselineSelection) {
@@ -130,7 +131,8 @@ public class PlanSimulationService {
             planSimulationCommandRepository.saveSimulationDetail(
                     simulationId,
                     savedPlan.getPlanId(),
-                    selectedPlan
+                    selectedPlan,
+                    selectedAt
             );
         }
 

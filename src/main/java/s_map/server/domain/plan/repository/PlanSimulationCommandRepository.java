@@ -22,7 +22,8 @@ public class PlanSimulationCommandRepository {
             String simulationGroupId,
             String simulationType,
             Long appliedBy,
-            OffsetDateTime appliedAt
+            OffsetDateTime appliedAt,
+            OffsetDateTime createdAt
     ) {
         String sql = """
                 INSERT INTO schedule_simulation_results (
@@ -43,7 +44,8 @@ public class PlanSimulationCommandRepository {
                     cost_change_amount,
                     recommendation_grade,
                     applied_by,
-                    applied_at
+                    applied_at,
+                    created_at
                 ) VALUES (
                     :simulationGroupId,
                     :simulationName,
@@ -62,7 +64,8 @@ public class PlanSimulationCommandRepository {
                     :costChangeAmount,
                     :recommendationGrade,
                     :appliedBy,
-                    :appliedAt
+                    :appliedAt,
+                    :createdAt
                 )
                 """;
 
@@ -84,7 +87,8 @@ public class PlanSimulationCommandRepository {
                 .addValue("costChangeAmount", request.getCostChangeAmount())
                 .addValue("recommendationGrade", request.getRecommendationGrade())
                 .addValue("appliedBy", appliedBy)
-                .addValue("appliedAt", appliedAt);
+                .addValue("appliedAt", appliedAt)
+                .addValue("createdAt", createdAt);
 
         KeyHolder keyHolder = new GeneratedKeyHolder();
 
@@ -97,7 +101,8 @@ public class PlanSimulationCommandRepository {
     public void saveSimulationDetail(
             Long simulationId,
             Long savedPlanId,
-            SelectedPlanSimulationSaveRequest.SelectedPlan plan
+            SelectedPlanSimulationSaveRequest.SelectedPlan plan,
+            OffsetDateTime createdAt
     ) {
         String sql = """
                 INSERT INTO schedule_simulation_details (
@@ -116,7 +121,8 @@ public class PlanSimulationCommandRepository {
                     after_is_delayed,
                     before_quantity,
                     after_quantity,
-                    change_reason
+                    change_reason,
+                    created_at
                 ) VALUES (
                     :simulationId,
                     :orderId,
@@ -133,7 +139,8 @@ public class PlanSimulationCommandRepository {
                     :afterDelayed,
                     :beforeQuantity,
                     :afterQuantity,
-                    :changeReason
+                    :changeReason,
+                    :createdAt
                 )
                 """;
 
@@ -153,7 +160,8 @@ public class PlanSimulationCommandRepository {
                 .addValue("afterDelayed", plan.getAfterDelayed())
                 .addValue("beforeQuantity", plan.getBeforeQuantity())
                 .addValue("afterQuantity", plan.getPlannedQuantity())
-                .addValue("changeReason", plan.getChangeReason());
+                .addValue("changeReason", plan.getChangeReason())
+                .addValue("createdAt", createdAt);
 
         jdbcTemplate.update(sql, params);
     }

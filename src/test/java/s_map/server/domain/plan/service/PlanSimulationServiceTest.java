@@ -82,6 +82,7 @@ class PlanSimulationServiceTest {
                 anyString(),
                 eq("DUE_DATE_OPTIMIZATION"),
                 eq(9L),
+                any(OffsetDateTime.class),
                 any(OffsetDateTime.class)
         )).thenReturn(300L);
         when(productionPlanRepository.findMaxPlanSequence()).thenReturn(10);
@@ -99,7 +100,12 @@ class PlanSimulationServiceTest {
 
         verify(productionPlanRepository).flush();
         verify(productionPlanRepository, never()).save(any(ProductionPlan.class));
-        verify(planSimulationCommandRepository).saveSimulationDetail(300L, 200L, selectedPlan);
+        verify(planSimulationCommandRepository).saveSimulationDetail(
+                eq(300L),
+                eq(200L),
+                eq(selectedPlan),
+                any(OffsetDateTime.class)
+        );
     }
 
     @Test
@@ -112,7 +118,8 @@ class PlanSimulationServiceTest {
                 anyString(),
                 eq("CURRENT_PLAN_BASELINE"),
                 eq(null),
-                eq(null)
+                eq(null),
+                any(OffsetDateTime.class)
         )).thenReturn(301L);
 
         var response = planSimulationService.saveSelectedSimulation(request, 9L);
