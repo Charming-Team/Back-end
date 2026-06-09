@@ -33,6 +33,7 @@ import s_map.server.global.error.ErrorCode;
 import s_map.server.global.security.AuthUser;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -46,6 +47,10 @@ public class ReportService {
     private static final int DEFAULT_PAGE = 0;
     private static final int DEFAULT_SIZE = 10;
     private static final int MAX_SIZE = 100;
+    private static final List<ReportType> NORMAL_REPORT_TYPES = List.of(
+            ReportType.ON_DEMAND,
+            ReportType.MONTHLY
+    );
 
     private final ReportRepository reportRepository;
     private final ReportJobRepository reportJobRepository;
@@ -66,7 +71,7 @@ public class ReportService {
      */
     @Transactional
     public ReportGenerateStartResponse generateReport(AuthUser authUser, ReportGenerateRequest request) {
-        User user = getAuthorizedReportUser(authUser);
+        User user = getAuthorizedReportWriter(authUser);
         validateGenerateRequest(request);
 
         JsonNode requestPayload = createRequestPayload(user, request);
@@ -107,7 +112,7 @@ public class ReportService {
             AuthUser authUser,
             BusinessReportGenerateRequest request
     ) {
-        User user = getAuthorizedReportUser(authUser);
+        User user = getAuthorizedReportWriter(authUser);
         validateBusinessReportGenerateRequest(request);
 
         Report sourceReport = reportRepository.findById(request.getReportId())
@@ -151,11 +156,12 @@ public class ReportService {
      * - result / ReportJobResponse / Job 상태, 실패 사유, 결과 보고서 ID
      */
     public ReportJobResponse getReportJob(AuthUser authUser, Long reportJobId) {
-        getAuthorizedReportUser(authUser);
+        User user = getAuthorizedReportReader(authUser);
         validatePositiveId(reportJobId, "reportJobId");
 
         ReportJob reportJob = reportJobRepository.findById(reportJobId)
                 .orElseThrow(() -> new CustomException(ErrorCode.REPORT_JOB_NOT_FOUND));
+        validateReportJobVisibility(user, reportJob);
 
         return ReportJobResponse.from(reportJob);
     }
@@ -172,10 +178,12 @@ public class ReportService {
      * - result / Page<ReportListResponse> / 보고서 목록 페이지와 작성자 표시명
      */
     public Page<ReportListResponse> getReports(AuthUser authUser, int page, int size) {
-        getAuthorizedReportUser(authUser);
+        User user = getAuthorizedReportReader(authUser);
 
         Pageable pageable = createPageable(page, size);
-        Page<Report> reports = reportRepository.findAllByOrderByCreatedAtDesc(pageable);
+        Page<Report> reports = canViewBusinessReports(user)
+                ? reportRepository.findAllByOrderByCreatedAtDesc(pageable)
+                : reportRepository.findAllByReportTypeInOrderByCreatedAtDesc(NORMAL_REPORT_TYPES, pageable);
         Map<Long, String> authorNameMap = findAuthorNameMap(reports);
 
         return reports.map(report -> ReportListResponse.from(
@@ -195,11 +203,12 @@ public class ReportService {
      * - result / ReportDetailResponse / 보고서 기본 정보, 본문, 근거 데이터, 작성자 표시명
      */
     public ReportDetailResponse getReport(AuthUser authUser, Long reportId) {
-        getAuthorizedReportUser(authUser);
+        User user = getAuthorizedReportReader(authUser);
         validatePositiveId(reportId, "reportId");
 
         Report report = reportRepository.findById(reportId)
                 .orElseThrow(() -> new CustomException(ErrorCode.REPORT_NOT_FOUND));
+        validateReportVisibility(user, report);
         String authorName = findAuthorName(report.getAuthorId());
         ReportStructuredData structuredData = reportStructuredDataService.resolve(report);
 
@@ -218,11 +227,12 @@ public class ReportService {
      */
     @Transactional
     public ReportDetailResponse backfillReportStructuredData(AuthUser authUser, Long reportId) {
-        getAuthorizedReportUser(authUser);
+        User user = getAuthorizedReportWriter(authUser);
         validatePositiveId(reportId, "reportId");
 
         Report report = reportRepository.findById(reportId)
                 .orElseThrow(() -> new CustomException(ErrorCode.REPORT_NOT_FOUND));
+        validateReportVisibility(user, report);
         ReportStructuredData structuredData = reportStructuredDataService.createFromCurrentDatabase(report);
         report.updateIncludedItems(objectMapper.valueToTree(structuredData));
 
@@ -281,7 +291,37 @@ public class ReportService {
         }
     }
 
-    private User getAuthorizedReportUser(AuthUser authUser) {
+    private User getAuthorizedReportReader(AuthUser authUser) {
+        User user = getActiveUser(authUser);
+
+        if (!hasReportReadAccess(user.getRole())) {
+            log.warn(
+                    "[ReportService] 보고서 요청 실패 reason=report_access_denied userId={}, role={}",
+                    user.getId(),
+                    user.getRole()
+            );
+            throw new CustomException(ErrorCode.REPORT_ACCESS_DENIED);
+        }
+
+        return user;
+    }
+
+    private User getAuthorizedReportWriter(AuthUser authUser) {
+        User user = getActiveUser(authUser);
+
+        if (!hasReportWriteAccess(user.getRole())) {
+            log.warn(
+                    "[ReportService] 보고서 쓰기 요청 실패 reason=report_write_access_denied userId={}, role={}",
+                    user.getId(),
+                    user.getRole()
+            );
+            throw new CustomException(ErrorCode.REPORT_ACCESS_DENIED);
+        }
+
+        return user;
+    }
+
+    private User getActiveUser(AuthUser authUser) {
         if (authUser == null || authUser.id() == null) {
             log.warn("[ReportService] 보고서 요청 실패 reason=unauthenticated");
             throw new CustomException(ErrorCode.UNAUTHORIZED);
@@ -302,22 +342,52 @@ public class ReportService {
             throw new CustomException(ErrorCode.INACTIVE_ACCOUNT);
         }
 
-        if (!hasReportAccess(user.getRole())) {
-            log.warn(
-                    "[ReportService] 보고서 요청 실패 reason=report_access_denied userId={}, role={}",
-                    user.getId(),
-                    user.getRole()
-            );
-            throw new CustomException(ErrorCode.REPORT_ACCESS_DENIED);
-        }
-
         return user;
     }
 
-    private boolean hasReportAccess(Role role) {
+    private boolean hasReportReadAccess(Role role) {
+        return role == Role.OPERATOR
+                || role == Role.MANUFACTURING_MANAGER
+                || role == Role.EXECUTIVE
+                || role == Role.ADMIN;
+    }
+
+    private boolean hasReportWriteAccess(Role role) {
         return role == Role.MANUFACTURING_MANAGER
                 || role == Role.EXECUTIVE
                 || role == Role.ADMIN;
+    }
+
+    private boolean canViewBusinessReports(User user) {
+        return user != null && user.getRole() != Role.OPERATOR;
+    }
+
+    private void validateReportVisibility(User user, Report report) {
+        if (isBusinessReport(report) && !canViewBusinessReports(user)) {
+            log.warn(
+                    "[ReportService] 경영진용 보고서 접근 차단 userId={}, role={}, reportId={}, reportType={}",
+                    user.getId(),
+                    user.getRole(),
+                    report.getReportId(),
+                    report.getReportType()
+            );
+            throw new CustomException(ErrorCode.REPORT_ACCESS_DENIED);
+        }
+    }
+
+    private void validateReportJobVisibility(User user, ReportJob reportJob) {
+        if (reportJob.getReportId() == null) {
+            return;
+        }
+
+        reportRepository.findById(reportJob.getReportId())
+                .ifPresent(report -> validateReportVisibility(user, report));
+    }
+
+    private boolean isBusinessReport(Report report) {
+        return report != null
+                && (report.getReportType() == ReportType.ON_DEMAND_BUSINESS
+                || report.getReportType() == ReportType.MONTHLY_BUSINESS);
     }
 
     private void validatePositiveId(Long id, String fieldName) {

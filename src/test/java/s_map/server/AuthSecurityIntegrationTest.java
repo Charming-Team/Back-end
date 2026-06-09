@@ -926,6 +926,35 @@ class AuthSecurityIntegrationTest {
                     .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("403"));
         }
 
+        @ParameterizedTest
+        @EnumSource(value = Role.class, names = {"OPERATOR"}, mode = Mode.EXCLUDE)
+        @DisplayName("작업자가 아닌 사용자는 AI 생산계획 생성 API 검증까지 도달할 수 있다")
+        void nonOperatorCanReachPlanAiGenerateValidation(Role role) throws Exception {
+            String accessToken = loginAndGetAccessToken(saveUser(role, role.name().toLowerCase() + "@sk.com", PASSWORD));
+
+            mockMvc.perform(MockMvcRequestBuilders.post("/api/plans/ai/generate")
+                            .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{}"))
+                    .andExpect(MockMvcResultMatchers.status().isBadRequest())
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(false))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("400-001"));
+        }
+
+        @Test
+        @DisplayName("작업자는 AI 생산계획 생성 API에 접근할 수 없다")
+        void operatorCannotAccessPlanAiGenerate() throws Exception {
+            String accessToken = loginAndGetAccessToken(saveUser(Role.OPERATOR, "operator@sk.com", PASSWORD));
+
+            mockMvc.perform(MockMvcRequestBuilders.post("/api/plans/ai/generate")
+                            .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{}"))
+                    .andExpect(MockMvcResultMatchers.status().isForbidden())
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(false))
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.code").value("403"));
+        }
+
     }
 
     @Nested
