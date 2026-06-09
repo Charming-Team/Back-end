@@ -209,7 +209,7 @@ public class PlanSimulationService {
     private Map<Long, ProductionPlan> loadEditablePlansByOrderId(Set<Long> orderIds) {
         List<ProductionPlan> plans = productionPlanRepository.findByOrderIdInAndPlanStatusNot(
                 new ArrayList<>(orderIds),
-                PlanStatus.CANCELLED
+                PlanStatus.CANCELLED.name()
         );
 
         Map<Long, ProductionPlan> plansByOrderId = new HashMap<>();
@@ -335,7 +335,7 @@ public class PlanSimulationService {
                 plan.getLineId(),
                 plan.getPlannedStartAt(),
                 plan.getPlannedEndAt(),
-                PlanStatus.CANCELLED,
+                PlanStatus.CANCELLED.name(),
                 excludedPlanIds
         );
 

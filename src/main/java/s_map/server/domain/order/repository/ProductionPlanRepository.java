@@ -3,7 +3,6 @@ package s_map.server.domain.order.repository;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import s_map.server.domain.order.entity.PlanStatus;
 import s_map.server.domain.order.entity.ProductionPlan;
 
 import java.time.OffsetDateTime;
@@ -32,9 +31,18 @@ public interface ProductionPlanRepository extends JpaRepository<ProductionPlan, 
             Integer planSequence
     );
 
+    @Query(
+            value = """
+                    SELECT *
+                    FROM production_plans pp
+                    WHERE pp.order_id IN (:orderIds)
+                      AND CAST(pp.plan_status AS varchar) <> :excludedStatus
+                    """,
+            nativeQuery = true
+    )
     List<ProductionPlan> findByOrderIdInAndPlanStatusNot(
-            List<Long> orderIds,
-            PlanStatus planStatus
+            @Param("orderIds") List<Long> orderIds,
+            @Param("excludedStatus") String excludedStatus
     );
 
     @Query("""
@@ -56,20 +64,25 @@ public interface ProductionPlanRepository extends JpaRepository<ProductionPlan, 
             @Param("excludedPlanIds") List<Long> excludedPlanIds
     );
 
-    @Query("""
-            SELECT COUNT(plan) > 0
-            FROM ProductionPlan plan
-            WHERE plan.lineId = :lineId
-              AND plan.planStatus <> :excludedStatus
-              AND plan.plannedStartAt < :plannedEndAt
-              AND plan.plannedEndAt > :plannedStartAt
-              AND plan.planId NOT IN :excludedPlanIds
-            """)
+    @Query(
+            value = """
+                    SELECT EXISTS (
+                        SELECT 1
+                        FROM production_plans pp
+                        WHERE pp.line_id = :lineId
+                          AND CAST(pp.plan_status AS varchar) <> :excludedStatus
+                          AND pp.planned_start_at < :plannedEndAt
+                          AND pp.planned_end_at > :plannedStartAt
+                          AND pp.plan_id NOT IN (:excludedPlanIds)
+                    )
+                    """,
+            nativeQuery = true
+    )
     boolean existsScheduleConflictOutsidePlans(
             @Param("lineId") Long lineId,
             @Param("plannedStartAt") OffsetDateTime plannedStartAt,
             @Param("plannedEndAt") OffsetDateTime plannedEndAt,
-            @Param("excludedStatus") PlanStatus excludedStatus,
+            @Param("excludedStatus") String excludedStatus,
             @Param("excludedPlanIds") List<Long> excludedPlanIds
     );
 
