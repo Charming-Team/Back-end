@@ -65,7 +65,7 @@ class PlanSimulationServiceTest {
         ProductionPlan existingPlan = productionPlan(200L, 100L, 10L);
 
         when(customerOrderRepository.findAllById(any())).thenReturn(List.of(order));
-        when(productionPlanRepository.findByOrderIdInAndPlanStatusNot(anyList(), eq(PlanStatus.CANCELLED)))
+        when(productionPlanRepository.findByOrderIdInAndPlanStatusNot(anyList(), eq(PlanStatus.CANCELLED.name())))
                 .thenReturn(List.of(existingPlan));
         when(productionPlanRepository.existsActiveLineCapability(2L, 10L)).thenReturn(true);
         when(userRepository.existsByIdAndStatusAndRole(7L, UserStatus.ACTIVE, Role.OPERATOR)).thenReturn(true);
@@ -74,7 +74,7 @@ class PlanSimulationServiceTest {
                 eq(2L),
                 eq(startAt),
                 eq(startAt.plusHours(4)),
-                eq(PlanStatus.CANCELLED),
+                eq(PlanStatus.CANCELLED.name()),
                 eq(List.of(200L))
         )).thenReturn(false);
         when(planSimulationCommandRepository.saveSimulationResult(
