@@ -6,6 +6,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import s_map.server.domain.plan.dto.fastapi.FastApiPlanningGenerateRequest;
@@ -94,6 +95,14 @@ public class PlanningFastApiClient {
             log.info("[PlanningFastApiClient] FastAPI 생산계획 조정 응답 수신 성공");
 
             return response;
+        } catch (HttpClientErrorException exception) {
+            String responseMessage = resolveFastApiClientErrorMessage(exception);
+            log.warn(
+                    "[PlanningFastApiClient] FastAPI 생산계획 조정 요청 실패 reason=client_error status={} body={}",
+                    exception.getStatusCode(),
+                    responseMessage
+            );
+            throw new CustomException(ErrorCode.BAD_REQUEST, responseMessage);
         } catch (RestClientException exception) {
             log.error(
                     "[PlanningFastApiClient] FastAPI 생산계획 조정 요청 실패 reason=rest_client_exception",
@@ -119,6 +128,16 @@ public class PlanningFastApiClient {
         return value.endsWith("/")
                 ? value.substring(0, value.length() - 1)
                 : value;
+    }
+
+    private String resolveFastApiClientErrorMessage(HttpClientErrorException exception) {
+        String responseBody = exception.getResponseBodyAsString();
+
+        if (responseBody == null || responseBody.isBlank()) {
+            return ErrorCode.BAD_REQUEST.getMessage();
+        }
+
+        return responseBody;
     }
 
 }

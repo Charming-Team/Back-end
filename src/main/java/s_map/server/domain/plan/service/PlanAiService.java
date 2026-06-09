@@ -196,7 +196,7 @@ public class PlanAiService {
             PlanAiGenerateRequest request
     ) {
         return FastApiPlanningGenerateRequest.PlanningEditOrder.of(
-                plan.getOrderId(),
+                plan.getPlanId(),
                 plan.getProductId(),
                 plan.getPlannedQuantity(),
                 formatDueDate(order),
@@ -216,7 +216,7 @@ public class PlanAiService {
             CustomerOrder order
     ) {
         return FastApiPlanningGenerateRequest.PlanningAddOrder.of(
-                plan.getOrderId(),
+                plan.getPlanId(),
                 plan.getProductId(),
                 plan.getPlannedQuantity(),
                 formatDueDate(order),
