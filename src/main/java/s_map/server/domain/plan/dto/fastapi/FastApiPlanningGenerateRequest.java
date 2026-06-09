@@ -36,6 +36,20 @@ public class FastApiPlanningGenerateRequest {
     @JsonProperty("add_orders")
     private List<PlanningAddOrder> addOrders;
 
+    public static FastApiPlanningGenerateRequest of(
+            String planningStart,
+            String planningEnd,
+            List<PlanningEditOrder> editOrders,
+            List<PlanningAddOrder> addOrders
+    ) {
+        FastApiPlanningGenerateRequest request = new FastApiPlanningGenerateRequest();
+        request.planningStart = planningStart;
+        request.planningEnd = planningEnd;
+        request.editOrders = editOrders;
+        request.addOrders = addOrders;
+        return request;
+    }
+
     @Getter
     @Schema(description = "FastAPI 생산계획 조정 대상 기존 주문")
     public static class PlanningEditOrder {
@@ -80,6 +94,28 @@ public class FastApiPlanningGenerateRequest {
         @Valid
         @JsonProperty("locked_plan")
         private LockedPlan lockedPlan;
+
+        public static PlanningEditOrder of(
+                Long orderId,
+                Long productId,
+                Integer orderQuantity,
+                String dueDate,
+                BigDecimal contractAmount,
+                BigDecimal latePenaltyAmount,
+                String orderStatus,
+                LockedPlan lockedPlan
+        ) {
+            PlanningEditOrder order = new PlanningEditOrder();
+            order.orderId = orderId;
+            order.productId = productId;
+            order.orderQuantity = orderQuantity;
+            order.dueDate = dueDate;
+            order.contractAmount = contractAmount;
+            order.latePenaltyAmount = latePenaltyAmount;
+            order.orderStatus = orderStatus;
+            order.lockedPlan = lockedPlan;
+            return order;
+        }
     }
 
     @Getter
@@ -120,6 +156,26 @@ public class FastApiPlanningGenerateRequest {
         @NotBlank(message = "주문 상태는 필수입니다.")
         @JsonProperty("order_status")
         private String orderStatus;
+
+        public static PlanningAddOrder of(
+                Long orderId,
+                Long productId,
+                Integer orderQuantity,
+                String dueDate,
+                BigDecimal contractAmount,
+                BigDecimal latePenaltyAmount,
+                String orderStatus
+        ) {
+            PlanningAddOrder order = new PlanningAddOrder();
+            order.orderId = orderId;
+            order.productId = productId;
+            order.orderQuantity = orderQuantity;
+            order.dueDate = dueDate;
+            order.contractAmount = contractAmount;
+            order.latePenaltyAmount = latePenaltyAmount;
+            order.orderStatus = orderStatus;
+            return order;
+        }
     }
 
     @Getter
@@ -140,5 +196,17 @@ public class FastApiPlanningGenerateRequest {
         @NotBlank(message = "고정 종료 시각은 필수입니다.")
         @JsonProperty("planned_end_at")
         private String plannedEndAt;
+
+        public static LockedPlan of(
+                Long lineId,
+                String plannedStartAt,
+                String plannedEndAt
+        ) {
+            LockedPlan lockedPlan = new LockedPlan();
+            lockedPlan.lineId = lineId;
+            lockedPlan.plannedStartAt = plannedStartAt;
+            lockedPlan.plannedEndAt = plannedEndAt;
+            return lockedPlan;
+        }
     }
 }
