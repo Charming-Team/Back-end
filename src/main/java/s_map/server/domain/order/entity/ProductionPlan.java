@@ -143,6 +143,26 @@ public class ProductionPlan extends BaseEntity {
         this.planStatus = planStatus;
     }
 
+    public void applySelectedSimulationPlan(
+            Long lineId,
+            Long operatorId,
+            OffsetDateTime plannedStartAt,
+            OffsetDateTime plannedEndAt,
+            BigDecimal estimatedDurationHr,
+            Integer plannedQuantity,
+            Integer planSequence,
+            PlanStatus planStatus
+    ) {
+        this.lineId = lineId;
+        this.operatorId = operatorId;
+        this.plannedStartAt = plannedStartAt;
+        this.plannedEndAt = plannedEndAt;
+        this.estimatedDurationHr = estimatedDurationHr;
+        this.plannedQuantity = plannedQuantity;
+        this.planSequence = planSequence;
+        this.planStatus = planStatus;
+    }
+
     public void moveSchedule(
             Long lineId,
             OffsetDateTime plannedStartAt,

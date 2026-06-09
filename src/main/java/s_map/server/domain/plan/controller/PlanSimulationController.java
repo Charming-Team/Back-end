@@ -15,6 +15,14 @@ import s_map.server.domain.plan.dto.res.PlanSimulationListResponse;
 import s_map.server.domain.plan.service.PlanSimulationService;
 import s_map.server.global.common.BaseResponse;
 
+import jakarta.validation.Valid;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import s_map.server.domain.plan.dto.req.SelectedPlanSimulationSaveRequest;
+import s_map.server.domain.plan.dto.res.SelectedPlanSimulationSaveResponse;
+import s_map.server.global.security.AuthUser;
+
 import java.util.List;
 
 @Tag(name = "Plan Simulation", description = "생산계획 시뮬레이션 API")
@@ -55,5 +63,28 @@ public class PlanSimulationController {
             @PathVariable Long simulationId
     ) {
         return BaseResponse.success(planSimulationService.getSimulationDetails(simulationId));
+    }
+
+    @Operation(
+            summary = "사용자 선택 생산계획 시뮬레이션 저장",
+            description = """
+                FastAPI 생산계획 조정 결과 중 사용자가 선택한 대안 1개만 저장합니다.
+                AI 전체 결과는 저장하지 않습니다.
+                선택된 plans는 production_plans에 저장하고,
+                시뮬레이션 요약은 schedule_simulation_results에,
+                상세 변경 내역은 schedule_simulation_details에 저장합니다.
+                """
+    )
+    @PostMapping("/selected")
+    public BaseResponse<SelectedPlanSimulationSaveResponse> saveSelectedSimulation(
+            @AuthenticationPrincipal AuthUser authUser,
+            @Valid @RequestBody SelectedPlanSimulationSaveRequest request
+    ) {
+        return BaseResponse.success(
+                planSimulationService.saveSelectedSimulation(
+                        request,
+                        authUser.id()
+                )
+        );
     }
 }

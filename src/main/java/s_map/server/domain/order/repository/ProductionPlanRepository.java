@@ -32,6 +32,47 @@ public interface ProductionPlanRepository extends JpaRepository<ProductionPlan, 
             Integer planSequence
     );
 
+    List<ProductionPlan> findByOrderIdInAndPlanStatusNot(
+            List<Long> orderIds,
+            PlanStatus planStatus
+    );
+
+    @Query("""
+            SELECT COALESCE(MAX(plan.planSequence), 0)
+            FROM ProductionPlan plan
+            """)
+    Integer findMaxPlanSequence();
+
+    @Query("""
+            SELECT COUNT(plan) > 0
+            FROM ProductionPlan plan
+            WHERE plan.lineId = :lineId
+              AND plan.planSequence = :planSequence
+              AND plan.planId NOT IN :excludedPlanIds
+            """)
+    boolean existsLineSequenceOutsidePlans(
+            @Param("lineId") Long lineId,
+            @Param("planSequence") Integer planSequence,
+            @Param("excludedPlanIds") List<Long> excludedPlanIds
+    );
+
+    @Query("""
+            SELECT COUNT(plan) > 0
+            FROM ProductionPlan plan
+            WHERE plan.lineId = :lineId
+              AND plan.planStatus <> :excludedStatus
+              AND plan.plannedStartAt < :plannedEndAt
+              AND plan.plannedEndAt > :plannedStartAt
+              AND plan.planId NOT IN :excludedPlanIds
+            """)
+    boolean existsScheduleConflictOutsidePlans(
+            @Param("lineId") Long lineId,
+            @Param("plannedStartAt") OffsetDateTime plannedStartAt,
+            @Param("plannedEndAt") OffsetDateTime plannedEndAt,
+            @Param("excludedStatus") PlanStatus excludedStatus,
+            @Param("excludedPlanIds") List<Long> excludedPlanIds
+    );
+
     @Query(
             value = """
                     SELECT EXISTS (
