@@ -168,6 +168,51 @@ class PlanSimulationServiceTest {
     }
 
     @Test
+    @DisplayName("planId가 없는 선택 계획은 신규 생산계획으로 저장한다")
+    void saveSelectedSimulationCreatesNewPlanWithoutPlanId() {
+        OffsetDateTime startAt = OffsetDateTime.of(2026, 6, 10, 9, 0, 0, 0, ZoneOffset.ofHours(9));
+        SelectedPlanSimulationSaveRequest request = selectedSimulationSaveRequest(
+                List.of(selectedPlan(startAt, null, 2L, 5))
+        );
+        CustomerOrder order = customerOrder(100L, 10L);
+
+        when(customerOrderRepository.findAllById(any())).thenReturn(List.of(order));
+        when(productionPlanRepository.existsActiveLineCapability(2L, 10L)).thenReturn(true);
+        when(userRepository.existsByIdAndStatusAndRole(7L, UserStatus.ACTIVE, Role.OPERATOR)).thenReturn(true);
+        when(productionPlanRepository.existsLineSequenceOutsidePlans(2L, 5, List.of(Long.MIN_VALUE)))
+                .thenReturn(false);
+        when(productionPlanRepository.existsScheduleConflictOutsidePlans(
+                eq(2L),
+                eq(startAt),
+                eq(startAt.plusHours(4)),
+                eq(PlanStatus.CANCELLED.name()),
+                eq(List.of(Long.MIN_VALUE))
+        )).thenReturn(false);
+        when(planSimulationCommandRepository.saveSimulationResult(
+                eq(request),
+                anyString(),
+                eq("DUE_DATE_OPTIMIZATION"),
+                eq(9L),
+                any(OffsetDateTime.class),
+                any(OffsetDateTime.class)
+        )).thenReturn(300L);
+        when(productionPlanRepository.save(any(ProductionPlan.class))).thenAnswer(invocation -> {
+            ProductionPlan plan = invocation.getArgument(0);
+            ReflectionTestUtils.setField(plan, "planId", 400L);
+            return plan;
+        });
+
+        var response = planSimulationService.saveSelectedSimulation(request, 9L);
+
+        assertThat(response.getSavedPlanIds()).containsExactly(400L);
+        assertThat(response.getSavedPlanCount()).isEqualTo(1);
+        assertThat(response.isApplied()).isTrue();
+
+        verify(productionPlanRepository, never()).findAllById(any());
+        verify(productionPlanRepository, never()).flush();
+    }
+
+    @Test
     @DisplayName("기존안을 선택하면 생산계획을 수정하지 않는다")
     void saveSelectedSimulationDoesNotApplyBaselineSelection() {
         SelectedPlanSimulationSaveRequest request = baselineSelectionRequest();

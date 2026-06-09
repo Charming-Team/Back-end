@@ -122,7 +122,7 @@ public class PlanSimulationService {
         for (SelectedPlanSimulationSaveRequest.SelectedPlan selectedPlan : request.getPlans()) {
             ProductionPlan savedPlan = applySelectedPlan(
                     selectedPlan,
-                    plansByPlanId.get(selectedPlan.resolvePlanId())
+                    resolveExistingPlan(selectedPlan, plansByPlanId)
             );
 
             savedPlanIds.add(savedPlan.getPlanId());
@@ -251,7 +251,7 @@ public class PlanSimulationService {
 
         for (SelectedPlanSimulationSaveRequest.SelectedPlan plan : request.getPlans()) {
             CustomerOrder order = ordersById.get(plan.getOrderId());
-            ProductionPlan existingPlan = plansByPlanId.get(plan.resolvePlanId());
+            ProductionPlan existingPlan = resolveExistingPlan(plan, plansByPlanId);
 
             if (!order.getProductId().equals(plan.getProductId())) {
                 throw new CustomException(ErrorCode.BAD_REQUEST);
@@ -276,6 +276,14 @@ public class PlanSimulationService {
                 .toList();
 
         return planIds.isEmpty() ? List.of(Long.MIN_VALUE) : planIds;
+    }
+
+    private ProductionPlan resolveExistingPlan(
+            SelectedPlanSimulationSaveRequest.SelectedPlan plan,
+            Map<Long, ProductionPlan> plansByPlanId
+    ) {
+        Long planId = plan.resolvePlanId();
+        return planId == null ? null : plansByPlanId.get(planId);
     }
 
     private void validateDuplicateLineSequences(List<SelectedPlanSimulationSaveRequest.SelectedPlan> plans) {
