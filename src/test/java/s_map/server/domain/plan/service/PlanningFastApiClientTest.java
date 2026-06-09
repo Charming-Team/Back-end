@@ -5,7 +5,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
@@ -16,14 +18,55 @@ import s_map.server.global.error.ErrorCode;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 class PlanningFastApiClientTest {
+
+    @Test
+    @DisplayName("FastAPI 유동 JSON 응답을 생산계획 AI 응답 DTO로 변환한다")
+    void generatePlanningReadsFlexibleJsonResponse() {
+        FastApiPlanningProperties properties = new FastApiPlanningProperties();
+        properties.setBaseUrl("http://internal-fastapi:8000");
+        PlanningFastApiClient client = new PlanningFastApiClient(properties);
+        RestTemplate restTemplate = new RestTemplate();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
+        FastApiPlanningGenerateRequest request = request();
+
+        ReflectionTestUtils.setField(client, "restTemplate", restTemplate);
+        server.expect(requestTo("http://internal-fastapi:8000/ai/api/v1/planning"))
+                .andRespond(withSuccess(
+                        """
+                                {
+                                  "planning_response": {
+                                    "candidates": [
+                                      {"schedule_id": 425, "line_id": 2}
+                                    ]
+                                  },
+                                  "simulation_response": {
+                                    "delay_reduction_hr": 12.5
+                                  }
+                                }
+                                """,
+                        MediaType.APPLICATION_JSON
+                ));
+
+        FastApiPlanningGenerateResponse response =
+                client.generatePlanning(request, "Bearer access-token", "refresh-token");
+
+        org.assertj.core.api.Assertions.assertThat(response.getPlanningResponse())
+                .isInstanceOf(Map.class);
+        org.assertj.core.api.Assertions.assertThat(response.getSimulationResponse())
+                .isInstanceOf(Map.class);
+        server.verify();
+    }
 
     @Test
     @DisplayName("FastAPI 400 응답은 Spring에서도 BAD_REQUEST로 전달한다")
