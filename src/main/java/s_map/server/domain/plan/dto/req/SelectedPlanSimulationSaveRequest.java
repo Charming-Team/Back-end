@@ -1,5 +1,6 @@
 package s_map.server.domain.plan.dto.req;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -82,6 +83,14 @@ public class SelectedPlanSimulationSaveRequest {
     @Schema(description = "사용자 선택 대안의 생산계획")
     public static class SelectedPlan {
 
+        @Schema(description = "수정할 기존 생산계획 ID. FastAPI schedule_id와 동일합니다. 없으면 신규 생산계획으로 등록합니다.", example = "425", nullable = true)
+        @JsonAlias("plan_id")
+        private Long planId;
+
+        @Schema(description = "수정할 기존 생산계획 ID alias. planId가 있으면 planId를 우선합니다.", example = "425", nullable = true)
+        @JsonAlias("schedule_id")
+        private Long scheduleId;
+
         @Schema(description = "주문 ID. customer_orders에 이미 존재해야 합니다.", example = "421")
         @NotNull(message = "주문 ID는 필수입니다.")
         private Long orderId;
@@ -149,6 +158,10 @@ public class SelectedPlanSimulationSaveRequest {
 
         public PlanStatus resolvePlanStatus() {
             return planStatus != null ? planStatus : PlanStatus.SCHEDULED;
+        }
+
+        public Long resolvePlanId() {
+            return planId != null ? planId : scheduleId;
         }
     }
 }

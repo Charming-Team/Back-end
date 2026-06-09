@@ -27,7 +27,6 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -65,7 +64,7 @@ class PlanSimulationServiceTest {
         ProductionPlan existingPlan = productionPlan(200L, 100L, 10L);
 
         when(customerOrderRepository.findAllById(any())).thenReturn(List.of(order));
-        when(productionPlanRepository.findByOrderIdInAndPlanStatusNot(anyList(), eq(PlanStatus.CANCELLED.name())))
+        when(productionPlanRepository.findAllById(any()))
                 .thenReturn(List.of(existingPlan));
         when(productionPlanRepository.existsActiveLineCapability(2L, 10L)).thenReturn(true);
         when(userRepository.existsByIdAndStatusAndRole(7L, UserStatus.ACTIVE, Role.OPERATOR)).thenReturn(true);
@@ -110,6 +109,65 @@ class PlanSimulationServiceTest {
     }
 
     @Test
+    @DisplayName("같은 주문에 연결된 여러 생산계획은 planId 기준으로 각각 갱신한다")
+    void saveSelectedSimulationUpdatesMultiplePlansForSameOrderByPlanId() {
+        OffsetDateTime firstStartAt = OffsetDateTime.of(2026, 6, 10, 9, 0, 0, 0, ZoneOffset.ofHours(9));
+        OffsetDateTime secondStartAt = OffsetDateTime.of(2026, 6, 11, 9, 0, 0, 0, ZoneOffset.ofHours(9));
+        SelectedPlanSimulationSaveRequest request = selectedSimulationSaveRequest(List.of(
+                selectedPlan(firstStartAt, 200L, 2L, 5),
+                selectedPlan(secondStartAt, 201L, 3L, 6)
+        ));
+        CustomerOrder order = customerOrder(100L, 10L);
+        ProductionPlan firstExistingPlan = productionPlan(200L, 100L, 10L);
+        ProductionPlan secondExistingPlan = productionPlan(201L, 100L, 10L);
+
+        when(customerOrderRepository.findAllById(any())).thenReturn(List.of(order));
+        when(productionPlanRepository.findAllById(any()))
+                .thenReturn(List.of(firstExistingPlan, secondExistingPlan));
+        when(productionPlanRepository.existsActiveLineCapability(2L, 10L)).thenReturn(true);
+        when(productionPlanRepository.existsActiveLineCapability(3L, 10L)).thenReturn(true);
+        when(userRepository.existsByIdAndStatusAndRole(7L, UserStatus.ACTIVE, Role.OPERATOR)).thenReturn(true);
+        when(productionPlanRepository.existsLineSequenceOutsidePlans(2L, 5, List.of(200L, 201L)))
+                .thenReturn(false);
+        when(productionPlanRepository.existsLineSequenceOutsidePlans(3L, 6, List.of(200L, 201L)))
+                .thenReturn(false);
+        when(productionPlanRepository.existsScheduleConflictOutsidePlans(
+                eq(2L),
+                eq(firstStartAt),
+                eq(firstStartAt.plusHours(4)),
+                eq(PlanStatus.CANCELLED.name()),
+                eq(List.of(200L, 201L))
+        )).thenReturn(false);
+        when(productionPlanRepository.existsScheduleConflictOutsidePlans(
+                eq(3L),
+                eq(secondStartAt),
+                eq(secondStartAt.plusHours(4)),
+                eq(PlanStatus.CANCELLED.name()),
+                eq(List.of(200L, 201L))
+        )).thenReturn(false);
+        when(planSimulationCommandRepository.saveSimulationResult(
+                eq(request),
+                anyString(),
+                eq("DUE_DATE_OPTIMIZATION"),
+                eq(9L),
+                any(OffsetDateTime.class),
+                any(OffsetDateTime.class)
+        )).thenReturn(300L);
+        when(productionPlanRepository.findMaxPlanSequence()).thenReturn(10);
+
+        var response = planSimulationService.saveSelectedSimulation(request, 9L);
+
+        assertThat(response.getSavedPlanIds()).containsExactly(200L, 201L);
+        assertThat(firstExistingPlan.getLineId()).isEqualTo(2L);
+        assertThat(firstExistingPlan.getPlanSequence()).isEqualTo(5);
+        assertThat(secondExistingPlan.getLineId()).isEqualTo(3L);
+        assertThat(secondExistingPlan.getPlanSequence()).isEqualTo(6);
+
+        verify(productionPlanRepository).flush();
+        verify(productionPlanRepository, never()).save(any(ProductionPlan.class));
+    }
+
+    @Test
     @DisplayName("기존안을 선택하면 생산계획을 수정하지 않는다")
     void saveSelectedSimulationDoesNotApplyBaselineSelection() {
         SelectedPlanSimulationSaveRequest request = baselineSelectionRequest();
@@ -138,12 +196,18 @@ class PlanSimulationServiceTest {
     }
 
     private SelectedPlanSimulationSaveRequest selectedSimulationSaveRequest(OffsetDateTime startAt) {
+        return selectedSimulationSaveRequest(List.of(selectedPlan(startAt, 200L, 2L, 5)));
+    }
+
+    private SelectedPlanSimulationSaveRequest selectedSimulationSaveRequest(
+            List<SelectedPlanSimulationSaveRequest.SelectedPlan> plans
+    ) {
         SelectedPlanSimulationSaveRequest request = new SelectedPlanSimulationSaveRequest();
         ReflectionTestUtils.setField(request, "simulationName", "납기 최적화 대안");
         ReflectionTestUtils.setField(request, "planVariantCode", "DUE_DATE_OPTIMAL");
         ReflectionTestUtils.setField(request, "beforeTotalDelayHr", BigDecimal.valueOf(12));
         ReflectionTestUtils.setField(request, "afterTotalDelayHr", BigDecimal.valueOf(3));
-        ReflectionTestUtils.setField(request, "plans", List.of(selectedPlan(startAt)));
+        ReflectionTestUtils.setField(request, "plans", plans);
         return request;
     }
 
@@ -162,16 +226,26 @@ class PlanSimulationServiceTest {
     }
 
     private SelectedPlanSimulationSaveRequest.SelectedPlan selectedPlan(OffsetDateTime startAt) {
+        return selectedPlan(startAt, 200L, 2L, 5);
+    }
+
+    private SelectedPlanSimulationSaveRequest.SelectedPlan selectedPlan(
+            OffsetDateTime startAt,
+            Long planId,
+            Long lineId,
+            Integer planSequence
+    ) {
         SelectedPlanSimulationSaveRequest.SelectedPlan plan = new SelectedPlanSimulationSaveRequest.SelectedPlan();
+        ReflectionTestUtils.setField(plan, "planId", planId);
         ReflectionTestUtils.setField(plan, "orderId", 100L);
         ReflectionTestUtils.setField(plan, "productId", 10L);
-        ReflectionTestUtils.setField(plan, "lineId", 2L);
+        ReflectionTestUtils.setField(plan, "lineId", lineId);
         ReflectionTestUtils.setField(plan, "operatorId", 7L);
         ReflectionTestUtils.setField(plan, "plannedStartAt", startAt);
         ReflectionTestUtils.setField(plan, "plannedEndAt", startAt.plusHours(4));
         ReflectionTestUtils.setField(plan, "estimatedDurationHr", BigDecimal.valueOf(4));
         ReflectionTestUtils.setField(plan, "plannedQuantity", 500);
-        ReflectionTestUtils.setField(plan, "planSequence", 5);
+        ReflectionTestUtils.setField(plan, "planSequence", planSequence);
         ReflectionTestUtils.setField(plan, "afterDelayed", false);
         return plan;
     }

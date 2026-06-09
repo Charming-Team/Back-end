@@ -31,20 +31,6 @@ public interface ProductionPlanRepository extends JpaRepository<ProductionPlan, 
             Integer planSequence
     );
 
-    @Query(
-            value = """
-                    SELECT *
-                    FROM production_plans pp
-                    WHERE pp.order_id IN (:orderIds)
-                      AND CAST(pp.plan_status AS varchar) <> :excludedStatus
-                    """,
-            nativeQuery = true
-    )
-    List<ProductionPlan> findByOrderIdInAndPlanStatusNot(
-            @Param("orderIds") List<Long> orderIds,
-            @Param("excludedStatus") String excludedStatus
-    );
-
     @Query("""
             SELECT COALESCE(MAX(plan.planSequence), 0)
             FROM ProductionPlan plan
