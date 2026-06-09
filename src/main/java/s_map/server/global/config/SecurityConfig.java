@@ -94,6 +94,8 @@ public class SecurityConfig {
                         .hasAnyRole("ADMIN", "EXECUTIVE", "MANUFACTURING_MANAGER")
                         .requestMatchers(HttpMethod.POST, "/api/orders")
                         .hasRole("MANUFACTURING_MANAGER")
+                        .requestMatchers(HttpMethod.POST, "/api/plans/ai/**")
+                        .hasAnyRole(PLAN_WRITE_ROLES)
                         .requestMatchers(HttpMethod.POST, "/api/plans/simulations/**")
                         .hasAnyRole(PLAN_WRITE_ROLES)
                         .requestMatchers(HttpMethod.PATCH, "/api/plans/**")
