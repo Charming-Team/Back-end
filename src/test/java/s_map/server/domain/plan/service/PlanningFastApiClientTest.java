@@ -32,7 +32,7 @@ class PlanningFastApiClientTest {
 
         ReflectionTestUtils.setField(client, "restTemplate", restTemplate);
         when(restTemplate.postForObject(
-                eq("http://internal-fastapi:8000/api/v1/planning/generate"),
+                eq("http://internal-fastapi:8000/ai/api/v1/planning"),
                 any(HttpEntity.class),
                 eq(FastApiPlanningGenerateResponse.class)
         )).thenThrow(new RestClientException("I/O error on POST request for http://internal-fastapi:8000/secret"));
