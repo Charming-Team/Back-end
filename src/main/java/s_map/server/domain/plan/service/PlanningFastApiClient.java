@@ -99,7 +99,7 @@ public class PlanningFastApiClient {
                     "[PlanningFastApiClient] FastAPI 생산계획 조정 요청 실패 reason=rest_client_exception",
                     exception
             );
-            throw new CustomException(ErrorCode.AI_SERVER_CALL_FAILED, resolveRestClientMessage(exception));
+            throw new CustomException(ErrorCode.AI_SERVER_CALL_FAILED);
         }
     }
 
@@ -121,13 +121,4 @@ public class PlanningFastApiClient {
                 : value;
     }
 
-    private String resolveRestClientMessage(RestClientException exception) {
-        String message = exception.getMessage();
-
-        if (message == null || message.isBlank()) {
-            return ErrorCode.AI_SERVER_CALL_FAILED.getMessage();
-        }
-
-        return message;
-    }
 }
