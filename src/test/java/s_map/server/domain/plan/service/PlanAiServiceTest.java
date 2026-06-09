@@ -130,7 +130,7 @@ class PlanAiServiceTest {
 
         FastApiPlanningGenerateRequest.PlanningEditOrder editOrder =
                 fastApiRequest.getEditOrders().getFirst();
-        assertThat(editOrder.getOrderId()).isEqualTo(421L);
+        assertThat(editOrder.getOrderId()).isEqualTo(100L);
         assertThat(editOrder.getProductId()).isEqualTo(10L);
         assertThat(editOrder.getOrderQuantity()).isEqualTo(18_700);
         assertThat(editOrder.getDueDate()).isEqualTo("2026-06-20 08:59:59.000 +0900");
@@ -143,7 +143,7 @@ class PlanAiServiceTest {
 
         FastApiPlanningGenerateRequest.PlanningAddOrder addOrder =
                 fastApiRequest.getAddOrders().getFirst();
-        assertThat(addOrder.getOrderId()).isEqualTo(422L);
+        assertThat(addOrder.getOrderId()).isEqualTo(101L);
         assertThat(addOrder.getProductId()).isEqualTo(11L);
         assertThat(addOrder.getOrderQuantity()).isEqualTo(9_000);
         assertThat(addOrder.getDueDate()).isEqualTo("2026-06-15 08:59:59.000 +0900");
