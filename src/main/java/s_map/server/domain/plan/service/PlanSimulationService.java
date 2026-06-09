@@ -3,6 +3,8 @@ package s_map.server.domain.plan.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import s_map.server.domain.order.entity.CustomerOrder;
+import s_map.server.domain.order.entity.PlanStatus;
 import s_map.server.domain.order.entity.ProductionPlan;
 import s_map.server.domain.order.repository.CustomerOrderRepository;
 import s_map.server.domain.order.repository.ProductionPlanRepository;
@@ -12,6 +14,9 @@ import s_map.server.domain.plan.dto.res.PlanSimulationListResponse;
 import s_map.server.domain.plan.dto.res.SelectedPlanSimulationSaveResponse;
 import s_map.server.domain.plan.repository.PlanSimulationCommandRepository;
 import s_map.server.domain.plan.repository.PlanSimulationRepository;
+import s_map.server.domain.user.entity.Role;
+import s_map.server.domain.user.entity.UserStatus;
+import s_map.server.domain.user.repository.UserRepository;
 import s_map.server.global.error.CustomException;
 import s_map.server.global.error.ErrorCode;
 
@@ -19,8 +24,15 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -33,6 +45,7 @@ public class PlanSimulationService {
     private final PlanSimulationCommandRepository planSimulationCommandRepository;
     private final ProductionPlanRepository productionPlanRepository;
     private final CustomerOrderRepository customerOrderRepository;
+    private final UserRepository userRepository;
 
     /**
      * [기능]
@@ -60,8 +73,8 @@ public class PlanSimulationService {
      *
      * [Process]
      * - 요청값을 검증한다.
-     * - 요청 plans의 orderId가 customer_orders에 존재하는지 확인한다.
-     * - 선택된 plans를 production_plans에 저장한다.
+     * - 요청 plans의 주문, 제품, 생산 라인, 담당자, 일정 충돌 여부를 검증한다.
+     * - 기존 생산계획이 있는 주문은 해당 계획을 수정하고, 없는 주문은 새 계획을 저장한다.
      * - 시뮬레이션 요약을 schedule_simulation_results에 저장한다.
      * - 시뮬레이션 상세 변경 내역을 schedule_simulation_details에 저장한다.
      */
@@ -70,49 +83,47 @@ public class PlanSimulationService {
             SelectedPlanSimulationSaveRequest request,
             Long appliedBy
     ) {
-        validateSaveRequest(request);
-        validateOrdersExist(request);
+        validateBaseRequest(request);
 
-        OffsetDateTime appliedAt = OffsetDateTime.now(DEFAULT_PRODUCTION_ZONE);
-        String simulationGroupId = resolveSimulationGroupId(request.getSimulationGroupId(), appliedAt);
+        OffsetDateTime selectedAt = OffsetDateTime.now(DEFAULT_PRODUCTION_ZONE);
+        String simulationGroupId = resolveSimulationGroupId(request.getSimulationGroupId(), selectedAt);
         String simulationType = resolveSimulationType(request.getPlanVariantCode());
+        boolean baselineSelection = isCurrentPlanBaseline(simulationType);
 
         Long simulationId = planSimulationCommandRepository.saveSimulationResult(
                 request,
                 simulationGroupId,
                 simulationType,
-                appliedBy,
-                appliedAt
+                baselineSelection ? null : appliedBy,
+                baselineSelection ? null : selectedAt
         );
 
+        if (baselineSelection) {
+            return SelectedPlanSimulationSaveResponse.builder()
+                    .simulationId(simulationId)
+                    .simulationGroupId(simulationGroupId)
+                    .savedPlanCount(0)
+                    .savedDetailCount(0)
+                    .savedPlanIds(List.of())
+                    .applied(false)
+                    .appliedBy(null)
+                    .appliedAt(null)
+                    .build();
+        }
+
+        validateSaveRequest(request);
+        Map<Long, CustomerOrder> ordersById = loadOrdersById(request);
+        Map<Long, ProductionPlan> plansByOrderId = loadEditablePlansByOrderId(ordersById.keySet());
+        validateSelectedPlans(request, ordersById, plansByOrderId);
+
         List<Long> savedPlanIds = new ArrayList<>();
+        releasePlanSequencesTemporarily(plansByOrderId.values());
 
         for (SelectedPlanSimulationSaveRequest.SelectedPlan selectedPlan : request.getPlans()) {
-            ProductionPlan savedPlan = productionPlanRepository.save(
-                    ProductionPlan.create(
-                            selectedPlan.getOrderId(),
-                            selectedPlan.getProductId(),
-                            selectedPlan.getLineId(),
-                            selectedPlan.getOperatorId(),
-                            selectedPlan.getPlannedStartAt(),
-                            selectedPlan.getPlannedEndAt(),
-                            selectedPlan.getEstimatedDurationHr(),
-                            selectedPlan.getPlannedQuantity(),
-                            selectedPlan.getPlanSequence()
-                    )
+            ProductionPlan savedPlan = applySelectedPlan(
+                    selectedPlan,
+                    plansByOrderId.get(selectedPlan.getOrderId())
             );
-
-            if (selectedPlan.resolvePlanStatus() != savedPlan.getPlanStatus()) {
-                savedPlan.updatePlan(
-                        savedPlan.getLineId(),
-                        savedPlan.getOperatorId(),
-                        savedPlan.getPlannedStartAt(),
-                        savedPlan.getPlannedEndAt(),
-                        savedPlan.getPlannedQuantity(),
-                        savedPlan.getPlanSequence(),
-                        selectedPlan.resolvePlanStatus()
-                );
-            }
 
             savedPlanIds.add(savedPlan.getPlanId());
 
@@ -131,12 +142,18 @@ public class PlanSimulationService {
                 .savedPlanIds(savedPlanIds)
                 .applied(true)
                 .appliedBy(appliedBy)
-                .appliedAt(appliedAt)
+                .appliedAt(selectedAt)
                 .build();
     }
 
+    private void validateBaseRequest(SelectedPlanSimulationSaveRequest request) {
+        if (request == null || request.getPlans() == null) {
+            throw new CustomException(ErrorCode.BAD_REQUEST);
+        }
+    }
+
     private void validateSaveRequest(SelectedPlanSimulationSaveRequest request) {
-        if (request == null || request.getPlans() == null || request.getPlans().isEmpty()) {
+        if (request.getPlans().isEmpty()) {
             throw new CustomException(ErrorCode.BAD_REQUEST);
         }
 
@@ -166,12 +183,217 @@ public class PlanSimulationService {
         }
     }
 
-    private void validateOrdersExist(SelectedPlanSimulationSaveRequest request) {
-        for (SelectedPlanSimulationSaveRequest.SelectedPlan plan : request.getPlans()) {
-            if (!customerOrderRepository.existsById(plan.getOrderId())) {
-                throw new CustomException(ErrorCode.ORDER_NOT_FOUND);
+    private Map<Long, CustomerOrder> loadOrdersById(SelectedPlanSimulationSaveRequest request) {
+        List<Long> orderIds = request.getPlans()
+                .stream()
+                .map(SelectedPlanSimulationSaveRequest.SelectedPlan::getOrderId)
+                .toList();
+
+        if (new HashSet<>(orderIds).size() != orderIds.size()) {
+            throw new CustomException(ErrorCode.BAD_REQUEST);
+        }
+
+        Map<Long, CustomerOrder> ordersById = customerOrderRepository.findAllById(orderIds)
+                .stream()
+                .collect(Collectors.toMap(CustomerOrder::getOrderId, Function.identity()));
+
+        if (ordersById.size() != orderIds.size()) {
+            throw new CustomException(ErrorCode.ORDER_NOT_FOUND);
+        }
+
+        return ordersById;
+    }
+
+    private Map<Long, ProductionPlan> loadEditablePlansByOrderId(Set<Long> orderIds) {
+        List<ProductionPlan> plans = productionPlanRepository.findByOrderIdInAndPlanStatusNot(
+                new ArrayList<>(orderIds),
+                PlanStatus.CANCELLED
+        );
+
+        Map<Long, ProductionPlan> plansByOrderId = new HashMap<>();
+
+        for (ProductionPlan plan : plans) {
+            if (plan.getPlanStatus() == PlanStatus.COMPLETED) {
+                throw new CustomException(ErrorCode.BAD_REQUEST);
+            }
+
+            ProductionPlan previous = plansByOrderId.put(plan.getOrderId(), plan);
+            if (previous != null) {
+                throw new CustomException(ErrorCode.BAD_REQUEST);
             }
         }
+
+        return plansByOrderId;
+    }
+
+    private void validateSelectedPlans(
+            SelectedPlanSimulationSaveRequest request,
+            Map<Long, CustomerOrder> ordersById,
+            Map<Long, ProductionPlan> plansByOrderId
+    ) {
+        List<Long> excludedPlanIds = excludedPlanIds(plansByOrderId.values());
+        validateDuplicateLineSequences(request.getPlans());
+        validateScheduleOverlapsInRequest(request.getPlans());
+
+        for (SelectedPlanSimulationSaveRequest.SelectedPlan plan : request.getPlans()) {
+            CustomerOrder order = ordersById.get(plan.getOrderId());
+
+            if (!order.getProductId().equals(plan.getProductId())) {
+                throw new CustomException(ErrorCode.BAD_REQUEST);
+            }
+
+            validateLineCapability(plan);
+            validateOperator(plan);
+            validateLineSequence(plan, excludedPlanIds);
+            validateScheduleConflict(plan, excludedPlanIds);
+        }
+    }
+
+    private List<Long> excludedPlanIds(Collection<ProductionPlan> plans) {
+        List<Long> planIds = plans.stream()
+                .map(ProductionPlan::getPlanId)
+                .toList();
+
+        return planIds.isEmpty() ? List.of(Long.MIN_VALUE) : planIds;
+    }
+
+    private void validateDuplicateLineSequences(List<SelectedPlanSimulationSaveRequest.SelectedPlan> plans) {
+        Set<LineSequenceKey> keys = new HashSet<>();
+
+        for (SelectedPlanSimulationSaveRequest.SelectedPlan plan : plans) {
+            if (!keys.add(new LineSequenceKey(plan.getLineId(), plan.getPlanSequence()))) {
+                throw new CustomException(ErrorCode.BAD_REQUEST);
+            }
+        }
+    }
+
+    private void validateScheduleOverlapsInRequest(List<SelectedPlanSimulationSaveRequest.SelectedPlan> plans) {
+        for (int left = 0; left < plans.size(); left++) {
+            SelectedPlanSimulationSaveRequest.SelectedPlan leftPlan = plans.get(left);
+
+            for (int right = left + 1; right < plans.size(); right++) {
+                SelectedPlanSimulationSaveRequest.SelectedPlan rightPlan = plans.get(right);
+
+                if (leftPlan.getLineId().equals(rightPlan.getLineId())
+                        && leftPlan.getPlannedStartAt().isBefore(rightPlan.getPlannedEndAt())
+                        && leftPlan.getPlannedEndAt().isAfter(rightPlan.getPlannedStartAt())) {
+                    throw new CustomException(ErrorCode.PLAN_SCHEDULE_CONFLICT);
+                }
+            }
+        }
+    }
+
+    private void validateLineCapability(SelectedPlanSimulationSaveRequest.SelectedPlan plan) {
+        boolean existsActiveLineCapability = productionPlanRepository.existsActiveLineCapability(
+                plan.getLineId(),
+                plan.getProductId()
+        );
+
+        if (!existsActiveLineCapability) {
+            throw new CustomException(ErrorCode.AVAILABLE_PRODUCTION_LINE_NOT_FOUND);
+        }
+    }
+
+    private void validateOperator(SelectedPlanSimulationSaveRequest.SelectedPlan plan) {
+        if (plan.getOperatorId() == null) {
+            return;
+        }
+
+        boolean existsActiveOperator = userRepository.existsByIdAndStatusAndRole(
+                plan.getOperatorId(),
+                UserStatus.ACTIVE,
+                Role.OPERATOR
+        );
+
+        if (!existsActiveOperator) {
+            throw new CustomException(ErrorCode.OPERATOR_NOT_FOUND);
+        }
+    }
+
+    private void validateLineSequence(
+            SelectedPlanSimulationSaveRequest.SelectedPlan plan,
+            List<Long> excludedPlanIds
+    ) {
+        boolean existsLineSequence = productionPlanRepository.existsLineSequenceOutsidePlans(
+                plan.getLineId(),
+                plan.getPlanSequence(),
+                excludedPlanIds
+        );
+
+        if (existsLineSequence) {
+            throw new CustomException(ErrorCode.BAD_REQUEST);
+        }
+    }
+
+    private void validateScheduleConflict(
+            SelectedPlanSimulationSaveRequest.SelectedPlan plan,
+            List<Long> excludedPlanIds
+    ) {
+        boolean existsScheduleConflict = productionPlanRepository.existsScheduleConflictOutsidePlans(
+                plan.getLineId(),
+                plan.getPlannedStartAt(),
+                plan.getPlannedEndAt(),
+                PlanStatus.CANCELLED,
+                excludedPlanIds
+        );
+
+        if (existsScheduleConflict) {
+            throw new CustomException(ErrorCode.PLAN_SCHEDULE_CONFLICT);
+        }
+    }
+
+    private void releasePlanSequencesTemporarily(Collection<ProductionPlan> plans) {
+        if (plans.isEmpty()) {
+            return;
+        }
+
+        int temporarySequence = productionPlanRepository.findMaxPlanSequence() + 1_000;
+
+        for (ProductionPlan plan : plans) {
+            plan.updatePlan(
+                    plan.getLineId(),
+                    plan.getOperatorId(),
+                    plan.getPlannedStartAt(),
+                    plan.getPlannedEndAt(),
+                    plan.getPlannedQuantity(),
+                    temporarySequence++,
+                    plan.getPlanStatus()
+            );
+        }
+
+        productionPlanRepository.flush();
+    }
+
+    private ProductionPlan applySelectedPlan(
+            SelectedPlanSimulationSaveRequest.SelectedPlan selectedPlan,
+            ProductionPlan existingPlan
+    ) {
+        if (existingPlan == null) {
+            ProductionPlan newPlan = ProductionPlan.create(
+                    selectedPlan.getOrderId(),
+                    selectedPlan.getProductId(),
+                    selectedPlan.getLineId(),
+                    selectedPlan.getOperatorId(),
+                    selectedPlan.getPlannedStartAt(),
+                    selectedPlan.getPlannedEndAt(),
+                    selectedPlan.getEstimatedDurationHr(),
+                    selectedPlan.getPlannedQuantity(),
+                    selectedPlan.getPlanSequence()
+            );
+            return productionPlanRepository.save(newPlan);
+        }
+
+        existingPlan.updatePlan(
+                selectedPlan.getLineId(),
+                selectedPlan.getOperatorId(),
+                selectedPlan.getPlannedStartAt(),
+                selectedPlan.getPlannedEndAt(),
+                selectedPlan.getPlannedQuantity(),
+                selectedPlan.getPlanSequence(),
+                selectedPlan.resolvePlanStatus()
+        );
+
+        return existingPlan;
     }
 
     private String resolveSimulationType(String planVariantCode) {
@@ -189,11 +411,18 @@ public class PlanSimulationService {
         };
     }
 
+    private boolean isCurrentPlanBaseline(String simulationType) {
+        return "CURRENT_PLAN_BASELINE".equals(simulationType);
+    }
+
     private String resolveSimulationGroupId(String simulationGroupId, OffsetDateTime appliedAt) {
         if (simulationGroupId != null && !simulationGroupId.isBlank()) {
             return simulationGroupId.trim();
         }
 
         return "SIM-GRP-" + appliedAt.format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
+    }
+
+    private record LineSequenceKey(Long lineId, Integer planSequence) {
     }
 }
