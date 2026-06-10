@@ -18,6 +18,8 @@ import s_map.server.domain.plan.repository.PlanSimulationRepository;
 import s_map.server.domain.user.entity.Role;
 import s_map.server.domain.user.entity.UserStatus;
 import s_map.server.domain.user.repository.UserRepository;
+import s_map.server.global.error.CustomException;
+import s_map.server.global.error.ErrorCode;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -26,6 +28,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -216,6 +219,49 @@ class PlanSimulationServiceTest {
 
         verify(productionPlanRepository, never()).findAllById(any());
         verify(productionPlanRepository, never()).flush();
+    }
+
+    @Test
+    @DisplayName("선택 대안 안에서 같은 라인 계획이 초 단위로라도 겹치면 거절한다")
+    void saveSelectedSimulationRejectsSecondLevelOverlapInSelectedPlans() {
+        OffsetDateTime firstStartAt = OffsetDateTime.of(2026, 6, 10, 9, 0, 0, 0, ZoneOffset.ofHours(9));
+        OffsetDateTime firstEndAt = firstStartAt.plusHours(1).plusSeconds(31);
+        SelectedPlanSimulationSaveRequest.SelectedPlan firstPlan = selectedPlan(firstStartAt, null, 2L, 5);
+        ReflectionTestUtils.setField(firstPlan, "plannedEndAt", firstEndAt);
+        SelectedPlanSimulationSaveRequest.SelectedPlan overlappingPlan = selectedPlan(
+                firstStartAt.plusHours(1),
+                null,
+                2L,
+                6
+        );
+        SelectedPlanSimulationSaveRequest request = selectedSimulationSaveRequest(List.of(
+                firstPlan,
+                overlappingPlan
+        ));
+        CustomerOrder order = customerOrder(100L, 10L);
+
+        when(planSimulationCommandRepository.saveSimulationResult(
+                eq(request),
+                anyString(),
+                eq("DUE_DATE_OPTIMIZATION"),
+                eq(9L),
+                any(OffsetDateTime.class),
+                any(OffsetDateTime.class)
+        )).thenReturn(300L);
+        when(customerOrderRepository.findAllById(any())).thenReturn(List.of(order));
+
+        assertThatThrownBy(() -> planSimulationService.saveSelectedSimulation(request, 9L))
+                .isInstanceOf(CustomException.class)
+                .satisfies(exception -> assertThat(((CustomException) exception).getErrorCode())
+                        .isEqualTo(ErrorCode.PLAN_SCHEDULE_CONFLICT));
+
+        verify(productionPlanRepository, never()).save(any(ProductionPlan.class));
+        verify(planSimulationCommandRepository, never()).saveSimulationDetail(
+                any(),
+                any(),
+                any(),
+                any()
+        );
     }
 
     @Test

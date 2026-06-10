@@ -47,14 +47,14 @@ class PlanAiServiceTest {
     private PlanAiService planAiService;
 
     @Test
-    @DisplayName("드래그 앤 드롭 AI 생성 요청은 DB 정보로 FastAPI 요청 body를 조립한다")
+    @DisplayName("드래그 앤 드롭 AI 생성 요청은 생산계획 상태 기준으로 FastAPI 요청 body를 조립한다")
     void generatePlanningBuildsFastApiRequestFromPlanAndOrderData() {
         PlanAiGenerateRequest request = planAiGenerateRequest();
         ProductionPlan targetPlan = productionPlan(
                 100L,
                 421L,
                 10L,
-                PlanStatus.SCHEDULED,
+                PlanStatus.DELAYED,
                 BigDecimal.valueOf(18),
                 18_700
         );
@@ -62,7 +62,7 @@ class PlanAiServiceTest {
                 101L,
                 422L,
                 11L,
-                PlanStatus.DELAYED,
+                PlanStatus.SCHEDULED,
                 BigDecimal.valueOf(10),
                 9_000
         );
@@ -88,7 +88,7 @@ class PlanAiServiceTest {
                 LocalDate.of(2026, 6, 20),
                 BigDecimal.valueOf(30_000_000),
                 BigDecimal.valueOf(800_000),
-                OrderStatus.DELAYED
+                OrderStatus.COMPLETED
         );
         CustomerOrder candidateOrder = customerOrder(
                 422L,
@@ -96,7 +96,7 @@ class PlanAiServiceTest {
                 LocalDate.of(2026, 6, 15),
                 null,
                 BigDecimal.valueOf(120_000),
-                OrderStatus.WAITING
+                OrderStatus.COMPLETED
         );
 
         when(productionPlanRepository.findById(100L)).thenReturn(Optional.of(targetPlan));
@@ -149,7 +149,7 @@ class PlanAiServiceTest {
         assertThat(addOrder.getDueDate()).isEqualTo("2026-06-15 08:59:59.000 +0900");
         assertThat(addOrder.getContractAmount()).isEqualByComparingTo("0");
         assertThat(addOrder.getLatePenaltyAmount()).isEqualByComparingTo("120000");
-        assertThat(addOrder.getOrderStatus()).isEqualTo("WAITING");
+        assertThat(addOrder.getOrderStatus()).isEqualTo("SCHEDULED");
     }
 
     private PlanAiGenerateRequest planAiGenerateRequest() {

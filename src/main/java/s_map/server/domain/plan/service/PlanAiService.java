@@ -202,7 +202,7 @@ public class PlanAiService {
                 formatDueDate(order),
                 amountOrZero(order.getContractAmount()),
                 amountOrZero(order.getLatePenaltyAmount()),
-                order.getOrderStatus().name(),
+                plan.getPlanStatus().name(),
                 FastApiPlanningGenerateRequest.LockedPlan.of(
                         targetLineId,
                         formatDateTime(request.getPlannedStartAt()),
@@ -222,7 +222,7 @@ public class PlanAiService {
                 formatDueDate(order),
                 amountOrZero(order.getContractAmount()),
                 amountOrZero(order.getLatePenaltyAmount()),
-                order.getOrderStatus().name()
+                plan.getPlanStatus().name()
         );
     }
 

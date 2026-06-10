@@ -1,6 +1,7 @@
 package s_map.server.domain.plan.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import s_map.server.domain.order.entity.CustomerOrder;
@@ -34,6 +35,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class PlanSimulationService {
@@ -88,11 +90,20 @@ public class PlanSimulationService {
             Long appliedBy
     ) {
         validateBaseRequest(request);
+        logSelectedSimulationRequest(request, appliedBy);
 
         OffsetDateTime selectedAt = OffsetDateTime.now(DEFAULT_PRODUCTION_ZONE);
         String simulationGroupId = resolveSimulationGroupId(request.getSimulationGroupId(), selectedAt);
         String simulationType = resolveSimulationType(request.getPlanVariantCode());
         boolean baselineSelection = isCurrentPlanBaseline(simulationType);
+        log.info(
+                "[PlanSimulation] 시뮬레이션 저장 시작 simulationGroupId={} simulationType={} baseline={} planCount={} appliedBy={}",
+                simulationGroupId,
+                simulationType,
+                baselineSelection,
+                request.getPlans().size(),
+                appliedBy
+        );
 
         Long simulationId = planSimulationCommandRepository.saveSimulationResult(
                 request,
@@ -101,6 +112,12 @@ public class PlanSimulationService {
                 baselineSelection ? null : appliedBy,
                 baselineSelection ? null : selectedAt,
                 selectedAt
+        );
+        log.info(
+                "[PlanSimulation] 시뮬레이션 결과 row 저장 완료 simulationId={} simulationGroupId={} simulationType={}",
+                simulationId,
+                simulationGroupId,
+                simulationType
         );
 
         if (baselineSelection) {
@@ -119,15 +136,35 @@ public class PlanSimulationService {
         validateSaveRequest(request);
         Map<Long, CustomerOrder> ordersById = loadOrdersById(request);
         Map<Long, ProductionPlan> plansByPlanId = loadEditablePlansByPlanId(request);
+        log.info(
+                "[PlanSimulation] 선택안 검증 대상 확인 simulationId={} simulationGroupId={} requestedPlanIds={} loadedExistingPlanIds={} loadedOrderIds={}",
+                simulationId,
+                simulationGroupId,
+                requestedPlanIds(request),
+                plansByPlanId.keySet(),
+                ordersById.keySet()
+        );
         validateSelectedPlans(request, ordersById, plansByPlanId);
 
         List<Long> savedPlanIds = new ArrayList<>();
+        log.info(
+                "[PlanSimulation] 기존 계획 sequence 임시 해제 simulationId={} targetCount={}",
+                simulationId,
+                plansByPlanId.size()
+        );
         releasePlanSequencesTemporarily(plansByPlanId.values());
 
         for (SelectedPlanSimulationSaveRequest.SelectedPlan selectedPlan : request.getPlans()) {
+            ProductionPlan existingPlan = resolveExistingPlan(selectedPlan, plansByPlanId);
+            log.info(
+                    "[PlanSimulation] 선택 계획 반영 simulationId={} requested={} mode={}",
+                    simulationId,
+                    selectedPlanLogRow(selectedPlan),
+                    existingPlan == null ? "CREATE" : "UPDATE"
+            );
             ProductionPlan savedPlan = applySelectedPlan(
                     selectedPlan,
-                    resolveExistingPlan(selectedPlan, plansByPlanId)
+                    existingPlan
             );
 
             savedPlanIds.add(savedPlan.getPlanId());
@@ -140,7 +177,7 @@ public class PlanSimulationService {
             );
         }
 
-        return SelectedPlanSimulationSaveResponse.builder()
+        SelectedPlanSimulationSaveResponse response = SelectedPlanSimulationSaveResponse.builder()
                 .simulationId(simulationId)
                 .simulationGroupId(simulationGroupId)
                 .savedPlanCount(savedPlanIds.size())
@@ -150,6 +187,67 @@ public class PlanSimulationService {
                 .appliedBy(appliedBy)
                 .appliedAt(selectedAt)
                 .build();
+        log.info(
+                "[PlanSimulation] 선택안 반영 완료 simulationId={} simulationGroupId={} savedPlanIds={}",
+                response.getSimulationId(),
+                response.getSimulationGroupId(),
+                response.getSavedPlanIds()
+        );
+        return response;
+    }
+
+    private void logSelectedSimulationRequest(
+            SelectedPlanSimulationSaveRequest request,
+            Long appliedBy
+    ) {
+        log.info(
+                "[PlanSimulation] 선택안 저장 요청 appliedBy={} variant={} inputSimulationGroupId={} planCount={} requestedPlanIds={} orderIds={}",
+                appliedBy,
+                request.getPlanVariantCode(),
+                request.getSimulationGroupId(),
+                request.getPlans().size(),
+                requestedPlanIds(request),
+                requestedOrderIds(request)
+        );
+
+        if (log.isDebugEnabled()) {
+            log.debug(
+                    "[PlanSimulation] 선택안 저장 요청 상세 plans={}",
+                    request.getPlans().stream()
+                            .map(this::selectedPlanLogRow)
+                            .toList()
+            );
+        }
+    }
+
+    private List<Long> requestedPlanIds(SelectedPlanSimulationSaveRequest request) {
+        return request.getPlans().stream()
+                .map(SelectedPlanSimulationSaveRequest.SelectedPlan::resolvePlanId)
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .toList();
+    }
+
+    private List<Long> requestedOrderIds(SelectedPlanSimulationSaveRequest request) {
+        return request.getPlans().stream()
+                .map(SelectedPlanSimulationSaveRequest.SelectedPlan::getOrderId)
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .toList();
+    }
+
+    private String selectedPlanLogRow(SelectedPlanSimulationSaveRequest.SelectedPlan plan) {
+        return "planId=%s orderId=%s productId=%s lineId=%s sequence=%s start=%s end=%s status=%s"
+                .formatted(
+                        plan.resolvePlanId(),
+                        plan.getOrderId(),
+                        plan.getProductId(),
+                        plan.getLineId(),
+                        plan.getPlanSequence(),
+                        plan.getPlannedStartAt(),
+                        plan.getPlannedEndAt(),
+                        plan.resolvePlanStatus()
+                );
     }
 
     private void validateBaseRequest(SelectedPlanSimulationSaveRequest request) {

@@ -8,6 +8,7 @@ import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
 import s_map.server.domain.plan.dto.req.SelectedPlanSimulationSaveRequest;
 
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.Objects;
 
@@ -77,7 +78,7 @@ public class PlanSimulationCommandRepository {
                 .addValue("actionResult", request.getActionResult())
                 .addValue("beforeTotalDelayHr", request.getBeforeTotalDelayHr())
                 .addValue("afterTotalDelayHr", request.getAfterTotalDelayHr())
-                .addValue("delayReductionHr", request.getDelayReductionHr())
+                .addValue("delayReductionHr", nonNegative(request.getDelayReductionHr()))
                 .addValue("beforeAvgLineUtilizationRate", request.getBeforeAvgLineUtilizationRate())
                 .addValue("afterAvgLineUtilizationRate", request.getAfterAvgLineUtilizationRate())
                 .addValue("beforeTotalProductionQuantity", request.getBeforeTotalProductionQuantity())
@@ -96,6 +97,14 @@ public class PlanSimulationCommandRepository {
 
         Number key = keyHolder.getKey();
         return Objects.requireNonNull(key, "simulation_id 생성 결과가 없습니다.").longValue();
+    }
+
+    private BigDecimal nonNegative(BigDecimal value) {
+        if (value == null) {
+            return null;
+        }
+
+        return value.max(BigDecimal.ZERO);
     }
 
     public void saveSimulationDetail(

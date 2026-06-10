@@ -116,7 +116,15 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
-    public ResponseEntity<BaseResponse<Void>> handleDataIntegrityViolationException() {
+    public ResponseEntity<BaseResponse<Void>> handleDataIntegrityViolationException(
+            DataIntegrityViolationException exception,
+            HttpServletRequest request
+    ) {
+        log.warn(
+                "[GlobalExceptionHandler] DB 무결성 제약 위반 reason=data_integrity_violation path={} rootCause={}",
+                request.getRequestURI(),
+                rootCauseMessage(exception)
+        );
         ErrorCode errorCode = ErrorCode.CONFLICT;
 
         return ResponseEntity
@@ -136,5 +144,14 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(errorCode.getHttpStatus())
                 .body(BaseResponse.fail(errorCode));
+    }
+
+    private String rootCauseMessage(Throwable exception) {
+        Throwable rootCause = exception;
+        while (rootCause.getCause() != null) {
+            rootCause = rootCause.getCause();
+        }
+
+        return rootCause.getMessage();
     }
 }
