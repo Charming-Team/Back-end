@@ -56,7 +56,7 @@ public interface ProductionPlanRepository extends JpaRepository<ProductionPlan, 
                         SELECT 1
                         FROM production_plans pp
                         WHERE pp.line_id = :lineId
-                          AND CAST(pp.plan_status AS varchar) <> :excludedStatus
+                          AND CAST(pp.plan_status AS varchar) IN (:blockingStatuses)
                           AND pp.planned_start_at < :plannedEndAt
                           AND pp.planned_end_at > :plannedStartAt
                           AND pp.plan_id NOT IN (:excludedPlanIds)
@@ -68,7 +68,7 @@ public interface ProductionPlanRepository extends JpaRepository<ProductionPlan, 
             @Param("lineId") Long lineId,
             @Param("plannedStartAt") OffsetDateTime plannedStartAt,
             @Param("plannedEndAt") OffsetDateTime plannedEndAt,
-            @Param("excludedStatus") String excludedStatus,
+            @Param("blockingStatuses") List<String> blockingStatuses,
             @Param("excludedPlanIds") List<Long> excludedPlanIds
     );
 

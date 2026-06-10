@@ -36,6 +36,12 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class PlanSimulationServiceTest {
 
+    private static final List<String> SCHEDULE_BLOCKING_STATUSES = List.of(
+            PlanStatus.SCHEDULED.name(),
+            PlanStatus.IN_PROGRESS.name(),
+            PlanStatus.DELAYED.name()
+    );
+
     @Mock
     private PlanSimulationRepository planSimulationRepository;
 
@@ -73,7 +79,7 @@ class PlanSimulationServiceTest {
                 eq(2L),
                 eq(startAt),
                 eq(startAt.plusHours(4)),
-                eq(PlanStatus.CANCELLED.name()),
+                eq(SCHEDULE_BLOCKING_STATUSES),
                 eq(List.of(200L))
         )).thenReturn(false);
         when(planSimulationCommandRepository.saveSimulationResult(
@@ -135,14 +141,14 @@ class PlanSimulationServiceTest {
                 eq(2L),
                 eq(firstStartAt),
                 eq(firstStartAt.plusHours(4)),
-                eq(PlanStatus.CANCELLED.name()),
+                eq(SCHEDULE_BLOCKING_STATUSES),
                 eq(List.of(200L, 201L))
         )).thenReturn(false);
         when(productionPlanRepository.existsScheduleConflictOutsidePlans(
                 eq(3L),
                 eq(secondStartAt),
                 eq(secondStartAt.plusHours(4)),
-                eq(PlanStatus.CANCELLED.name()),
+                eq(SCHEDULE_BLOCKING_STATUSES),
                 eq(List.of(200L, 201L))
         )).thenReturn(false);
         when(planSimulationCommandRepository.saveSimulationResult(
@@ -185,7 +191,7 @@ class PlanSimulationServiceTest {
                 eq(2L),
                 eq(startAt),
                 eq(startAt.plusHours(4)),
-                eq(PlanStatus.CANCELLED.name()),
+                eq(SCHEDULE_BLOCKING_STATUSES),
                 eq(List.of(Long.MIN_VALUE))
         )).thenReturn(false);
         when(planSimulationCommandRepository.saveSimulationResult(
