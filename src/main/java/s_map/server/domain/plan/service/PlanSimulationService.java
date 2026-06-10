@@ -39,6 +39,11 @@ import java.util.stream.Collectors;
 public class PlanSimulationService {
 
     private static final ZoneId DEFAULT_PRODUCTION_ZONE = ZoneId.of("Asia/Seoul");
+    private static final List<String> SCHEDULE_BLOCKING_STATUSES = List.of(
+            PlanStatus.SCHEDULED.name(),
+            PlanStatus.IN_PROGRESS.name(),
+            PlanStatus.DELAYED.name()
+    );
 
     private final PlanSimulationRepository planSimulationRepository;
     private final PlanSimulationCommandRepository planSimulationCommandRepository;
@@ -362,7 +367,7 @@ public class PlanSimulationService {
                 plan.getLineId(),
                 plan.getPlannedStartAt(),
                 plan.getPlannedEndAt(),
-                PlanStatus.CANCELLED.name(),
+                SCHEDULE_BLOCKING_STATUSES,
                 excludedPlanIds
         );
 
