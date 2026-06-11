@@ -124,7 +124,7 @@ public class FastApiBusinessReportGenerateRequest {
         }
 
         return switch (reportType) {
-            case ON_DEMAND, ON_DEMAND_BUSINESS -> "AD_HOC";
+            case ON_DEMAND, ON_DEMAND_BUSINESS -> "ON_DEMAND";
             case MONTHLY, MONTHLY_BUSINESS -> "MONTHLY";
         };
     }
