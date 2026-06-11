@@ -15,11 +15,14 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import s_map.server.domain.report.dto.req.BusinessReportGenerateRequest;
 import s_map.server.domain.report.dto.req.ReportGenerateRequest;
+import s_map.server.domain.report.dto.req.ReportMailSendRequest;
 import s_map.server.domain.report.dto.req.ReportUpdateRequest;
 import s_map.server.domain.report.dto.res.ReportDetailResponse;
 import s_map.server.domain.report.dto.res.ReportGenerateStartResponse;
 import s_map.server.domain.report.dto.res.ReportJobResponse;
 import s_map.server.domain.report.dto.res.ReportListResponse;
+import s_map.server.domain.report.dto.res.ReportMailSendResponse;
+import s_map.server.domain.report.dto.res.ReportPdfDownloadResponse;
 import s_map.server.domain.report.dto.res.ReportStructuredData;
 import s_map.server.domain.report.entity.Report;
 import s_map.server.domain.report.entity.ReportJob;
@@ -58,6 +61,8 @@ public class ReportService {
     private final UserRepository userRepository;
     private final ReportAsyncService reportAsyncService;
     private final ReportStructuredDataService reportStructuredDataService;
+    private final ReportPdfService reportPdfService;
+    private final ReportMailService reportMailService;
     private final ObjectMapper objectMapper;
 
     /**
@@ -217,6 +222,108 @@ public class ReportService {
     }
 
     /**
+     * 기능: 보고서 최신 저장 버전을 PDF로 생성하고 다운로드 응답을 반환한다.
+     *
+     * Input:
+     * - authUser / AuthUser / JWT에서 추출한 로그인 사용자 ID, 이메일, Role
+     * - reportId / Long / PDF 출력 대상 보고서 ID
+     *
+     * Process:
+     * - PDF 다운로드 권한과 보고서 조회 가능 여부를 확인한다.
+     * - reports 테이블의 최신 저장 row와 구조화 데이터를 기준으로 PDF를 생성한다.
+     * - PDF 생성/다운로드 이벤트를 애플리케이션 로그로 남긴다.
+     *
+     * Output:
+     * - result / ReportPdfDownloadResponse / 파일명, MIME 타입, PDF bytes
+     */
+    @Transactional
+    public ReportPdfDownloadResponse downloadReportPdf(AuthUser authUser, Long reportId) {
+        User user = getAuthorizedReportPdfDownloader(authUser);
+        validatePositiveId(reportId, "reportId");
+
+        Report report = reportRepository.findById(reportId)
+                .orElseThrow(() -> new CustomException(
+                        ErrorCode.REPORT_NOT_FOUND,
+                        "출력할 보고서를 찾을 수 없습니다."
+                ));
+        validateReportVisibility(user, report);
+
+        String authorName = findAuthorName(report.getAuthorId());
+        ReportStructuredData structuredData = reportStructuredDataService.resolve(report);
+        String fileName = createPdfFileName(report);
+        byte[] content = generatePdfContent(report, authorName, structuredData);
+
+        log.info(
+                "[ReportService] 보고서 PDF 생성 및 다운로드 제공 reportId={}, userId={}, fileName={}, fileSizeBytes={}",
+                report.getReportId(),
+                user.getId(),
+                fileName,
+                content.length
+        );
+
+        return new ReportPdfDownloadResponse(fileName, "application/pdf", content);
+    }
+
+    /**
+     * 기능: 보고서 최신 저장 버전 PDF를 생성하여 메일 첨부로 발송한다.
+     *
+     * Input:
+     * - authUser / AuthUser / JWT에서 추출한 로그인 사용자 ID, 이메일, Role
+     * - reportId / Long / 메일 발송 대상 보고서 ID
+     * - request / ReportMailSendRequest / 수신자 이메일, 제목, 본문
+     *
+     * Process:
+     * - PDF 다운로드와 동일한 권한 및 보고서 접근 가능 여부를 확인한다.
+     * - 최신 저장 보고서 기준 PDF를 생성한다.
+     * - SMTP 설정이 있으면 PDF를 첨부하여 메일을 발송한다.
+     * - 발송 이벤트를 애플리케이션 로그로 남긴다.
+     *
+     * Output:
+     * - result / ReportMailSendResponse / 발송 상태, 수신자, 첨부 파일명
+     */
+    @Transactional
+    public ReportMailSendResponse sendReportPdfMail(
+            AuthUser authUser,
+            Long reportId,
+            ReportMailSendRequest request
+    ) {
+        User user = getAuthorizedReportPdfDownloader(authUser);
+        validatePositiveId(reportId, "reportId");
+        List<String> recipients = resolveMailRecipients(request);
+
+        Report report = reportRepository.findById(reportId)
+                .orElseThrow(() -> new CustomException(
+                        ErrorCode.REPORT_NOT_FOUND,
+                        "출력할 보고서를 찾을 수 없습니다."
+                ));
+        validateReportVisibility(user, report);
+
+        String authorName = findAuthorName(report.getAuthorId());
+        ReportStructuredData structuredData = reportStructuredDataService.resolve(report);
+        String fileName = createPdfFileName(report);
+        byte[] content = generatePdfContent(report, authorName, structuredData);
+        ReportPdfDownloadResponse pdf = new ReportPdfDownloadResponse(fileName, "application/pdf", content);
+        ReportMailSendRequest normalizedRequest = new ReportMailSendRequest(
+                recipients,
+                request.subject(),
+                request.message()
+        );
+
+        reportMailService.sendReportPdfMail(report, authorName, normalizedRequest, pdf);
+
+        log.info(
+                "[ReportService] 보고서 PDF 메일 발송 완료 reportId={}, userId={}, recipients={}, fileName={}, fileSizeBytes={}",
+                report.getReportId(),
+                user.getId(),
+                recipients,
+                fileName,
+                content.length
+        );
+
+        return ReportMailSendResponse.sent(report.getReportId(), recipients, fileName);
+    }
+
+    /**
      * 기능: 보고서 제목과 상세 화면용 본문/분석 내용을 수정한다.
      *
      * Input:
@@ -353,6 +460,29 @@ public class ReportService {
         }
     }
 
+    private List<String> resolveMailRecipients(ReportMailSendRequest request) {
+        if (request == null || request.recipients() == null || request.recipients().isEmpty()) {
+            throw new CustomException(ErrorCode.INVALID_REPORT_REQUEST, "수신자 이메일은 필수입니다.");
+        }
+
+        List<String> recipients = request.recipients()
+                .stream()
+                .map(email -> email == null ? "" : email.trim().toLowerCase())
+                .filter(email -> !email.isBlank())
+                .distinct()
+                .toList();
+
+        if (recipients.isEmpty()) {
+            throw new CustomException(ErrorCode.INVALID_REPORT_REQUEST, "수신자 이메일은 필수입니다.");
+        }
+
+        if (recipients.size() > 10) {
+            throw new CustomException(ErrorCode.INVALID_REPORT_REQUEST, "수신자는 최대 10명까지 지정할 수 있습니다.");
+        }
+
+        return recipients;
+    }
+
     private ReportStructuredData createUpdatedStructuredData(
             ReportStructuredData currentStructuredData,
             ReportUpdateRequest request
@@ -473,6 +603,21 @@ public class ReportService {
         return user;
     }
 
+    private User getAuthorizedReportPdfDownloader(AuthUser authUser) {
+        User user = getActiveUser(authUser);
+
+        if (!hasReportPdfDownloadAccess(user.getRole())) {
+            log.warn(
+                    "[ReportService] 보고서 PDF 다운로드 차단 userId={}, role={}",
+                    user.getId(),
+                    user.getRole()
+            );
+            throw new CustomException(ErrorCode.REPORT_ACCESS_DENIED, "PDF를 다운로드할 권한이 없습니다.");
+        }
+
+        return user;
+    }
+
     private User getActiveUser(AuthUser authUser) {
         if (authUser == null || authUser.id() == null) {
             log.warn("[ReportService] 보고서 요청 실패 reason=unauthenticated");
@@ -505,6 +650,12 @@ public class ReportService {
     }
 
     private boolean hasReportWriteAccess(Role role) {
+        return role == Role.MANUFACTURING_MANAGER
+                || role == Role.EXECUTIVE
+                || role == Role.ADMIN;
+    }
+
+    private boolean hasReportPdfDownloadAccess(Role role) {
         return role == Role.MANUFACTURING_MANAGER
                 || role == Role.EXECUTIVE
                 || role == Role.ADMIN;
@@ -589,6 +740,37 @@ public class ReportService {
         payload.put("requestedBy", user.getId());
         payload.put("userRole", user.getRole().name());
         return payload;
+    }
+
+    private byte[] generatePdfContent(
+            Report report,
+            String authorName,
+            ReportStructuredData structuredData
+    ) {
+        try {
+            return reportPdfService.generatePdf(report, authorName, structuredData);
+        } catch (RuntimeException exception) {
+            log.error(
+                    "[ReportService] 보고서 PDF 생성 실패 reportId={}, authorId={}",
+                    report.getReportId(),
+                    report.getAuthorId(),
+                    exception
+            );
+            throw new CustomException(ErrorCode.REPORT_PDF_GENERATION_FAILED);
+        }
+    }
+
+    private String createPdfFileName(Report report) {
+        String baseName = report.getReportTitle() == null || report.getReportTitle().isBlank()
+                ? "report-" + report.getReportId()
+                : report.getReportTitle().trim();
+        String sanitizedBaseName = baseName
+                .replaceAll("[\\\\/:*?\"<>|]", "_")
+                .replaceAll("\\s+", "_");
+        if (sanitizedBaseName.length() > 80) {
+            sanitizedBaseName = sanitizedBaseName.substring(0, 80);
+        }
+        return sanitizedBaseName + "_" + report.getReportId() + ".pdf";
     }
 
     private void runAfterCommit(Runnable action) {

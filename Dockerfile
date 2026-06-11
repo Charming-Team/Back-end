@@ -13,6 +13,7 @@ RUN JAR_PATH=$(find build/libs -name "*.jar" ! -name "*plain.jar" | head -n 1) &
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 
+RUN apk add --no-cache font-noto-cjk
 RUN addgroup -S app && adduser -S app -G app
 
 COPY --from=build /app/app.jar /app/app.jar
