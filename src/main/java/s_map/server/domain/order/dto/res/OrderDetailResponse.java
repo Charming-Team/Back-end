@@ -40,7 +40,7 @@ public record OrderDetailResponse(
         @Schema(description = "고객사명", example = "A사")
         String customerName,
 
-        @Schema(description = "고객사 담당자명", example = "배난수")
+        @Schema(description = "고객사 담당자명", example = "박고객")
         String customerContactName,
 
         @Schema(description = "주문일", example = "2026-05-28")

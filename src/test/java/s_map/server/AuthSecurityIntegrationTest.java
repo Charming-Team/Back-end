@@ -843,7 +843,7 @@ class AuthSecurityIntegrationTest {
                                     "orderQuantity", 1000,
                                     "dueDate", dueDate.toString(),
                                     "operatorId", 1,
-                                    "customerContactName", "배난수"
+                                    "customerContactName", "박고객"
                             ))))
                     .andExpect(MockMvcResultMatchers.status().isBadRequest())
                     .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(false))
@@ -870,7 +870,7 @@ class AuthSecurityIntegrationTest {
                                     "orderQuantity", 1000,
                                     "dueDate", dueDate.toString(),
                                     "productionStartDate", productionStartDate.toString(),
-                                    "customerContactName", "배난수"
+                                    "customerContactName", "박고객"
                             ))))
                     .andExpect(MockMvcResultMatchers.status().isBadRequest())
                     .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(false))

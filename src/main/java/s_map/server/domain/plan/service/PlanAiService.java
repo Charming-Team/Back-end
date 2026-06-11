@@ -11,6 +11,7 @@ import s_map.server.domain.order.repository.ProductionPlanRepository;
 import s_map.server.domain.plan.dto.fastapi.FastApiPlanningGenerateRequest;
 import s_map.server.domain.plan.dto.fastapi.FastApiPlanningGenerateResponse;
 import s_map.server.domain.plan.dto.req.PlanAiGenerateRequest;
+import s_map.server.domain.plan.dto.req.PlanAiMonthlyGenerateRequest;
 import s_map.server.global.error.CustomException;
 import s_map.server.global.error.ErrorCode;
 
@@ -19,6 +20,8 @@ import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -33,6 +36,12 @@ public class PlanAiService {
     private static final LocalTime DUE_DATE_CUTOFF_TIME = LocalTime.of(8, 59, 59);
     private static final DateTimeFormatter FAST_API_DATE_TIME_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS Z");
+    private static final List<PlanStatus> NON_REPLANNING_STATUSES =
+            List.of(PlanStatus.COMPLETED, PlanStatus.CANCELLED, PlanStatus.IN_PROGRESS);
+    private static final List<String> NON_REPLANNING_STATUS_NAMES = NON_REPLANNING_STATUSES
+            .stream()
+            .map(Enum::name)
+            .toList();
 
     private final PlanningFastApiClient planningFastApiClient;
     private final ProductionPlanRepository productionPlanRepository;
@@ -49,8 +58,9 @@ public class PlanAiService {
      *
      * [Process]
      * - planId로 이동 대상 생산계획과 주문 정보를 조회한다.
-     * - planningStart~planningEnd 기간에 포함되는 재배치 후보 생산계획을 조회한다.
-     * - 이동 대상은 edit_orders.locked_plan으로 고정하고, 후보 계획은 add_orders로 변환한다.
+     * - 이동 목표 시간과 직접 겹치는 동일 라인의 재배치 후보 생산계획을 조회한다.
+     * - 이동 대상은 edit_orders.locked_plan으로 고정하고, 직접 충돌 후보 계획은 add_orders로 변환한다.
+     * - FastAPI 재계획 기간은 이동 대상과 직접 충돌 후보가 포함되는 최소 범위로 축소한다.
      * - FastAPI 생산계획 조정 API를 호출한다.
      * - 응답 결과는 DB에 저장하지 않고 그대로 반환한다.
      *
@@ -71,6 +81,45 @@ public class PlanAiService {
         );
     }
 
+    /**
+     * [기능]
+     * 월간 FastAPI 생산계획 분석 결과를 생성한다.
+     *
+     * [Input]
+     * - request: 월간 재계획 시작/종료 일시
+     * - authorizationHeader: Authorization 헤더
+     * - refreshToken: refreshToken 쿠키
+     *
+     * [Process]
+     * - 요청 기간을 검증한다.
+     * - edit_orders/add_orders를 비운 FastAPI 요청을 생성한다.
+     * - FastAPI는 요청 기간의 DB 생산계획을 기준으로 월간 재계획 대안을 생성한다.
+     * - 응답 결과는 DB에 저장하지 않고 그대로 반환한다.
+     *
+     * [Output]
+     * - FastApiPlanningGenerateResponse
+     */
+    public FastApiPlanningGenerateResponse generateMonthlyPlanning(
+            PlanAiMonthlyGenerateRequest request,
+            String authorizationHeader,
+            String refreshToken
+    ) {
+        validateMonthlyRequest(request);
+
+        FastApiPlanningGenerateRequest fastApiRequest = FastApiPlanningGenerateRequest.of(
+                formatDateTime(request.getPlanningStart()),
+                formatDateTime(request.getPlanningEnd()),
+                List.of(),
+                List.of()
+        );
+
+        return planningFastApiClient.generatePlanning(
+                fastApiRequest,
+                authorizationHeader,
+                refreshToken
+        );
+    }
+
     private FastApiPlanningGenerateRequest buildFastApiPlanningRequest(PlanAiGenerateRequest request) {
         validateRequest(request);
 
@@ -82,15 +131,12 @@ public class PlanAiService {
         Long targetLineId = request.getLineId() == null ? targetPlan.getLineId() : request.getLineId();
         validateLineCapability(targetPlan, targetLineId);
 
-        List<ProductionPlan> addPlans = productionPlanRepository
-                .findByPlannedStartAtLessThanAndPlannedEndAtGreaterThanOrderByPlannedStartAtAsc(
-                        request.getPlanningEnd(),
-                        request.getPlanningStart()
-                )
-                .stream()
-                .filter(this::isReplanningCandidate)
-                .filter(plan -> !plan.getPlanId().equals(targetPlan.getPlanId()))
-                .toList();
+        List<ProductionPlan> addPlans = resolveLocalReplanningCandidates(
+                targetPlan,
+                targetLineId,
+                request
+        );
+        PlanningWindow planningWindow = resolvePlanningWindow(targetPlan, request, addPlans);
 
         Map<Long, CustomerOrder> orderMap = findOrderMap(targetPlan, addPlans);
         CustomerOrder targetOrder = findOrder(targetPlan, orderMap);
@@ -103,8 +149,8 @@ public class PlanAiService {
                 .toList();
 
         return FastApiPlanningGenerateRequest.of(
-                formatDateTime(request.getPlanningStart()),
-                formatDateTime(request.getPlanningEnd()),
+                formatDateTime(planningWindow.start()),
+                formatDateTime(planningWindow.end()),
                 List.of(editOrder),
                 addOrders
         );
@@ -130,6 +176,20 @@ public class PlanAiService {
 
         if (request.getPlannedStartAt().isBefore(request.getPlanningStart())
                 || request.getPlannedEndAt().isAfter(request.getPlanningEnd())) {
+            throw new CustomException(ErrorCode.BAD_REQUEST);
+        }
+    }
+
+    private void validateMonthlyRequest(PlanAiMonthlyGenerateRequest request) {
+        if (request == null) {
+            throw new CustomException(ErrorCode.BAD_REQUEST, "월간 AI 생산계획 분석 요청은 필수입니다.");
+        }
+
+        if (request.getPlanningStart() == null || request.getPlanningEnd() == null) {
+            throw new CustomException(ErrorCode.BAD_REQUEST);
+        }
+
+        if (!request.getPlanningStart().isBefore(request.getPlanningEnd())) {
             throw new CustomException(ErrorCode.BAD_REQUEST);
         }
     }
@@ -227,8 +287,83 @@ public class PlanAiService {
     }
 
     private boolean isReplanningCandidate(ProductionPlan plan) {
-        return plan.getPlanStatus() != PlanStatus.COMPLETED
-                && plan.getPlanStatus() != PlanStatus.CANCELLED;
+        return !NON_REPLANNING_STATUSES.contains(plan.getPlanStatus());
+    }
+
+    private List<ProductionPlan> resolveLocalReplanningCandidates(
+            ProductionPlan targetPlan,
+            Long targetLineId,
+            PlanAiGenerateRequest request
+    ) {
+        List<ProductionPlan> conflictPlans = productionPlanRepository
+                .findByLineIdAndPlanIdNotAndPlannedStartAtLessThanAndPlannedEndAtGreaterThanOrderByPlannedStartAtAsc(
+                        targetLineId,
+                        targetPlan.getPlanId(),
+                        request.getPlannedEndAt(),
+                        request.getPlannedStartAt()
+                )
+                .stream()
+                .filter(this::isReplanningCandidate)
+                .toList();
+
+        PlanningWindow conflictWindow = resolvePlanningWindow(targetPlan, request, conflictPlans);
+        Map<Long, ProductionPlan> candidates = new LinkedHashMap<>();
+        conflictPlans.forEach(plan -> candidates.put(plan.getPlanId(), plan));
+
+        productionPlanRepository
+                .findPreviousLocalReplanningCandidate(
+                        targetLineId,
+                        targetPlan.getPlanId(),
+                        NON_REPLANNING_STATUS_NAMES,
+                        conflictWindow.start()
+                )
+                .ifPresent(plan -> candidates.put(plan.getPlanId(), plan));
+
+        productionPlanRepository
+                .findNextLocalReplanningCandidate(
+                        targetLineId,
+                        targetPlan.getPlanId(),
+                        NON_REPLANNING_STATUS_NAMES,
+                        conflictWindow.end()
+                )
+                .ifPresent(plan -> candidates.put(plan.getPlanId(), plan));
+
+        return candidates.values()
+                .stream()
+                .sorted(Comparator.comparing(ProductionPlan::getPlannedStartAt))
+                .toList();
+    }
+
+    private PlanningWindow resolvePlanningWindow(
+            ProductionPlan targetPlan,
+            PlanAiGenerateRequest request,
+            List<ProductionPlan> addPlans
+    ) {
+        List<OffsetDateTime> starts = java.util.stream.Stream.concat(
+                        java.util.stream.Stream.of(
+                                targetPlan.getPlannedStartAt(),
+                                request.getPlannedStartAt()
+                        ),
+                        addPlans.stream().map(ProductionPlan::getPlannedStartAt)
+                )
+                .toList();
+        List<OffsetDateTime> ends = java.util.stream.Stream.concat(
+                        java.util.stream.Stream.of(
+                                targetPlan.getPlannedEndAt(),
+                                request.getPlannedEndAt()
+                        ),
+                        addPlans.stream().map(ProductionPlan::getPlannedEndAt)
+                )
+                .toList();
+
+        OffsetDateTime start = starts.stream()
+                .min(Comparator.naturalOrder())
+                .orElse(request.getPlannedStartAt());
+        OffsetDateTime end = ends.stream()
+                .max(Comparator.naturalOrder())
+                .orElse(request.getPlannedEndAt());
+
+        return new PlanningWindow(start, end);
     }
 
     private String formatDateTime(OffsetDateTime value) {
@@ -245,5 +380,8 @@ public class PlanAiService {
 
     private BigDecimal amountOrZero(BigDecimal value) {
         return value != null ? value : BigDecimal.ZERO;
+    }
+
+    private record PlanningWindow(OffsetDateTime start, OffsetDateTime end) {
     }
 }

@@ -9,6 +9,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import s_map.server.domain.plan.dto.fastapi.FastApiPlanningGenerateRequest;
@@ -128,6 +129,40 @@ class PlanningFastApiClientTest {
                             .isEqualTo(ErrorCode.AI_SERVER_CALL_FAILED.getMessage())
                             .doesNotContain("internal-fastapi")
                             .doesNotContain("secret");
+                });
+    }
+
+    @Test
+    @DisplayName("FastAPI 5xx 응답은 AI 서버 호출 실패로 처리하되 응답 메시지를 전달한다")
+    void generatePlanningPropagatesFastApiServerErrorMessage() {
+        FastApiPlanningProperties properties = new FastApiPlanningProperties();
+        properties.setBaseUrl("http://internal-fastapi:8000");
+        PlanningFastApiClient client = new PlanningFastApiClient(properties);
+        RestTemplate restTemplate = mock(RestTemplate.class);
+        FastApiPlanningGenerateRequest request = request();
+        String responseBody = "{\"detail\":\"optimizer failed to build adjusted plan.\"}";
+
+        ReflectionTestUtils.setField(client, "restTemplate", restTemplate);
+        when(restTemplate.postForObject(
+                eq("http://internal-fastapi:8000/ai/api/v1/planning"),
+                any(HttpEntity.class),
+                eq(FastApiPlanningGenerateResponse.class)
+        )).thenThrow(HttpServerErrorException.create(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                "Internal Server Error",
+                new HttpHeaders(),
+                responseBody.getBytes(StandardCharsets.UTF_8),
+                StandardCharsets.UTF_8
+        ));
+
+        assertThatThrownBy(() -> client.generatePlanning(request, "Bearer access-token", "refresh-token"))
+                .isInstanceOf(CustomException.class)
+                .satisfies(exception -> {
+                    CustomException customException = (CustomException) exception;
+                    org.assertj.core.api.Assertions.assertThat(customException.getErrorCode())
+                            .isEqualTo(ErrorCode.AI_SERVER_CALL_FAILED);
+                    org.assertj.core.api.Assertions.assertThat(customException.getMessage())
+                            .contains("optimizer failed to build adjusted plan");
                 });
     }
 

@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import s_map.server.domain.plan.dto.req.PlanAiGenerateRequest;
+import s_map.server.domain.plan.dto.req.PlanAiMonthlyGenerateRequest;
 import s_map.server.domain.plan.dto.fastapi.FastApiPlanningGenerateResponse;
 import s_map.server.domain.plan.service.PlanAiService;
 import s_map.server.global.common.BaseResponse;
@@ -42,6 +43,31 @@ public class PlanAiController {
     ) {
         return BaseResponse.success(
                 planAiService.generatePlanning(
+                        request,
+                        authorizationHeader,
+                        refreshToken
+                )
+        );
+    }
+
+    @Operation(
+            summary = "월간 AI 생산계획 분석",
+            description = """
+                    현재 캘린더 월 범위의 생산계획을 기준으로 FastAPI 월간 재계획/시뮬레이션 API를 호출합니다.
+                    특정 드래그 앤 드롭 충돌을 해결하는 API가 아니라, 조회 중인 월 전체 운영 계획을 대상으로 분석합니다.
+                    Spring은 edit_orders/add_orders를 비운 채 planning_start/planning_end만 전달하고,
+                    FastAPI는 해당 기간의 DB 생산계획을 기준으로 월간 대안을 생성합니다.
+                    AI 응답은 DB에 저장하지 않고 그대로 프론트에 반환합니다.
+                    """
+    )
+    @PostMapping("/monthly-analysis")
+    public BaseResponse<FastApiPlanningGenerateResponse> generateMonthlyPlanning(
+            @RequestHeader(HttpHeaders.AUTHORIZATION) String authorizationHeader,
+            @CookieValue(value = "refreshToken", required = false) String refreshToken,
+            @Valid @RequestBody PlanAiMonthlyGenerateRequest request
+    ) {
+        return BaseResponse.success(
+                planAiService.generateMonthlyPlanning(
                         request,
                         authorizationHeader,
                         refreshToken

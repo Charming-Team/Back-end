@@ -25,6 +25,53 @@ public interface ProductionPlanRepository extends JpaRepository<ProductionPlan, 
             OffsetDateTime plannedStartAt
     );
 
+    List<ProductionPlan> findByLineIdAndPlanIdNotAndPlannedStartAtLessThanAndPlannedEndAtGreaterThanOrderByPlannedStartAtAsc(
+            Long lineId,
+            Long planId,
+            OffsetDateTime plannedEndAt,
+            OffsetDateTime plannedStartAt
+    );
+
+    @Query(
+            value = """
+                    SELECT *
+                    FROM production_plans pp
+                    WHERE pp.line_id = :lineId
+                      AND pp.plan_id <> :planId
+                      AND CAST(pp.plan_status AS varchar) NOT IN (:excludedStatuses)
+                      AND pp.planned_end_at <= :plannedStartAt
+                    ORDER BY pp.planned_end_at DESC
+                    LIMIT 1
+                    """,
+            nativeQuery = true
+    )
+    Optional<ProductionPlan> findPreviousLocalReplanningCandidate(
+            @Param("lineId") Long lineId,
+            @Param("planId") Long planId,
+            @Param("excludedStatuses") List<String> excludedStatuses,
+            @Param("plannedStartAt") OffsetDateTime plannedStartAt
+    );
+
+    @Query(
+            value = """
+                    SELECT *
+                    FROM production_plans pp
+                    WHERE pp.line_id = :lineId
+                      AND pp.plan_id <> :planId
+                      AND CAST(pp.plan_status AS varchar) NOT IN (:excludedStatuses)
+                      AND pp.planned_start_at >= :plannedEndAt
+                    ORDER BY pp.planned_start_at ASC
+                    LIMIT 1
+                    """,
+            nativeQuery = true
+    )
+    Optional<ProductionPlan> findNextLocalReplanningCandidate(
+            @Param("lineId") Long lineId,
+            @Param("planId") Long planId,
+            @Param("excludedStatuses") List<String> excludedStatuses,
+            @Param("plannedEndAt") OffsetDateTime plannedEndAt
+    );
+
     boolean existsByLineIdAndPlanIdNotAndPlanSequence(
             Long lineId,
             Long planId,
