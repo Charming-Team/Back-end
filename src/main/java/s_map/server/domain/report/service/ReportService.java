@@ -15,6 +15,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import s_map.server.domain.report.dto.req.BusinessReportGenerateRequest;
 import s_map.server.domain.report.dto.req.ReportGenerateRequest;
+import s_map.server.domain.report.dto.req.ReportUpdateRequest;
 import s_map.server.domain.report.dto.res.ReportDetailResponse;
 import s_map.server.domain.report.dto.res.ReportGenerateStartResponse;
 import s_map.server.domain.report.dto.res.ReportJobResponse;
@@ -216,6 +217,53 @@ public class ReportService {
     }
 
     /**
+     * 기능: 보고서 제목과 상세 화면용 본문/분석 내용을 수정한다.
+     *
+     * Input:
+     * - authUser / AuthUser / JWT에서 추출한 로그인 사용자 ID, 이메일, Role
+     * - reportId / Long / 수정할 보고서 ID
+     * - request / ReportUpdateRequest / 보고서 제목, Markdown, 구조화 데이터
+     *
+     * Output:
+     * - result / ReportDetailResponse / 수정 후 보고서 상세 응답
+     */
+    @Transactional
+    public ReportDetailResponse updateReport(
+            AuthUser authUser,
+            Long reportId,
+            ReportUpdateRequest request
+    ) {
+        User user = getAuthorizedReportWriter(authUser);
+        validatePositiveId(reportId, "reportId");
+        validateUpdateRequest(request);
+
+        Report report = reportRepository.findById(reportId)
+                .orElseThrow(() -> new CustomException(ErrorCode.REPORT_NOT_FOUND));
+        validateReportVisibility(user, report);
+
+        ReportStructuredData currentStructuredData = reportStructuredDataService.resolve(report);
+        ReportStructuredData updatedStructuredData = createUpdatedStructuredData(
+                currentStructuredData,
+                request
+        );
+        JsonNode updatedIncludedItems = objectMapper.valueToTree(updatedStructuredData);
+        JsonNode updatedReportContent = createUpdatedReportContent(
+                report,
+                request,
+                updatedStructuredData
+        );
+
+        report.updateReport(
+                request.title().trim(),
+                updatedReportContent,
+                updatedIncludedItems
+        );
+
+        String authorName = findAuthorName(report.getAuthorId());
+        return ReportDetailResponse.from(report, authorName, updatedStructuredData);
+    }
+
+    /**
      * 기능: 기존 레거시 보고서의 상세 화면 구조화 데이터를 DB 현재 집계 기준으로 생성하여 저장한다.
      *
      * Input:
@@ -289,6 +337,110 @@ public class ReportService {
                     "이미 경영진용 보고서입니다. 원본 수시/월간 보고서에서만 비즈니스 보고서를 생성할 수 있습니다."
             );
         }
+    }
+
+    private void validateUpdateRequest(ReportUpdateRequest request) {
+        if (request == null) {
+            throw new CustomException(ErrorCode.INVALID_REPORT_REQUEST, "보고서 수정 요청은 필수입니다.");
+        }
+
+        if (request.title() == null || request.title().isBlank()) {
+            throw new CustomException(ErrorCode.INVALID_REPORT_REQUEST, "보고서 제목은 필수입니다.");
+        }
+
+        if (request.title().length() > 200) {
+            throw new CustomException(ErrorCode.INVALID_REPORT_REQUEST, "보고서 제목은 200자 이하여야 합니다.");
+        }
+    }
+
+    private ReportStructuredData createUpdatedStructuredData(
+            ReportStructuredData currentStructuredData,
+            ReportUpdateRequest request
+    ) {
+        return new ReportStructuredData(
+                request.summaryRows() != null ? request.summaryRows() : currentStructuredData.summaryRows(),
+                request.lineRows() != null ? request.lineRows() : currentStructuredData.lineRows(),
+                request.equipmentRows() != null ? request.equipmentRows() : currentStructuredData.equipmentRows(),
+                request.analysis() != null ? request.analysis() : currentStructuredData.analysis()
+        );
+    }
+
+    private JsonNode createUpdatedReportContent(
+            Report report,
+            ReportUpdateRequest request,
+            ReportStructuredData structuredData
+    ) {
+        ObjectNode reportContent = report.getReportContent() != null && report.getReportContent().isObject()
+                ? report.getReportContent().deepCopy()
+                : objectMapper.createObjectNode();
+
+        reportContent.put("title", request.title().trim());
+        reportContent.put("markdown", resolveUpdatedMarkdown(reportContent, request, structuredData));
+        reportContent.set("analysis", objectMapper.valueToTree(structuredData.analysis()));
+
+        return reportContent;
+    }
+
+    private String resolveUpdatedMarkdown(
+            ObjectNode currentReportContent,
+            ReportUpdateRequest request,
+            ReportStructuredData structuredData
+    ) {
+        if (request.markdown() != null && !request.markdown().isBlank()) {
+            return request.markdown();
+        }
+
+        JsonNode currentMarkdown = currentReportContent.get("markdown");
+        if (currentMarkdown != null && currentMarkdown.isTextual() && !currentMarkdown.asText().isBlank()) {
+            return currentMarkdown.asText();
+        }
+
+        return createMarkdownFromAnalysis(request.title(), structuredData.analysis());
+    }
+
+    private String createMarkdownFromAnalysis(
+            String title,
+            ReportStructuredData.Analysis analysis
+    ) {
+        StringBuilder markdown = new StringBuilder();
+        markdown.append("# ").append(title.trim()).append("\n\n");
+
+        if (analysis == null) {
+            return markdown.toString().trim();
+        }
+
+        if (analysis.overview() != null && !analysis.overview().isBlank()) {
+            markdown.append(analysis.overview().trim()).append("\n\n");
+        }
+
+        if (analysis.sections() != null) {
+            analysis.sections().stream()
+                    .filter(section -> section != null && section.title() != null && !section.title().isBlank())
+                    .forEach(section -> appendAnalysisSection(markdown, section));
+        }
+
+        if (analysis.recommendation() != null && !analysis.recommendation().isBlank()) {
+            markdown.append("## 종합 의견 및 제안\n\n")
+                    .append(analysis.recommendation().trim())
+                    .append("\n");
+        }
+
+        return markdown.toString().trim();
+    }
+
+    private void appendAnalysisSection(
+            StringBuilder markdown,
+            ReportStructuredData.AnalysisSection section
+    ) {
+        markdown.append("## ").append(section.title().trim()).append("\n\n");
+
+        if (section.items() != null) {
+            section.items().stream()
+                    .filter(item -> item != null && !item.isBlank())
+                    .forEach(item -> markdown.append("- ").append(item.trim()).append("\n"));
+        }
+
+        markdown.append("\n");
     }
 
     private User getAuthorizedReportReader(AuthUser authUser) {
