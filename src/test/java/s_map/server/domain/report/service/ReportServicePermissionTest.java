@@ -10,6 +10,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import s_map.server.domain.report.dto.res.ReportListResponse;
+import s_map.server.domain.report.dto.res.ReportPdfDownloadResponse;
+import s_map.server.domain.report.dto.res.ReportStructuredData;
 import s_map.server.domain.report.entity.Report;
 import s_map.server.domain.report.entity.ReportType;
 import s_map.server.domain.report.repository.ReportJobRepository;
@@ -50,6 +52,9 @@ class ReportServicePermissionTest {
 
     @Mock
     private ReportStructuredDataService reportStructuredDataService;
+
+    @Mock
+    private ReportPdfService reportPdfService;
 
     @Mock
     private ObjectMapper objectMapper;
@@ -112,6 +117,49 @@ class ReportServicePermissionTest {
                 .isInstanceOf(CustomException.class)
                 .extracting(exception -> ((CustomException) exception).getErrorCode())
                 .isEqualTo(ErrorCode.REPORT_ACCESS_DENIED);
+    }
+
+    @Test
+    void downloadReportPdfBlocksOperatorAccess() {
+        User operator = user(1L, Role.OPERATOR);
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(operator));
+
+        assertThatThrownBy(() -> reportService.downloadReportPdf(
+                new AuthUser(1L, "operator@smap.com", Role.OPERATOR),
+                10L
+        ))
+                .isInstanceOf(CustomException.class)
+                .extracting(exception -> ((CustomException) exception).getMessage())
+                .isEqualTo("PDF를 다운로드할 권한이 없습니다.");
+        verify(reportRepository, never()).findById(any());
+    }
+
+    @Test
+    void downloadReportPdfReturnsPdfDownloadResponse() {
+        User manager = user(1L, Role.MANUFACTURING_MANAGER);
+        Report report = report(10L, ReportType.MONTHLY);
+        ReportStructuredData structuredData = new ReportStructuredData(
+                List.of(),
+                List.of(),
+                List.of(),
+                null
+        );
+        byte[] pdfContent = "%PDF".getBytes();
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(manager));
+        when(reportRepository.findById(10L)).thenReturn(Optional.of(report));
+        when(reportStructuredDataService.resolve(report)).thenReturn(structuredData);
+        when(reportPdfService.generatePdf(report, manager.getName(), structuredData)).thenReturn(pdfContent);
+
+        ReportPdfDownloadResponse result = reportService.downloadReportPdf(
+                new AuthUser(1L, "manager@smap.com", Role.MANUFACTURING_MANAGER),
+                10L
+        );
+
+        assertThat(result.content()).isEqualTo(pdfContent);
+        assertThat(result.contentType()).isEqualTo("application/pdf");
+        assertThat(result.fileName()).endsWith("_10.pdf");
     }
 
     private User user(Long id, Role role) {

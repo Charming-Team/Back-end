@@ -258,6 +258,7 @@ docker run --rm -p 8080:8080 \
 | 리포트 | `GET /api/reports/jobs/{reportJobId}` | 리포트 생성 작업 조회 |
 | 리포트 | `GET /api/reports` | 리포트 목록 조회 |
 | 리포트 | `GET /api/reports/{reportId}` | 리포트 상세 조회 |
+| 리포트 | `GET /api/reports/{reportId}/pdf` | 리포트 PDF 다운로드 |
 | 리포트 | `PATCH /api/reports/{reportId}` | 리포트 수정 |
 
 ## 응답 규격
