@@ -34,6 +34,9 @@ app:
   internal:
     chat:
       evidence-token: ${CHAT_EVIDENCE_INTERNAL_TOKEN:}
+  report:
+    mail:
+      from: ${REPORT_MAIL_FROM:no-reply@smap.local}
   jwt:
     access-token-expiration-ms: 300000
     refresh-token-expiration-ms: 86400000

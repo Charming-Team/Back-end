@@ -25,11 +25,13 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import s_map.server.domain.report.dto.req.BusinessReportGenerateRequest;
 import s_map.server.domain.report.dto.req.ReportGenerateRequest;
+import s_map.server.domain.report.dto.req.ReportMailSendRequest;
 import s_map.server.domain.report.dto.req.ReportUpdateRequest;
 import s_map.server.domain.report.dto.res.ReportDetailResponse;
 import s_map.server.domain.report.dto.res.ReportGenerateStartResponse;
 import s_map.server.domain.report.dto.res.ReportJobResponse;
 import s_map.server.domain.report.dto.res.ReportListResponse;
+import s_map.server.domain.report.dto.res.ReportMailSendResponse;
 import s_map.server.domain.report.dto.res.ReportPdfDownloadResponse;
 import s_map.server.domain.report.service.ReportService;
 import s_map.server.global.common.BaseResponse;
@@ -197,6 +199,29 @@ public class ReportController {
         return ResponseEntity.ok()
                 .headers(headers)
                 .body(response.content());
+    }
+
+    @Operation(
+            summary = "보고서 PDF 메일 발송",
+            description = "보고서 상세 화면의 최신 저장 버전을 기준으로 PDF 파일을 생성하고 지정 수신자에게 메일 첨부로 발송합니다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "보고서 PDF 메일 발송 성공"),
+            @ApiResponse(responseCode = "400", description = "보고서 ID 또는 수신자 이메일 오류"),
+            @ApiResponse(responseCode = "401", description = "인증 필요"),
+            @ApiResponse(responseCode = "403", description = "PDF 메일 발송 권한 없음"),
+            @ApiResponse(responseCode = "404", description = "출력할 보고서 없음"),
+            @ApiResponse(responseCode = "500", description = "PDF 생성 또는 메일 발송 실패")
+    })
+    @PostMapping("/{reportId}/mail")
+    public BaseResponse<ReportMailSendResponse> sendReportPdfMail(
+            @Parameter(hidden = true)
+            @AuthenticationPrincipal AuthUser authUser,
+            @Parameter(description = "보고서 ID", example = "1")
+            @PathVariable Long reportId,
+            @Valid @RequestBody ReportMailSendRequest request
+    ) {
+        return BaseResponse.success(reportService.sendReportPdfMail(authUser, reportId, request));
     }
 
     @Operation(

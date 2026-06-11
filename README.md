@@ -159,6 +159,16 @@ JWT_SECRET=<jwt-secret>
 | `AI_FASTAPI_PLANNING_GENERATE_PATH` | FastAPI 생산계획 생성 경로 | `/ai/api/v1/planning` |
 | `CHAT_EVIDENCE_INTERNAL_TOKEN` | FastAPI가 Spring Evidence API를 호출할 때 사용하는 내부 토큰 | 없음 |
 | `CHAT_ANSWER_INTERNAL_TOKEN` | Spring이 FastAPI 챗봇 응답 API를 호출할 때 사용하는 내부 토큰 | 없음 |
+| `SPRING_MAIL_HOST` | SMTP 서버 호스트 | 없음 |
+| `SPRING_MAIL_PORT` | SMTP 서버 포트 | 없음 |
+| `SPRING_MAIL_USERNAME` | SMTP 로그인 계정 | 없음 |
+| `SPRING_MAIL_PASSWORD` | SMTP 로그인 비밀번호 또는 앱 비밀번호 | 없음 |
+| `SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH` | SMTP 인증 사용 여부 | 없음 |
+| `SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE` | SMTP STARTTLS 사용 여부 | 없음 |
+| `SPRING_MAIL_PROPERTIES_MAIL_SMTP_CONNECTIONTIMEOUT` | SMTP 연결 타임아웃(ms) | 없음 |
+| `SPRING_MAIL_PROPERTIES_MAIL_SMTP_TIMEOUT` | SMTP 응답 타임아웃(ms) | 없음 |
+| `SPRING_MAIL_PROPERTIES_MAIL_SMTP_WRITETIMEOUT` | SMTP 쓰기 타임아웃(ms) | 없음 |
+| `REPORT_MAIL_FROM` | 리포트 메일 발신자 주소 | `no-reply@smap.local` |
 
 ### 2. 로컬 실행
 
@@ -169,6 +179,23 @@ export JWT_SECRET=<jwt-secret>
 ```
 
 기본 프로필은 `local`이며 서버 포트는 `8080`입니다.
+
+리포트 메일 발송을 로컬에서 테스트하려면 SMTP 환경 변수를 함께 지정합니다. Gmail SMTP를 사용하는 경우 `SPRING_MAIL_PASSWORD`에는 Google 계정 비밀번호가 아니라 앱 비밀번호를 사용합니다.
+
+```bash
+export SPRING_MAIL_HOST=smtp.gmail.com
+export SPRING_MAIL_PORT=587
+export SPRING_MAIL_USERNAME=<gmail-address>
+export SPRING_MAIL_PASSWORD=<gmail-app-password-without-spaces>
+export SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH=true
+export SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE=true
+export SPRING_MAIL_PROPERTIES_MAIL_SMTP_CONNECTIONTIMEOUT=5000
+export SPRING_MAIL_PROPERTIES_MAIL_SMTP_TIMEOUT=3000
+export SPRING_MAIL_PROPERTIES_MAIL_SMTP_WRITETIMEOUT=5000
+export REPORT_MAIL_FROM=<gmail-address>
+```
+
+Kubernetes 배포에서는 SMTP host, port, timeout, `REPORT_MAIL_FROM`처럼 노출되어도 되는 값은 `backend-config` ConfigMap에 두고, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD`는 `backend-mail-secret` Secret으로 주입합니다. 앱 비밀번호는 Git에 커밋하지 않습니다.
 
 ### 3. 테스트 실행
 
@@ -206,6 +233,16 @@ docker run --rm -p 8080:8080 \
   -e APP_CORS_ALLOWED_ORIGINS=http://localhost:3000 \
   -e CHAT_EVIDENCE_INTERNAL_TOKEN=<internal-token> \
   -e CHAT_ANSWER_INTERNAL_TOKEN=<internal-token> \
+  -e SPRING_MAIL_HOST=smtp.gmail.com \
+  -e SPRING_MAIL_PORT=587 \
+  -e SPRING_MAIL_USERNAME=<gmail-address> \
+  -e SPRING_MAIL_PASSWORD=<gmail-app-password-without-spaces> \
+  -e SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH=true \
+  -e SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE=true \
+  -e SPRING_MAIL_PROPERTIES_MAIL_SMTP_CONNECTIONTIMEOUT=5000 \
+  -e SPRING_MAIL_PROPERTIES_MAIL_SMTP_TIMEOUT=3000 \
+  -e SPRING_MAIL_PROPERTIES_MAIL_SMTP_WRITETIMEOUT=5000 \
+  -e REPORT_MAIL_FROM=<gmail-address> \
   s-map-server:local
 ```
 
@@ -259,6 +296,7 @@ docker run --rm -p 8080:8080 \
 | 리포트 | `GET /api/reports` | 리포트 목록 조회 |
 | 리포트 | `GET /api/reports/{reportId}` | 리포트 상세 조회 |
 | 리포트 | `GET /api/reports/{reportId}/pdf` | 리포트 PDF 다운로드 |
+| 리포트 | `POST /api/reports/{reportId}/mail` | 리포트 메일 발송 |
 | 리포트 | `PATCH /api/reports/{reportId}` | 리포트 수정 |
 
 ## 응답 규격

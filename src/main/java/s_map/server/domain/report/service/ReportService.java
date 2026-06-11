@@ -15,11 +15,13 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import s_map.server.domain.report.dto.req.BusinessReportGenerateRequest;
 import s_map.server.domain.report.dto.req.ReportGenerateRequest;
+import s_map.server.domain.report.dto.req.ReportMailSendRequest;
 import s_map.server.domain.report.dto.req.ReportUpdateRequest;
 import s_map.server.domain.report.dto.res.ReportDetailResponse;
 import s_map.server.domain.report.dto.res.ReportGenerateStartResponse;
 import s_map.server.domain.report.dto.res.ReportJobResponse;
 import s_map.server.domain.report.dto.res.ReportListResponse;
+import s_map.server.domain.report.dto.res.ReportMailSendResponse;
 import s_map.server.domain.report.dto.res.ReportPdfDownloadResponse;
 import s_map.server.domain.report.dto.res.ReportStructuredData;
 import s_map.server.domain.report.entity.Report;
@@ -60,6 +62,7 @@ public class ReportService {
     private final ReportAsyncService reportAsyncService;
     private final ReportStructuredDataService reportStructuredDataService;
     private final ReportPdfService reportPdfService;
+    private final ReportMailService reportMailService;
     private final ObjectMapper objectMapper;
 
     /**
@@ -262,6 +265,65 @@ public class ReportService {
     }
 
     /**
+     * 기능: 보고서 최신 저장 버전 PDF를 생성하여 메일 첨부로 발송한다.
+     *
+     * Input:
+     * - authUser / AuthUser / JWT에서 추출한 로그인 사용자 ID, 이메일, Role
+     * - reportId / Long / 메일 발송 대상 보고서 ID
+     * - request / ReportMailSendRequest / 수신자 이메일, 제목, 본문
+     *
+     * Process:
+     * - PDF 다운로드와 동일한 권한 및 보고서 접근 가능 여부를 확인한다.
+     * - 최신 저장 보고서 기준 PDF를 생성한다.
+     * - SMTP 설정이 있으면 PDF를 첨부하여 메일을 발송한다.
+     * - 발송 이벤트를 애플리케이션 로그로 남긴다.
+     *
+     * Output:
+     * - result / ReportMailSendResponse / 발송 상태, 수신자, 첨부 파일명
+     */
+    @Transactional
+    public ReportMailSendResponse sendReportPdfMail(
+            AuthUser authUser,
+            Long reportId,
+            ReportMailSendRequest request
+    ) {
+        User user = getAuthorizedReportPdfDownloader(authUser);
+        validatePositiveId(reportId, "reportId");
+        List<String> recipients = resolveMailRecipients(request);
+
+        Report report = reportRepository.findById(reportId)
+                .orElseThrow(() -> new CustomException(
+                        ErrorCode.REPORT_NOT_FOUND,
+                        "출력할 보고서를 찾을 수 없습니다."
+                ));
+        validateReportVisibility(user, report);
+
+        String authorName = findAuthorName(report.getAuthorId());
+        ReportStructuredData structuredData = reportStructuredDataService.resolve(report);
+        String fileName = createPdfFileName(report);
+        byte[] content = generatePdfContent(report, authorName, structuredData);
+        ReportPdfDownloadResponse pdf = new ReportPdfDownloadResponse(fileName, "application/pdf", content);
+        ReportMailSendRequest normalizedRequest = new ReportMailSendRequest(
+                recipients,
+                request.subject(),
+                request.message()
+        );
+
+        reportMailService.sendReportPdfMail(report, authorName, normalizedRequest, pdf);
+
+        log.info(
+                "[ReportService] 보고서 PDF 메일 발송 완료 reportId={}, userId={}, recipients={}, fileName={}, fileSizeBytes={}",
+                report.getReportId(),
+                user.getId(),
+                recipients,
+                fileName,
+                content.length
+        );
+
+        return ReportMailSendResponse.sent(report.getReportId(), recipients, fileName);
+    }
+
+    /**
      * 기능: 보고서 제목과 상세 화면용 본문/분석 내용을 수정한다.
      *
      * Input:
@@ -396,6 +458,29 @@ public class ReportService {
         if (request.title().length() > 200) {
             throw new CustomException(ErrorCode.INVALID_REPORT_REQUEST, "보고서 제목은 200자 이하여야 합니다.");
         }
+    }
+
+    private List<String> resolveMailRecipients(ReportMailSendRequest request) {
+        if (request == null || request.recipients() == null || request.recipients().isEmpty()) {
+            throw new CustomException(ErrorCode.INVALID_REPORT_REQUEST, "수신자 이메일은 필수입니다.");
+        }
+
+        List<String> recipients = request.recipients()
+                .stream()
+                .map(email -> email == null ? "" : email.trim().toLowerCase())
+                .filter(email -> !email.isBlank())
+                .distinct()
+                .toList();
+
+        if (recipients.isEmpty()) {
+            throw new CustomException(ErrorCode.INVALID_REPORT_REQUEST, "수신자 이메일은 필수입니다.");
+        }
+
+        if (recipients.size() > 10) {
+            throw new CustomException(ErrorCode.INVALID_REPORT_REQUEST, "수신자는 최대 10명까지 지정할 수 있습니다.");
+        }
+
+        return recipients;
     }
 
     private ReportStructuredData createUpdatedStructuredData(

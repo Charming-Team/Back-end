@@ -9,6 +9,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import s_map.server.domain.report.dto.req.ReportMailSendRequest;
+import s_map.server.domain.report.dto.res.ReportMailSendResponse;
 import s_map.server.domain.report.dto.res.ReportListResponse;
 import s_map.server.domain.report.dto.res.ReportPdfDownloadResponse;
 import s_map.server.domain.report.dto.res.ReportStructuredData;
@@ -55,6 +57,9 @@ class ReportServicePermissionTest {
 
     @Mock
     private ReportPdfService reportPdfService;
+
+    @Mock
+    private ReportMailService reportMailService;
 
     @Mock
     private ObjectMapper objectMapper;
@@ -160,6 +165,58 @@ class ReportServicePermissionTest {
         assertThat(result.content()).isEqualTo(pdfContent);
         assertThat(result.contentType()).isEqualTo("application/pdf");
         assertThat(result.fileName()).endsWith("_10.pdf");
+    }
+
+    @Test
+    void sendReportPdfMailBlocksOperatorAccess() {
+        User operator = user(1L, Role.OPERATOR);
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(operator));
+
+        assertThatThrownBy(() -> reportService.sendReportPdfMail(
+                new AuthUser(1L, "operator@smap.com", Role.OPERATOR),
+                10L,
+                new ReportMailSendRequest(List.of("manager@sk.com"), null, null)
+        ))
+                .isInstanceOf(CustomException.class)
+                .extracting(exception -> ((CustomException) exception).getMessage())
+                .isEqualTo("PDF를 다운로드할 권한이 없습니다.");
+        verify(reportRepository, never()).findById(any());
+    }
+
+    @Test
+    void sendReportPdfMailGeneratesPdfAndSendsMail() {
+        User manager = user(1L, Role.MANUFACTURING_MANAGER);
+        Report report = report(10L, ReportType.MONTHLY);
+        ReportStructuredData structuredData = new ReportStructuredData(
+                List.of(),
+                List.of(),
+                List.of(),
+                null
+        );
+        byte[] pdfContent = "%PDF".getBytes();
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(manager));
+        when(reportRepository.findById(10L)).thenReturn(Optional.of(report));
+        when(reportStructuredDataService.resolve(report)).thenReturn(structuredData);
+        when(reportPdfService.generatePdf(report, manager.getName(), structuredData)).thenReturn(pdfContent);
+
+        ReportMailSendResponse result = reportService.sendReportPdfMail(
+                new AuthUser(1L, "manager@smap.com", Role.MANUFACTURING_MANAGER),
+                10L,
+                new ReportMailSendRequest(List.of(" Manager@SK.com ", "manager@sk.com"), null, null)
+        );
+
+        assertThat(result.reportId()).isEqualTo(10L);
+        assertThat(result.recipients()).containsExactly("manager@sk.com");
+        assertThat(result.attachmentFileName()).endsWith("_10.pdf");
+        assertThat(result.status()).isEqualTo("SENT");
+        verify(reportMailService).sendReportPdfMail(
+                eq(report),
+                eq(manager.getName()),
+                any(ReportMailSendRequest.class),
+                any(ReportPdfDownloadResponse.class)
+        );
     }
 
     private User user(Long id, Role role) {
