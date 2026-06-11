@@ -6,6 +6,8 @@ import lombok.Builder;
 import lombok.Getter;
 import s_map.server.domain.report.entity.Report;
 import s_map.server.domain.report.entity.ReportJob;
+import s_map.server.domain.report.support.ReportPeriodSupport;
+import s_map.server.domain.report.support.ReportPeriodSupport.ResolvedPeriod;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -109,6 +111,11 @@ public class ReportGenerateResponse {
     public static ReportGenerateResponse of(Report report, ReportJob reportJob) {
         String markdown = extractMarkdown(report.getReportContent());
         ReportStructuredData structuredData = ReportStructuredData.from(report, markdown);
+        ResolvedPeriod period = ReportPeriodSupport.resolve(
+                report.getReportType(),
+                report.getTargetStartDate(),
+                report.getTargetEndDate()
+        );
 
         return ReportGenerateResponse.builder()
                 .reportId(report.getReportId())
@@ -116,8 +123,8 @@ public class ReportGenerateResponse {
                 .jobStatus(reportJob.getJobStatus().name())
                 .title(report.getReportTitle())
                 .reportType(report.getReportType().name())
-                .targetStartDate(report.getTargetStartDate())
-                .targetEndDate(report.getTargetEndDate())
+                .targetStartDate(period.startDate())
+                .targetEndDate(period.endDate())
                 .sections(report.getIncludedItems())
                 .summaryRows(structuredData.summaryRows())
                 .lineRows(structuredData.lineRows())

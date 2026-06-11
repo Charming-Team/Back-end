@@ -5,6 +5,8 @@ import lombok.Builder;
 import lombok.Getter;
 import s_map.server.domain.report.dto.req.ReportGenerateRequest;
 import s_map.server.domain.report.entity.ReportType;
+import s_map.server.domain.report.support.ReportPeriodSupport;
+import s_map.server.domain.report.support.ReportPeriodSupport.ResolvedPeriod;
 
 import java.util.Locale;
 
@@ -40,14 +42,20 @@ public class FastApiReportGenerateRequest {
             String userRole,
             ReportGenerateRequest request
     ) {
+        ResolvedPeriod period = ReportPeriodSupport.resolve(
+                request.getReportType(),
+                request.getPeriod().getStartDate(),
+                request.getPeriod().getEndDate()
+        );
+
         return FastApiReportGenerateRequest.builder()
                 .reportJobId(reportJobId)
                 .requestedBy(requestedBy)
                 .userRole(toFastApiUserRole(userRole))
                 .reportType(toFastApiReportType(request.getReportType()))
                 .period(FastApiReportPeriodRequest.builder()
-                        .startDate(request.getPeriod().getStartDate())
-                        .endDate(request.getPeriod().getEndDate())
+                        .startDate(period.startDate())
+                        .endDate(period.endDate())
                         .build())
                 .includeExecutiveSummary(defaultTrue(request.getIncludeExecutiveSummary()))
                 .includeEvidence(defaultTrue(request.getIncludeEvidence()))

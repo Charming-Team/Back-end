@@ -46,6 +46,8 @@ class FastApiReportGenerateRequestTest {
 
         assertThat(request.getUserRole()).isEqualTo("WORKER");
         assertThat(request.getReportType()).isEqualTo("MONTHLY");
+        assertThat(request.getPeriod().getStartDate()).isEqualTo(LocalDate.of(2026, 6, 1));
+        assertThat(request.getPeriod().getEndDate()).isEqualTo(LocalDate.of(2026, 6, 30));
     }
 
     private ReportGenerateRequest reportGenerateRequest(ReportType reportType) {

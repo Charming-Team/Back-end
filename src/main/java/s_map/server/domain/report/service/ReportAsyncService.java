@@ -20,6 +20,8 @@ import s_map.server.domain.report.entity.ReportJob;
 import s_map.server.domain.report.entity.ReportType;
 import s_map.server.domain.report.repository.ReportJobRepository;
 import s_map.server.domain.report.repository.ReportRepository;
+import s_map.server.domain.report.support.ReportPeriodSupport;
+import s_map.server.domain.report.support.ReportPeriodSupport.ResolvedPeriod;
 import s_map.server.global.error.CustomException;
 import s_map.server.global.error.ErrorCode;
 
@@ -270,13 +272,18 @@ public class ReportAsyncService {
         reportContent.put("markdown", fastApiResponse.getMarkdown());
 
         Long relatedSimulationId = extractRelatedSimulationId(sections);
+        ResolvedPeriod period = ReportPeriodSupport.resolve(
+                request.getReportType(),
+                request.getPeriod().getStartDate(),
+                request.getPeriod().getEndDate()
+        );
 
         Report report = Report.builder()
                 .reportTitle(resolveReportTitle(request, fastApiResponse))
                 .reportType(request.getReportType())
                 .authorId(requestedBy)
-                .targetStartDate(request.getPeriod().getStartDate())
-                .targetEndDate(request.getPeriod().getEndDate())
+                .targetStartDate(period.startDate())
+                .targetEndDate(period.endDate())
                 .includedItems(sections)
                 .reportContent(reportContent)
                 .reportEvidence(evidence)
@@ -297,13 +304,19 @@ public class ReportAsyncService {
         );
         JsonNode reportEvidence = objectMapper.valueToTree(fastApiResponse.getReportEvidence());
         JsonNode includedItems = extractBusinessReportSections(reportContent);
+        ReportType reportType = resolveBusinessReportType(sourceReport, fastApiResponse);
+        ResolvedPeriod period = ReportPeriodSupport.resolve(
+                reportType,
+                resolveTargetStartDate(sourceReport, fastApiResponse),
+                resolveTargetEndDate(sourceReport, fastApiResponse)
+        );
 
         Report report = Report.builder()
                 .reportTitle(resolveBusinessReportTitle(sourceReport, fastApiResponse))
-                .reportType(resolveBusinessReportType(sourceReport, fastApiResponse))
+                .reportType(reportType)
                 .authorId(requestedBy)
-                .targetStartDate(resolveTargetStartDate(sourceReport, fastApiResponse))
-                .targetEndDate(resolveTargetEndDate(sourceReport, fastApiResponse))
+                .targetStartDate(period.startDate())
+                .targetEndDate(period.endDate())
                 .includedItems(includedItems)
                 .reportContent(reportContent)
                 .reportEvidence(reportEvidence)
@@ -539,7 +552,13 @@ public class ReportAsyncService {
             return reportTypeLabel + " 보고서";
         }
 
-        return period.getStartDate() + " ~ " + period.getEndDate() + " " + reportTypeLabel + " 보고서";
+        ResolvedPeriod resolvedPeriod = ReportPeriodSupport.resolve(
+                request.getReportType(),
+                period.getStartDate(),
+                period.getEndDate()
+        );
+
+        return resolvedPeriod.startDate() + " ~ " + resolvedPeriod.endDate() + " " + reportTypeLabel + " 보고서";
     }
 
     private String resolveReportTypeLabel(ReportType reportType) {
