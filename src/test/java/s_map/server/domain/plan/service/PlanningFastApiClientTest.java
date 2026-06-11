@@ -1,5 +1,7 @@
 package s_map.server.domain.plan.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpEntity;
@@ -19,7 +21,6 @@ import s_map.server.global.error.ErrorCode;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -31,12 +32,14 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 class PlanningFastApiClientTest {
 
+    private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
+
     @Test
     @DisplayName("FastAPI 유동 JSON 응답을 생산계획 AI 응답 DTO로 변환한다")
     void generatePlanningReadsFlexibleJsonResponse() {
         FastApiPlanningProperties properties = new FastApiPlanningProperties();
         properties.setBaseUrl("http://internal-fastapi:8000");
-        PlanningFastApiClient client = new PlanningFastApiClient(properties);
+        PlanningFastApiClient client = new PlanningFastApiClient(properties, objectMapper);
         RestTemplate restTemplate = new RestTemplate();
         MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
         FastApiPlanningGenerateRequest request = request();
@@ -52,7 +55,24 @@ class PlanningFastApiClientTest {
                                     ]
                                   },
                                   "simulation_response": {
-                                    "delay_reduction_hr": 12.5
+                                    "delay_reduction_hr": 12.5,
+                                    "alternatives": [
+                                      {
+                                        "plan_variant_code": "DUE_DATE_OPTIMAL",
+                                        "simulation_metrics": {
+                                          "expected_delay_days": 0.87,
+                                          "delayed_orders_days": 0.87,
+                                          "total_tardiness_minutes": 1246,
+                                          "delay_risk_order_count": 1,
+                                          "expected_delayed_orders": 1
+                                        },
+                                        "computed_deltas": {
+                                          "expected_delay_days_reduction": 18.67,
+                                          "delayed_orders_days_reduction": 18.67,
+                                          "delay_risk_order_reduction": 0
+                                        }
+                                      }
+                                    ]
                                   }
                                 }
                                 """,
@@ -63,9 +83,111 @@ class PlanningFastApiClientTest {
                 client.generatePlanning(request, "Bearer access-token", "refresh-token");
 
         org.assertj.core.api.Assertions.assertThat(response.getPlanningResponse())
-                .isInstanceOf(Map.class);
+                .isNotNull();
         org.assertj.core.api.Assertions.assertThat(response.getSimulationResponse())
-                .isInstanceOf(Map.class);
+                .isNotNull();
+        JsonNode serializedResponse = objectMapper.valueToTree(response);
+        org.assertj.core.api.Assertions.assertThat(serializedResponse.path("simulation_response").has("nodeType"))
+                .isFalse();
+        org.assertj.core.api.Assertions.assertThat(serializedResponse.path("simulation_response").path("alternatives").isArray())
+                .isTrue();
+
+        JsonNode simulationResponse = objectMapper.valueToTree(response.getSimulationResponse());
+        JsonNode alternative = simulationResponse.path("alternatives").get(0);
+        JsonNode simulationMetrics = alternative.path("simulation_metrics");
+        JsonNode computedDeltas = alternative.path("computed_deltas");
+
+        org.assertj.core.api.Assertions.assertThat(simulationMetrics.path("expected_delay_days").asDouble())
+                .isEqualTo(0.87);
+        org.assertj.core.api.Assertions.assertThat(simulationMetrics.path("delayed_orders_days").asDouble())
+                .isEqualTo(0.87);
+        org.assertj.core.api.Assertions.assertThat(simulationMetrics.path("total_tardiness_minutes").asInt())
+                .isEqualTo(1246);
+        org.assertj.core.api.Assertions.assertThat(simulationMetrics.path("delay_risk_order_count").asInt())
+                .isEqualTo(1);
+        org.assertj.core.api.Assertions.assertThat(simulationMetrics.path("expected_delayed_orders").asInt())
+                .isEqualTo(1);
+        org.assertj.core.api.Assertions.assertThat(computedDeltas.path("expected_delay_days_reduction").asDouble())
+                .isEqualTo(18.67);
+        org.assertj.core.api.Assertions.assertThat(computedDeltas.path("delayed_orders_days_reduction").asDouble())
+                .isEqualTo(18.67);
+        org.assertj.core.api.Assertions.assertThat(computedDeltas.path("delay_risk_order_reduction").asInt())
+                .isEqualTo(0);
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("FastAPI 응답의 AI 지표 alias가 없으면 Spring 응답에서 보강한다")
+    void generatePlanningBackfillsPlanningMetricAliases() {
+        FastApiPlanningProperties properties = new FastApiPlanningProperties();
+        properties.setBaseUrl("http://internal-fastapi:8000");
+        PlanningFastApiClient client = new PlanningFastApiClient(properties, objectMapper);
+        RestTemplate restTemplate = new RestTemplate();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
+        FastApiPlanningGenerateRequest request = request();
+
+        ReflectionTestUtils.setField(client, "restTemplate", restTemplate);
+        server.expect(requestTo("http://internal-fastapi:8000/ai/api/v1/planning"))
+                .andRespond(withSuccess(
+                        """
+                                {
+                                  "planning_response": {
+                                    "adjusted_plan_candidates": [
+                                      {"plan_variant_code": "DUE_DATE_OPTIMAL", "plans": []}
+                                    ]
+                                  },
+                                  "simulation_response": {
+                                    "baseline": {
+                                      "current_state_summary": {
+                                        "delayed_orders_days": 4.86,
+                                        "expected_delayed_orders": 1
+                                      }
+                                    },
+                                    "alternatives": [
+                                      {
+                                        "plan_variant_code": "DUE_DATE_OPTIMAL",
+                                        "simulation_metrics": {
+                                          "total_tardiness_minutes": 0
+                                        },
+                                        "computed_deltas": {},
+                                        "plan_value_analysis": {
+                                          "delay_flag_order_count": 0
+                                        }
+                                      }
+                                    ]
+                                  }
+                                }
+                                """,
+                        MediaType.APPLICATION_JSON
+                ));
+
+        FastApiPlanningGenerateResponse response =
+                client.generatePlanning(request, "Bearer access-token", "refresh-token");
+
+        JsonNode simulationResponse = objectMapper.valueToTree(response.getSimulationResponse());
+        JsonNode baselineMetrics = simulationResponse
+                .path("baseline")
+                .path("current_state_summary");
+        JsonNode alternative = simulationResponse.path("alternatives").get(0);
+        JsonNode simulationMetrics = alternative.path("simulation_metrics");
+        JsonNode computedDeltas = alternative.path("computed_deltas");
+
+        org.assertj.core.api.Assertions.assertThat(baselineMetrics.path("expected_delay_days").asDouble())
+                .isEqualTo(4.86);
+        org.assertj.core.api.Assertions.assertThat(baselineMetrics.path("delay_risk_order_count").asInt())
+                .isEqualTo(1);
+        org.assertj.core.api.Assertions.assertThat(simulationMetrics.path("expected_delay_days").asDouble())
+                .isEqualTo(0.0);
+        org.assertj.core.api.Assertions.assertThat(simulationMetrics.path("delayed_orders_days").asDouble())
+                .isEqualTo(0.0);
+        org.assertj.core.api.Assertions.assertThat(simulationMetrics.path("delay_risk_order_count").asInt())
+                .isEqualTo(0);
+        org.assertj.core.api.Assertions.assertThat(simulationMetrics.path("expected_delayed_orders").asInt())
+                .isEqualTo(0);
+        org.assertj.core.api.Assertions.assertThat(computedDeltas.path("expected_delay_days_reduction").asDouble())
+                .isEqualTo(4.86);
+        org.assertj.core.api.Assertions.assertThat(computedDeltas.path("delayed_orders_days_reduction").asDouble())
+                .isEqualTo(4.86);
         server.verify();
     }
 
@@ -74,7 +196,7 @@ class PlanningFastApiClientTest {
     void generatePlanningPropagatesFastApiClientErrorMessage() {
         FastApiPlanningProperties properties = new FastApiPlanningProperties();
         properties.setBaseUrl("http://internal-fastapi:8000");
-        PlanningFastApiClient client = new PlanningFastApiClient(properties);
+        PlanningFastApiClient client = new PlanningFastApiClient(properties, objectMapper);
         RestTemplate restTemplate = mock(RestTemplate.class);
         FastApiPlanningGenerateRequest request = request();
         String responseBody = "{\"detail\":\"edit_order 398 does not exist in DB planning data.\"}";
@@ -83,7 +205,7 @@ class PlanningFastApiClientTest {
         when(restTemplate.postForObject(
                 eq("http://internal-fastapi:8000/ai/api/v1/planning"),
                 any(HttpEntity.class),
-                eq(FastApiPlanningGenerateResponse.class)
+                eq(String.class)
         )).thenThrow(HttpClientErrorException.create(
                 HttpStatus.BAD_REQUEST,
                 "Bad Request",
@@ -108,7 +230,7 @@ class PlanningFastApiClientTest {
     void generatePlanningDoesNotExposeRawRestClientMessage() {
         FastApiPlanningProperties properties = new FastApiPlanningProperties();
         properties.setBaseUrl("http://internal-fastapi:8000");
-        PlanningFastApiClient client = new PlanningFastApiClient(properties);
+        PlanningFastApiClient client = new PlanningFastApiClient(properties, objectMapper);
         RestTemplate restTemplate = mock(RestTemplate.class);
         FastApiPlanningGenerateRequest request = request();
 
@@ -116,7 +238,7 @@ class PlanningFastApiClientTest {
         when(restTemplate.postForObject(
                 eq("http://internal-fastapi:8000/ai/api/v1/planning"),
                 any(HttpEntity.class),
-                eq(FastApiPlanningGenerateResponse.class)
+                eq(String.class)
         )).thenThrow(new RestClientException("I/O error on POST request for http://internal-fastapi:8000/secret"));
 
         assertThatThrownBy(() -> client.generatePlanning(request, "Bearer access-token", "refresh-token"))
@@ -137,7 +259,7 @@ class PlanningFastApiClientTest {
     void generatePlanningPropagatesFastApiServerErrorMessage() {
         FastApiPlanningProperties properties = new FastApiPlanningProperties();
         properties.setBaseUrl("http://internal-fastapi:8000");
-        PlanningFastApiClient client = new PlanningFastApiClient(properties);
+        PlanningFastApiClient client = new PlanningFastApiClient(properties, objectMapper);
         RestTemplate restTemplate = mock(RestTemplate.class);
         FastApiPlanningGenerateRequest request = request();
         String responseBody = "{\"detail\":\"optimizer failed to build adjusted plan.\"}";
@@ -146,7 +268,7 @@ class PlanningFastApiClientTest {
         when(restTemplate.postForObject(
                 eq("http://internal-fastapi:8000/ai/api/v1/planning"),
                 any(HttpEntity.class),
-                eq(FastApiPlanningGenerateResponse.class)
+                eq(String.class)
         )).thenThrow(HttpServerErrorException.create(
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 "Internal Server Error",
