@@ -130,29 +130,54 @@ public class ReportStructuredDataQueryRepository {
             OffsetDateTime endExclusive
     ) {
         String sql = """
-                WITH latest_line_status AS (
+                WITH result_by_line AS (
+                    SELECT
+                        pp.line_id,
+                        COALESCE(SUM(pr.actual_quantity), 0) AS actual_quantity,
+                        COALESCE(SUM(pr.defect_quantity), 0) AS defect_quantity
+                    FROM production_results pr
+                    JOIN production_plans pp ON pp.plan_id = pr.plan_id
+                    WHERE pr.actual_end_at >= :startAt
+                      AND pr.actual_end_at < :endExclusive
+                    GROUP BY pp.line_id
+                ),
+                status_by_line AS (
+                    SELECT
+                        ls.line_id,
+                        AVG(ls.utilization_rate) AS utilization_rate
+                    FROM line_status ls
+                    WHERE ls.recorded_at >= :startAt
+                      AND ls.recorded_at < :endExclusive
+                    GROUP BY ls.line_id
+                ),
+                latest_line_status AS (
                     SELECT DISTINCT ON (ls.line_id)
                         ls.line_id,
-                        pl.line_name,
-                        ls.utilization_rate,
-                        ls.processed_quantity,
-                        ls.defect_quantity,
                         ls.operation_status::text AS operation_status
                     FROM line_status ls
-                    JOIN production_lines pl ON pl.line_id = ls.line_id
                     WHERE ls.recorded_at >= :startAt
                       AND ls.recorded_at < :endExclusive
                     ORDER BY ls.line_id, ls.recorded_at DESC
                 )
-                SELECT *
-                FROM latest_line_status
+                SELECT
+                    pl.line_code || ' ' || pl.line_name AS line_name,
+                    sbl.utilization_rate,
+                    COALESCE(rbl.actual_quantity, 0) AS processed_quantity,
+                    COALESCE(rbl.defect_quantity, 0) AS defect_quantity,
+                    lls.operation_status
+                FROM production_lines pl
+                LEFT JOIN result_by_line rbl ON rbl.line_id = pl.line_id
+                LEFT JOIN status_by_line sbl ON sbl.line_id = pl.line_id
+                LEFT JOIN latest_line_status lls ON lls.line_id = pl.line_id
+                WHERE rbl.line_id IS NOT NULL
+                   OR sbl.line_id IS NOT NULL
                 ORDER BY
                     CASE
-                        WHEN operation_status NOT IN ('RUNNING', 'OPERATING', 'ACTIVE') THEN 0
+                        WHEN lls.operation_status NOT IN ('RUNNING', 'OPERATING', 'ACTIVE') THEN 0
                         ELSE 1
                     END,
-                    utilization_rate ASC NULLS LAST,
-                    line_name ASC
+                    sbl.utilization_rate ASC NULLS LAST,
+                    pl.line_name ASC
                 LIMIT 5
                 """;
 
@@ -167,7 +192,7 @@ public class ReportStructuredDataQueryRepository {
                 WITH latest_machine_status AS (
                     SELECT DISTINCT ON (ms.machine_id)
                         ms.machine_id,
-                        pm.machine_name,
+                        pm.machine_code || ' ' || pm.machine_name AS machine_name,
                         ms.operation_status::text AS operation_status
                     FROM machine_statuses ms
                     JOIN production_machines pm ON pm.machine_id = ms.machine_id
@@ -232,7 +257,7 @@ public class ReportStructuredDataQueryRepository {
                 formatPercent(resultSet.getBigDecimal("utilization_rate")),
                 formatNumber(processedQuantity),
                 formatRate(defectQuantity, processedQuantity),
-                resultSet.getString("operation_status")
+                normalizeStatusLabel(resultSet.getString("operation_status"))
         );
     }
 
@@ -241,7 +266,7 @@ public class ReportStructuredDataQueryRepository {
                 resultSet.getString("machine_name"),
                 MISSING_VALUE,
                 MISSING_VALUE,
-                resultSet.getString("operation_status")
+                normalizeStatusLabel(resultSet.getString("operation_status"))
         );
     }
 
@@ -251,7 +276,7 @@ public class ReportStructuredDataQueryRepository {
 
     private String formatRate(BigDecimal numerator, BigDecimal denominator) {
         if (denominator == null || denominator.compareTo(BigDecimal.ZERO) <= 0) {
-            return "0%";
+            return "-";
         }
 
         return numerator
@@ -279,6 +304,23 @@ public class ReportStructuredDataQueryRepository {
         }
 
         return value.setScale(0, RoundingMode.HALF_UP).toPlainString();
+    }
+
+    private String normalizeStatusLabel(String status) {
+        if (status == null || status.isBlank()) {
+            return MISSING_VALUE;
+        }
+
+        String normalizedStatus = status.trim();
+        return switch (normalizedStatus) {
+            case "RUNNING", "OPERATING", "ACTIVE" -> "정상";
+            case "MAINTENANCE" -> "점검";
+            case "STOPPED" -> "비가동";
+            case "IDLE" -> "대기";
+            case "SETUP" -> "전환/준비 중";
+            case "ERROR" -> "오류";
+            default -> normalizedStatus;
+        };
     }
 
     public record SummaryMetrics(

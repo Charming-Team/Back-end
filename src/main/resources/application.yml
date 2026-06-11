@@ -34,6 +34,9 @@ app:
   internal:
     chat:
       evidence-token: ${CHAT_EVIDENCE_INTERNAL_TOKEN:}
+  report:
+    mail:
+      from: ${REPORT_MAIL_FROM:no-reply@smap.local}
   jwt:
     access-token-expiration-ms: 300000
     refresh-token-expiration-ms: 86400000
@@ -41,6 +44,7 @@ app:
 ai:
   fastapi:
     base-url: ${FASTAPI_BASE_URL:http://fastapi-service:8000}
+    planning-generate-path: ${AI_FASTAPI_PLANNING_GENERATE_PATH:/ai/api/v1/planning}
     chat-answer-path: /ai/api/v1/chat/answer
     chat-answer-internal-token: ${CHAT_ANSWER_INTERNAL_TOKEN:}
     timeout-seconds: 60

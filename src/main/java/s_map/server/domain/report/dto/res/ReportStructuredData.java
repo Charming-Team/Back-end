@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import s_map.server.domain.report.entity.Report;
 import s_map.server.domain.report.entity.ReportType;
+import s_map.server.domain.report.support.ReportPeriodSupport;
+import s_map.server.domain.report.support.ReportPeriodSupport.ResolvedPeriod;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -14,6 +16,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.Spliterator;
 import java.util.Spliterators;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
@@ -29,6 +33,7 @@ public record ReportStructuredData(
     private static final int MAX_OVERVIEW_LENGTH = 180;
     private static final String MISSING_VALUE = "확인 필요";
     private static final String DEFAULT_RECOMMENDATION = "생성 필요";
+    private static final Pattern ORDER_ITEM_PATTERN = Pattern.compile("주문\\s*(\\d+)");
     private static final Set<String> MARKDOWN_SECTION_HEADINGS = Set.of(
             "주요 요약",
             "라인별 성과",
@@ -126,7 +131,7 @@ public record ReportStructuredData(
                         text(row, "utilization"),
                         text(row, "completed"),
                         text(row, "defectRate", "defect_rate"),
-                        text(row, "note")
+                        normalizeStatusLabel(text(row, "note"))
                 ))
                 .filter(row -> hasText(row.line())
                         || hasText(row.utilization())
@@ -146,7 +151,7 @@ public record ReportStructuredData(
                         text(row, "name"),
                         text(row, "utilization"),
                         text(row, "downTime", "down_time"),
-                        text(row, "status")
+                        normalizeStatusLabel(text(row, "status"))
                 ))
                 .filter(row -> hasText(row.name())
                         || hasText(row.utilization())
@@ -179,7 +184,10 @@ public record ReportStructuredData(
         return stream(sectionsNode)
                 .map(section -> new AnalysisSection(
                         text(section, "title"),
-                        parseStringItems(field(section, "items"))
+                        deduplicateAnalysisItems(
+                                text(section, "title"),
+                                parseStringItems(field(section, "items"))
+                        )
                 ))
                 .filter(section -> hasText(section.title()) || !section.items().isEmpty())
                 .toList();
@@ -191,14 +199,44 @@ public record ReportStructuredData(
         }
 
         if (itemsNode.isArray()) {
-            return stream(itemsNode)
+            LinkedHashSet<String> items = stream(itemsNode)
                     .map(ReportStructuredData::textValue)
                     .filter(ReportStructuredData::hasText)
-                    .toList();
+                    .collect(LinkedHashSet::new, LinkedHashSet::add, LinkedHashSet::addAll);
+            return items.stream().toList();
         }
 
         String value = textValue(itemsNode);
         return hasText(value) ? List.of(value) : List.of();
+    }
+
+    private static List<String> deduplicateAnalysisItems(String title, List<String> items) {
+        if (items.isEmpty()) {
+            return items;
+        }
+
+        LinkedHashSet<String> keys = new LinkedHashSet<>();
+        List<String> deduplicatedItems = new ArrayList<>();
+
+        for (String item : items) {
+            String key = analysisItemKey(title, item);
+            if (keys.add(key)) {
+                deduplicatedItems.add(item);
+            }
+        }
+
+        return deduplicatedItems;
+    }
+
+    private static String analysisItemKey(String title, String item) {
+        if (hasText(title) && title.contains("납기 위험")) {
+            Matcher matcher = ORDER_ITEM_PATTERN.matcher(item);
+            if (matcher.find()) {
+                return "order:" + matcher.group(1);
+            }
+        }
+
+        return item;
     }
 
     private static List<SummaryRow> createDefaultSummaryRows(Report report) {
@@ -207,7 +245,7 @@ public record ReportStructuredData(
         }
 
         return List.of(
-                new SummaryRow("보고서 기간", formatPeriod(report.getTargetStartDate(), report.getTargetEndDate()), "-"),
+                new SummaryRow("보고서 기간", formatReportPeriod(report), "-"),
                 new SummaryRow("보고서 유형", reportTypeLabel(report.getReportType()), "-"),
                 new SummaryRow("총 생산 계획 수량", MISSING_VALUE, "-"),
                 new SummaryRow("총 생산 완료 수량", MISSING_VALUE, "-"),
@@ -230,11 +268,7 @@ public record ReportStructuredData(
         }
 
         List<SummaryRow> completedRows = new ArrayList<>(rows.stream()
-                .map(row -> new SummaryRow(
-                        defaultText(row.label(), MISSING_VALUE),
-                        defaultText(row.value(), MISSING_VALUE),
-                        defaultText(row.change(), "-")
-                ))
+                .map(row -> normalizeSummaryRow(row, report))
                 .toList());
 
         Set<String> labels = completedRows.stream()
@@ -249,6 +283,19 @@ public record ReportStructuredData(
         return completedRows;
     }
 
+    private static SummaryRow normalizeSummaryRow(SummaryRow row, Report report) {
+        String label = defaultText(row.label(), MISSING_VALUE);
+        String value = defaultText(row.value(), MISSING_VALUE);
+
+        if ("보고서 기간".equals(label)) {
+            value = formatReportPeriod(report);
+        } else if ("보고서 유형".equals(label) && report != null) {
+            value = reportTypeLabel(report.getReportType());
+        }
+
+        return new SummaryRow(label, value, defaultText(row.change(), "-"));
+    }
+
     private static List<LineRow> completeLineRows(List<LineRow> rows) {
         if (rows.isEmpty()) {
             return List.of(new LineRow(MISSING_VALUE, MISSING_VALUE, MISSING_VALUE, MISSING_VALUE, MISSING_VALUE));
@@ -260,7 +307,7 @@ public record ReportStructuredData(
                         defaultText(row.utilization(), MISSING_VALUE),
                         defaultText(row.completed(), MISSING_VALUE),
                         defaultText(row.defectRate(), MISSING_VALUE),
-                        defaultText(row.note(), MISSING_VALUE)
+                        defaultText(normalizeStatusLabel(row.note()), MISSING_VALUE)
                 ))
                 .toList();
     }
@@ -275,7 +322,7 @@ public record ReportStructuredData(
                         defaultText(row.name(), MISSING_VALUE),
                         defaultText(row.utilization(), MISSING_VALUE),
                         defaultText(row.downTime(), MISSING_VALUE),
-                        defaultText(row.status(), MISSING_VALUE)
+                        defaultText(normalizeStatusLabel(row.status()), MISSING_VALUE)
                 ))
                 .toList();
     }
@@ -346,6 +393,20 @@ public record ReportStructuredData(
         return DISPLAY_DATE_FORMATTER.format(startDate) + " ~ " + DISPLAY_DATE_FORMATTER.format(endDate);
     }
 
+    private static String formatReportPeriod(Report report) {
+        if (report == null) {
+            return "-";
+        }
+
+        ResolvedPeriod period = ReportPeriodSupport.resolve(
+                report.getReportType(),
+                report.getTargetStartDate(),
+                report.getTargetEndDate()
+        );
+
+        return formatPeriod(period.startDate(), period.endDate());
+    }
+
     private static String reportTypeLabel(ReportType reportType) {
         if (reportType == null) {
             return "-";
@@ -370,7 +431,7 @@ public record ReportStructuredData(
             return null;
         }
 
-        return node.asText();
+        return node.asText().trim();
     }
 
     private static JsonNode field(JsonNode node, String fieldName) {
@@ -399,7 +460,7 @@ public record ReportStructuredData(
     }
 
     private static String defaultText(String value, String defaultValue) {
-        return hasText(value) ? value : defaultValue;
+        return hasText(value) ? value.trim() : defaultValue;
     }
 
     private static String emptyToNull(String value) {
@@ -408,6 +469,27 @@ public record ReportStructuredData(
 
     private static boolean hasText(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private static String normalizeStatusLabel(String status) {
+        if (!hasText(status)) {
+            return status;
+        }
+
+        String normalizedStatus = status.trim();
+        String enumLikeStatus = normalizedStatus.toUpperCase()
+                .replace("-", "_")
+                .replace(" ", "_");
+
+        return switch (enumLikeStatus) {
+            case "RUNNING", "OPERATING", "ACTIVE" -> "정상";
+            case "MAINTENANCE" -> "점검";
+            case "STOPPED" -> "비가동";
+            case "IDLE" -> "대기";
+            case "SETUP" -> "전환/준비 중";
+            case "ERROR" -> "오류";
+            default -> normalizedStatus;
+        };
     }
 
     private static Stream<JsonNode> stream(JsonNode arrayNode) {

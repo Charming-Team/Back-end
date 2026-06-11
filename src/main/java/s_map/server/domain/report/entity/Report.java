@@ -80,4 +80,10 @@ public class Report extends BaseEntity {
     public void updateIncludedItems(JsonNode includedItems) {
         this.includedItems = includedItems;
     }
+
+    public void updateReport(String reportTitle, JsonNode reportContent, JsonNode includedItems) {
+        this.reportTitle = reportTitle;
+        this.reportContent = reportContent;
+        this.includedItems = includedItems;
+    }
 }

@@ -133,6 +133,81 @@ class ReportStructuredDataTest {
         );
     }
 
+    @Test
+    void fromNormalizesMonthlyPeriodStatusLabelsAndDuplicateAnalysisItems() throws Exception {
+        JsonNode includedItems = objectMapper.readTree("""
+                {
+                  "summaryRows": [
+                    {
+                      "label": "보고서 기간",
+                      "value": "2026-05-01 ~ 2026-06-11",
+                      "change": "-"
+                    },
+                    {
+                      "label": "보고서 유형",
+                      "value": "월간",
+                      "change": "-"
+                    }
+                  ],
+                  "lineRows": [
+                    {
+                      "line": "LINE-PE-01 PE 범용 생산 Line",
+                      "utilization": "54%",
+                      "completed": "0",
+                      "defectRate": "-",
+                      "note": "SETUP"
+                    }
+                  ],
+                  "equipmentRows": [
+                    {
+                      "name": "M-PP02-EXT PP-02 압출기",
+                      "utilization": "확인 필요",
+                      "downTime": "확인 필요",
+                      "status": " 점검"
+                    }
+                  ],
+                  "analysis": {
+                    "overview": "월간 생산 운영 요약입니다.",
+                    "sections": [
+                      {
+                        "title": "납기 위험 분석",
+                        "items": [
+                          "주문 391는 CRITICAL 위험으로 분류되었고, 예상 지연일은 11.46일입니다.",
+                          "주문 391는 CRITICAL 위험으로 분류되었고, 예상 지연일은 10.8일입니다."
+                        ]
+                      }
+                    ],
+                    "recommendation": "위험 주문을 우선 점검하세요."
+                  }
+                }
+                """);
+
+        ReportStructuredData structuredData = ReportStructuredData.from(
+                monthlyReport(includedItems),
+                "## 주요 요약\n- 월간 생산 운영 요약입니다."
+        );
+
+        assertThat(structuredData.summaryRows()).startsWith(
+                new ReportStructuredData.SummaryRow("보고서 기간", "2026.05.01 ~ 2026.05.31", "-"),
+                new ReportStructuredData.SummaryRow("보고서 유형", "월간", "-")
+        );
+        assertThat(structuredData.lineRows()).containsExactly(new ReportStructuredData.LineRow(
+                "LINE-PE-01 PE 범용 생산 Line",
+                "54%",
+                "0",
+                "-",
+                "전환/준비 중"
+        ));
+        assertThat(structuredData.equipmentRows()).containsExactly(new ReportStructuredData.EquipmentRow(
+                "M-PP02-EXT PP-02 압출기",
+                "확인 필요",
+                "확인 필요",
+                "점검"
+        ));
+        assertThat(structuredData.analysis().sections().get(0).items())
+                .containsExactly("주문 391는 CRITICAL 위험으로 분류되었고, 예상 지연일은 11.46일입니다.");
+    }
+
     private Report report(JsonNode includedItems) throws Exception {
         return Report.builder()
                 .reportId(1L)
@@ -145,6 +220,25 @@ class ReportStructuredDataTest {
                 .reportContent(objectMapper.readTree("""
                         {
                           "markdown": "## 주요 요약\\n- 전체 생산 흐름은 안정적입니다."
+                        }
+                        """))
+                .reportEvidence(objectMapper.createArrayNode())
+                .relatedSimulationId(null)
+                .build();
+    }
+
+    private Report monthlyReport(JsonNode includedItems) throws Exception {
+        return Report.builder()
+                .reportId(2L)
+                .reportTitle("2026년 05월 생산 운영 보고서")
+                .reportType(ReportType.MONTHLY)
+                .authorId(1L)
+                .targetStartDate(LocalDate.of(2026, 5, 1))
+                .targetEndDate(LocalDate.of(2026, 6, 11))
+                .includedItems(includedItems)
+                .reportContent(objectMapper.readTree("""
+                        {
+                          "markdown": "## 주요 요약\\n- 월간 생산 운영 요약입니다."
                         }
                         """))
                 .reportEvidence(objectMapper.createArrayNode())

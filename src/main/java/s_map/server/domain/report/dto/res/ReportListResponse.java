@@ -4,6 +4,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 import lombok.Getter;
 import s_map.server.domain.report.entity.Report;
+import s_map.server.domain.report.support.ReportPeriodSupport;
+import s_map.server.domain.report.support.ReportPeriodSupport.ResolvedPeriod;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -38,14 +40,20 @@ public class ReportListResponse {
     private LocalDateTime createdAt;
 
     public static ReportListResponse from(Report report, String authorName) {
+        ResolvedPeriod period = ReportPeriodSupport.resolve(
+                report.getReportType(),
+                report.getTargetStartDate(),
+                report.getTargetEndDate()
+        );
+
         return ReportListResponse.builder()
                 .reportId(report.getReportId())
                 .title(report.getReportTitle())
                 .reportType(report.getReportType().name())
                 .authorId(report.getAuthorId())
                 .authorName(authorName)
-                .targetStartDate(report.getTargetStartDate())
-                .targetEndDate(report.getTargetEndDate())
+                .targetStartDate(period.startDate())
+                .targetEndDate(period.endDate())
                 .createdAt(report.getCreatedAt())
                 .build();
     }

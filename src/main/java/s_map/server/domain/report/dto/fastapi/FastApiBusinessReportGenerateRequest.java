@@ -6,6 +6,8 @@ import lombok.Builder;
 import lombok.Getter;
 import s_map.server.domain.report.entity.Report;
 import s_map.server.domain.report.entity.ReportType;
+import s_map.server.domain.report.support.ReportPeriodSupport;
+import s_map.server.domain.report.support.ReportPeriodSupport.ResolvedPeriod;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -71,13 +73,19 @@ public class FastApiBusinessReportGenerateRequest {
         private String updatedAt;
 
         private static SourceReport from(Report report) {
+            ResolvedPeriod period = ReportPeriodSupport.resolve(
+                    report.getReportType(),
+                    report.getTargetStartDate(),
+                    report.getTargetEndDate()
+            );
+
             return SourceReport.builder()
                     .reportId(report.getReportId())
                     .reportTitle(report.getReportTitle())
                     .reportType(toFastApiReportType(report.getReportType()))
                     .authorId(report.getAuthorId())
-                    .targetStartDate(format(report.getTargetStartDate()))
-                    .targetEndDate(format(report.getTargetEndDate()))
+                    .targetStartDate(format(period.startDate()))
+                    .targetEndDate(format(period.endDate()))
                     .markdown(extractMarkdown(report.getReportContent()))
                     .sections(report.getIncludedItems())
                     .reportContent(report.getReportContent())

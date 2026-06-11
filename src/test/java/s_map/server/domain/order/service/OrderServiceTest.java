@@ -352,7 +352,7 @@ class OrderServiceTest {
                 desiredStartAt,
                 operatorId,
                 null,
-                " 배난수 ",
+                " 박고객 ",
                 BigDecimal.valueOf(10_000_000),
                 BigDecimal.valueOf(500_000)
         );

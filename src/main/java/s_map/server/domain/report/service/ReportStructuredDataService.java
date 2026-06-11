@@ -7,6 +7,8 @@ import s_map.server.domain.report.dto.res.ReportStructuredData;
 import s_map.server.domain.report.entity.Report;
 import s_map.server.domain.report.entity.ReportType;
 import s_map.server.domain.report.repository.ReportStructuredDataQueryRepository;
+import s_map.server.domain.report.support.ReportPeriodSupport;
+import s_map.server.domain.report.support.ReportPeriodSupport.ResolvedPeriod;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -15,7 +17,9 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -30,14 +34,18 @@ public class ReportStructuredDataService {
     public ReportStructuredData resolve(Report report) {
         String markdown = extractMarkdown(report.getReportContent());
         if (hasStructuredData(report)) {
-            return ReportStructuredData.from(report, markdown);
+            return enrichStructuredData(report, ReportStructuredData.from(report, markdown));
         }
 
         return createFromCurrentDatabase(report);
     }
 
     public ReportStructuredData createFromCurrentDatabase(Report report) {
-        DateRange dateRange = DateRange.from(report.getTargetStartDate(), report.getTargetEndDate());
+        DateRange dateRange = DateRange.from(
+                report.getReportType(),
+                report.getTargetStartDate(),
+                report.getTargetEndDate()
+        );
         ReportStructuredDataQueryRepository.SummaryMetrics metrics =
                 queryRepository.findSummaryMetrics(
                         dateRange.startDate(),
@@ -52,7 +60,7 @@ public class ReportStructuredDataService {
                 queryRepository.findEquipmentRows(dateRange.startAt(), dateRange.endExclusive());
 
         return new ReportStructuredData(
-                createSummaryRows(report, metrics),
+                createSummaryRows(report, metrics, dateRange),
                 lineRows.isEmpty()
                         ? List.of(new ReportStructuredData.LineRow(
                         MISSING_VALUE,
@@ -76,33 +84,115 @@ public class ReportStructuredDataService {
 
     private List<ReportStructuredData.SummaryRow> createSummaryRows(
             Report report,
-            ReportStructuredDataQueryRepository.SummaryMetrics metrics
+            ReportStructuredDataQueryRepository.SummaryMetrics metrics,
+            DateRange dateRange
+    ) {
+        Map<String, String> values = createSummaryValueMap(report, metrics, dateRange);
+
+        return List.of(
+                row("보고서 기간", values.get("보고서 기간")),
+                row("보고서 유형", values.get("보고서 유형")),
+                row("총 주문 수", values.get("총 주문 수")),
+                row("총 생산계획 수", values.get("총 생산계획 수")),
+                row("총 생산 계획 수량", values.get("총 생산 계획 수량")),
+                row("총 생산 완료 수량", values.get("총 생산 완료 수량")),
+                row("생산 계획 대비 실적", values.get("생산 계획 대비 실적")),
+                row("라인 가동률", values.get("라인 가동률")),
+                row("평균 Cycle Time", values.get("평균 Cycle Time")),
+                row("불량 수량", values.get("불량 수량")),
+                row("불량률", values.get("불량률")),
+                row("설비 다운 타임", values.get("설비 다운 타임")),
+                row("작업자 투입 시간", values.get("작업자 투입 시간")),
+                row("안전 사고 건수", values.get("안전 사고 건수")),
+                row("납기 준수율", values.get("납기 준수율")),
+                row("납기 위험 주문 수", values.get("납기 위험 주문 수")),
+                row("자재 위험 품목 수", values.get("자재 위험 품목 수")),
+                row("비정상 설비 상태 수", values.get("비정상 설비 상태 수"))
+        );
+    }
+
+    private ReportStructuredData enrichStructuredData(Report report, ReportStructuredData structuredData) {
+        DateRange dateRange = DateRange.from(
+                report.getReportType(),
+                report.getTargetStartDate(),
+                report.getTargetEndDate()
+        );
+        ReportStructuredDataQueryRepository.SummaryMetrics metrics =
+                queryRepository.findSummaryMetrics(
+                        dateRange.startDate(),
+                        dateRange.endDateExclusive(),
+                        dateRange.startAt(),
+                        dateRange.endExclusive()
+                );
+        List<ReportStructuredData.LineRow> lineRows =
+                queryRepository.findLineRows(dateRange.startAt(), dateRange.endExclusive());
+        Map<String, String> values = createSummaryValueMap(report, metrics, dateRange);
+
+        return new ReportStructuredData(
+                enrichSummaryRows(structuredData.summaryRows(), values),
+                lineRows.isEmpty() ? structuredData.lineRows() : lineRows,
+                structuredData.equipmentRows(),
+                structuredData.analysis()
+        );
+    }
+
+    private List<ReportStructuredData.SummaryRow> enrichSummaryRows(
+            List<ReportStructuredData.SummaryRow> rows,
+            Map<String, String> values
+    ) {
+        return rows.stream()
+                .map(row -> {
+                    String calculatedValue = values.get(row.label());
+                    String value = shouldReplaceSummaryValue(row.label(), row.value(), calculatedValue)
+                            ? calculatedValue
+                            : row.value();
+                    return new ReportStructuredData.SummaryRow(row.label(), value, row.change());
+                })
+                .toList();
+    }
+
+    private boolean shouldReplaceSummaryValue(String label, String currentValue, String calculatedValue) {
+        if (!hasText(calculatedValue)) {
+            return false;
+        }
+
+        if ("보고서 기간".equals(label) || "보고서 유형".equals(label)) {
+            return true;
+        }
+
+        return !hasText(currentValue) || MISSING_VALUE.equals(currentValue.trim());
+    }
+
+    private Map<String, String> createSummaryValueMap(
+            Report report,
+            ReportStructuredDataQueryRepository.SummaryMetrics metrics,
+            DateRange dateRange
     ) {
         BigDecimal plannedQuantity = defaultZero(metrics.plannedQuantity());
         BigDecimal actualQuantity = defaultZero(metrics.actualQuantity());
         BigDecimal defectQuantity = defaultZero(metrics.defectQuantity());
         BigDecimal actualDurationHours = defaultZero(metrics.actualDurationHours());
 
-        return List.of(
-                row("보고서 기간", formatPeriod(report.getTargetStartDate(), report.getTargetEndDate())),
-                row("보고서 유형", reportTypeLabel(report.getReportType())),
-                row("총 주문 수", formatNumber(metrics.orderCount())),
-                row("총 생산계획 수", formatNumber(metrics.planCount())),
-                row("총 생산 계획 수량", formatNumber(plannedQuantity)),
-                row("총 생산 완료 수량", formatNumber(actualQuantity)),
-                row("생산 계획 대비 실적", formatRate(actualQuantity, plannedQuantity)),
-                row("라인 가동률", formatPercent(metrics.avgLineUtilizationRate())),
-                row("평균 Cycle Time", formatCycleTime(actualDurationHours, actualQuantity)),
-                row("불량 수량", formatNumber(defectQuantity)),
-                row("불량률", formatRate(defectQuantity, actualQuantity)),
-                row("설비 다운 타임", MISSING_VALUE),
-                row("작업자 투입 시간", formatHours(actualDurationHours)),
-                row("안전 사고 건수", MISSING_VALUE),
-                row("납기 준수율", formatOnTimeRate(metrics.onTimeOrderCount(), metrics.dueOrderCount())),
-                row("납기 위험 주문 수", formatNumber(metrics.deliveryRiskOrderCount())),
-                row("자재 위험 품목 수", formatNumber(metrics.materialRiskItemCount())),
-                row("비정상 설비 상태 수", formatNumber(metrics.abnormalMachineCount()))
-        );
+        Map<String, String> values = new LinkedHashMap<>();
+        values.put("보고서 기간", formatPeriod(dateRange.startDate(), dateRange.endDate()));
+        values.put("보고서 유형", reportTypeLabel(report.getReportType()));
+        values.put("총 주문 수", formatNumber(metrics.orderCount()));
+        values.put("총 생산계획 수", formatNumber(metrics.planCount()));
+        values.put("총 생산 계획 수량", formatNumber(plannedQuantity));
+        values.put("총 생산 완료 수량", formatNumber(actualQuantity));
+        values.put("생산 계획 대비 실적", formatRate(actualQuantity, plannedQuantity));
+        values.put("라인 가동률", formatPercent(metrics.avgLineUtilizationRate()));
+        values.put("평균 Cycle Time", formatCycleTime(actualDurationHours, actualQuantity));
+        values.put("불량 수량", formatNumber(defectQuantity));
+        values.put("불량률", formatRate(defectQuantity, actualQuantity));
+        values.put("설비 다운 타임", MISSING_VALUE);
+        values.put("작업자 투입 시간", formatHours(actualDurationHours));
+        values.put("안전 사고 건수", MISSING_VALUE);
+        values.put("납기 준수율", formatOnTimeRate(metrics.onTimeOrderCount(), metrics.dueOrderCount()));
+        values.put("납기 위험 주문 수", formatNumber(metrics.deliveryRiskOrderCount()));
+        values.put("자재 위험 품목 수", formatNumber(metrics.materialRiskItemCount()));
+        values.put("비정상 설비 상태 수", formatNumber(metrics.abnormalMachineCount()));
+        return values;
     }
 
     private ReportStructuredData.SummaryRow row(String label, String value) {
@@ -370,20 +460,22 @@ public class ReportStructuredDataService {
 
     private record DateRange(
             LocalDate startDate,
+            LocalDate endDate,
             LocalDate endDateExclusive,
             OffsetDateTime startAt,
             OffsetDateTime endExclusive
     ) {
-        private static DateRange from(LocalDate startDate, LocalDate endDate) {
-            LocalDate endDateExclusive = endDate.plusDays(1);
-            OffsetDateTime startAt = startDate
+        private static DateRange from(ReportType reportType, LocalDate startDate, LocalDate endDate) {
+            ResolvedPeriod period = ReportPeriodSupport.resolve(reportType, startDate, endDate);
+            LocalDate endDateExclusive = period.endDateExclusive();
+            OffsetDateTime startAt = period.startDate()
                     .atStartOfDay(DEFAULT_PRODUCTION_ZONE)
                     .toOffsetDateTime();
             OffsetDateTime endExclusive = endDateExclusive
                     .atStartOfDay(DEFAULT_PRODUCTION_ZONE)
                     .toOffsetDateTime();
 
-            return new DateRange(startDate, endDateExclusive, startAt, endExclusive);
+            return new DateRange(period.startDate(), period.endDate(), endDateExclusive, startAt, endExclusive);
         }
     }
 }

@@ -49,11 +49,11 @@ public record OrderCreateRequest(
         @Positive(message = "생산 담당자 ID는 0보다 커야 합니다.")
         Long operatorId,
 
-        @Schema(description = "생산 담당자명. operatorId가 없을 때 이름으로 조회합니다.", example = "윤정원")
+        @Schema(description = "생산 담당자명. operatorId가 없을 때 이름으로 조회합니다.", example = "신작업")
         @Size(max = 50)
         String operatorName,
 
-        @Schema(description = "고객사 담당자명", example = "배난수")
+        @Schema(description = "고객사 담당자명", example = "박고객")
         @NotBlank(message = "고객사 담당자명은 필수입니다.")
         @Size(max = 50)
         String customerContactName,

@@ -52,14 +52,14 @@ class ReportStructuredDataServiceTest {
                         "81%",
                         "9513",
                         "6.3%",
-                        "RUNNING"
+                        "정상"
                 )));
         when(queryRepository.findEquipmentRows(any(OffsetDateTime.class), any(OffsetDateTime.class)))
                 .thenReturn(List.of(new ReportStructuredData.EquipmentRow(
                         "압출기",
                         "확인 필요",
                         "확인 필요",
-                        "MAINTENANCE"
+                        "점검"
                 )));
 
         ReportStructuredData structuredData = service.createFromCurrentDatabase(reportWithLegacySections());
@@ -76,13 +76,13 @@ class ReportStructuredDataServiceTest {
                 "81%",
                 "9513",
                 "6.3%",
-                "RUNNING"
+                "정상"
         ));
         assertThat(structuredData.equipmentRows()).containsExactly(new ReportStructuredData.EquipmentRow(
                 "압출기",
                 "확인 필요",
                 "확인 필요",
-                "MAINTENANCE"
+                "점검"
         ));
         assertThat(structuredData.analysis()).isEqualTo(new ReportStructuredData.Analysis(
                 "현재 미완료 생산계획과 미래 주문 중 자재 부족을 분석했습니다.",
