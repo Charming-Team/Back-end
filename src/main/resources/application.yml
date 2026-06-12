@@ -48,6 +48,11 @@ ai:
     chat-answer-path: /ai/api/v1/chat/answer
     chat-answer-internal-token: ${CHAT_ANSWER_INTERNAL_TOKEN:}
     timeout-seconds: 60
+    risk:
+      delay-probability-predict-path: ${AI_FASTAPI_DELAY_PROBABILITY_PREDICT_PATH:/api/v1/delay-probability/predict}
+      connect-timeout-ms: ${AI_FASTAPI_RISK_CONNECT_TIMEOUT_MS:3000}
+      read-timeout-ms: ${AI_FASTAPI_RISK_READ_TIMEOUT_MS:10000}
+      internal-token: ${AI_FASTAPI_RISK_INTERNAL_TOKEN:}
 
 ---
 spring:
