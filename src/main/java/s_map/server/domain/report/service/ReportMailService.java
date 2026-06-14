@@ -75,9 +75,9 @@ public class ReportMailService {
             mailSender.send(mimeMessage);
         } catch (MessagingException | MailException exception) {
             log.error(
-                    "[ReportMailService] 메일 발송 실패 reportId={}, recipients={}",
+                    "[ReportMailService] 메일 발송 실패 reportId={}, recipientCount={}",
                     report.getReportId(),
-                    request.recipients(),
+                    request.recipients().size(),
                     exception
             );
             throw new CustomException(ErrorCode.REPORT_MAIL_SEND_FAILED);

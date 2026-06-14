@@ -34,6 +34,8 @@ import java.util.Map;
 public class PlanningFastApiClient {
 
     private static final String REFRESH_TOKEN_COOKIE_NAME = "refreshToken";
+    private static final String AI_PLANNING_REQUEST_FAILED_MESSAGE =
+            "AI 생산계획 요청을 처리할 수 없습니다. 입력값을 확인해주세요.";
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
@@ -121,7 +123,7 @@ public class PlanningFastApiClient {
                     exception.getStatusCode(),
                     responseMessage
             );
-            throw new CustomException(ErrorCode.BAD_REQUEST, responseMessage);
+            throw new CustomException(ErrorCode.BAD_REQUEST, AI_PLANNING_REQUEST_FAILED_MESSAGE);
         } catch (HttpServerErrorException exception) {
             String responseMessage = resolveFastApiClientErrorMessage(exception);
             log.error(
@@ -129,7 +131,7 @@ public class PlanningFastApiClient {
                     exception.getStatusCode(),
                     responseMessage
             );
-            throw new CustomException(ErrorCode.AI_SERVER_CALL_FAILED, responseMessage);
+            throw new CustomException(ErrorCode.AI_SERVER_CALL_FAILED);
         } catch (RestClientException exception) {
             log.error(
                     "[PlanningFastApiClient] FastAPI 생산계획 조정 요청 실패 reason=rest_client_exception",

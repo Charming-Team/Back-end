@@ -76,7 +76,7 @@ public class FastApiReportClient {
                     "[FastApiReportClient] FastAPI 보고서 생성 요청 실패 reason=rest_client_exception",
                     exception
             );
-            throw new CustomException(ErrorCode.REPORT_FASTAPI_CALL_FAILED, resolveRestClientMessage(exception));
+            throw new CustomException(ErrorCode.REPORT_FASTAPI_CALL_FAILED);
         }
     }
 
@@ -129,7 +129,7 @@ public class FastApiReportClient {
                     "[FastApiReportClient] FastAPI 비즈니스 보고서 생성 요청 실패 reason=rest_client_exception",
                     exception
             );
-            throw new CustomException(ErrorCode.REPORT_FASTAPI_CALL_FAILED, resolveRestClientMessage(exception));
+            throw new CustomException(ErrorCode.REPORT_FASTAPI_CALL_FAILED);
         }
     }
 
@@ -150,13 +150,4 @@ public class FastApiReportClient {
                 : value;
     }
 
-    private String resolveRestClientMessage(RestClientException exception) {
-        String message = exception.getMessage();
-
-        if (message == null || message.isBlank()) {
-            return ErrorCode.REPORT_FASTAPI_CALL_FAILED.getMessage();
-        }
-
-        return message;
-    }
 }
