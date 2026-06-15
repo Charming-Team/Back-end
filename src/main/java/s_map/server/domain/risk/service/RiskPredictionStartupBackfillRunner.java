@@ -12,18 +12,24 @@ public class RiskPredictionStartupBackfillRunner {
 
     private static final Logger log = LoggerFactory.getLogger(RiskPredictionStartupBackfillRunner.class);
 
+    private static final String MODE_REFRESH_ALL_INCOMPLETE = "REFRESH_ALL_INCOMPLETE";
+    private static final String MODE_MISSING_ONLY = "MISSING_ONLY";
+
     private final RiskPredictionCoverageService coverageService;
     private final boolean startupBackfillEnabled;
     private final int startupBackfillLimit;
+    private final String startupBackfillMode;
 
     public RiskPredictionStartupBackfillRunner(
             RiskPredictionCoverageService coverageService,
-            @Value("${ai.fastapi.risk.startup-backfill-enabled:true}") boolean startupBackfillEnabled,
-            @Value("${ai.fastapi.risk.startup-backfill-limit:1000}") int startupBackfillLimit
+            @Value("${ai.fastapi.risk.startup-backfill-enabled:false}") boolean startupBackfillEnabled,
+            @Value("${ai.fastapi.risk.startup-backfill-limit:1000}") int startupBackfillLimit,
+            @Value("${ai.fastapi.risk.startup-backfill-mode:MISSING_ONLY}") String startupBackfillMode
     ) {
         this.coverageService = coverageService;
         this.startupBackfillEnabled = startupBackfillEnabled;
         this.startupBackfillLimit = startupBackfillLimit;
+        this.startupBackfillMode = startupBackfillMode;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -42,26 +48,42 @@ public class RiskPredictionStartupBackfillRunner {
         }
 
         log.info(
-                "Risk prediction startup backfill started. limit={}",
+                "Risk prediction startup backfill started. mode={}, limit={}",
+                startupBackfillMode,
                 startupBackfillLimit
         );
 
         try {
-            RiskPredictionCoverageService.RiskPredictionCoverageResult result =
-                    coverageService.backfillMissingPredictionsForIncompleteOrders(startupBackfillLimit);
+            RiskPredictionCoverageService.RiskPredictionCoverageResult result;
+
+            if (MODE_REFRESH_ALL_INCOMPLETE.equalsIgnoreCase(startupBackfillMode)) {
+                result = coverageService.refreshPredictionsForIncompleteOrders(startupBackfillLimit);
+            } else if (MODE_MISSING_ONLY.equalsIgnoreCase(startupBackfillMode)) {
+                result = coverageService.backfillMissingPredictionsForIncompleteOrders(startupBackfillLimit);
+            } else {
+                log.warn(
+                        "Unknown risk prediction startup backfill mode. mode={}, fallback={}",
+                        startupBackfillMode,
+                        MODE_MISSING_ONLY
+                );
+                result = coverageService.backfillMissingPredictionsForIncompleteOrders(startupBackfillLimit);
+            }
 
             log.info(
-                    "Risk prediction startup backfill finished. targetCount={}, succeededCount={}, failedCount={}",
+                    "Risk prediction startup backfill finished. mode={}, targetCount={}, succeededCount={}, failedCount={}",
+                    startupBackfillMode,
                     result.targetCount(),
                     result.succeededCount(),
                     result.failedCount()
             );
 
         } catch (Exception ex) {
-            /*
-             * Backfill 실패가 Spring 서버 기동 자체를 막지 않도록 합니다.
-             */
-            log.error("Risk prediction startup backfill failed.", ex);
+            log.error(
+                    "Risk prediction startup backfill failed. mode={}, limit={}",
+                    startupBackfillMode,
+                    startupBackfillLimit,
+                    ex
+            );
         }
     }
 }

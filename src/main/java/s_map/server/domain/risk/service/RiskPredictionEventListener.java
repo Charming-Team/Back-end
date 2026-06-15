@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
+import s_map.server.domain.risk.repository.RiskPredictionCoverageRepository;
 
 @Component
 public class RiskPredictionEventListener {
@@ -12,9 +13,14 @@ public class RiskPredictionEventListener {
     private static final Logger log = LoggerFactory.getLogger(RiskPredictionEventListener.class);
 
     private final RiskPredictionService riskPredictionService;
+    private final RiskPredictionCoverageRepository coverageRepository;
 
-    public RiskPredictionEventListener(RiskPredictionService riskPredictionService) {
+    public RiskPredictionEventListener(
+            RiskPredictionService riskPredictionService,
+            RiskPredictionCoverageRepository coverageRepository
+    ) {
         this.riskPredictionService = riskPredictionService;
+        this.coverageRepository = coverageRepository;
     }
 
     /**
@@ -41,6 +47,15 @@ public class RiskPredictionEventListener {
         );
 
         try {
+            if (!coverageRepository.existsIncompleteOrder(event.orderId())) {
+                log.info(
+                        "Risk prediction skipped because order is completed/cancelled or not found. orderId={}, triggerType={}",
+                        event.orderId(),
+                        event.triggerType()
+                );
+                return;
+            }
+
             var result = riskPredictionService.predictAndSaveDelayProbability(
                     event.orderId()
             );

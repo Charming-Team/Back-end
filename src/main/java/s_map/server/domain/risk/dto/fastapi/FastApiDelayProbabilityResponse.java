@@ -2,8 +2,6 @@ package s_map.server.domain.risk.dto.fastapi;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import s_map.server.domain.risk.dto.internal.AiPredictionResultSaveCommand;
 import s_map.server.domain.risk.entity.RiskLevel;
 
@@ -61,11 +59,8 @@ public record FastApiDelayProbabilityResponse(
         FastApiCauseDetailResponse causeDetail
 ) {
 
-    public AiPredictionResultSaveCommand toSaveCommand(ObjectMapper objectMapper) {
-        Objects.requireNonNull(objectMapper, "objectMapper must not be null");
+    public AiPredictionResultSaveCommand toSaveCommand() {
         validateRequiredFields();
-
-        JsonNode causeDetailJson = objectMapper.valueToTree(causeDetail);
 
         return new AiPredictionResultSaveCommand(
                 orderId,
@@ -77,7 +72,7 @@ public record FastApiDelayProbabilityResponse(
                 modelName,
                 modelVersion,
                 predictedAt,
-                causeDetailJson
+                causeDetail
         );
     }
 

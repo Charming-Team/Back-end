@@ -23,6 +23,7 @@ import s_map.server.domain.user.entity.UserStatus;
 import s_map.server.domain.user.repository.UserRepository;
 import s_map.server.global.error.CustomException;
 import s_map.server.global.error.ErrorCode;
+import s_map.server.domain.risk.service.RiskPredictionEventPublisher;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -44,7 +45,7 @@ public class PlanService {
     private final PlanQueryRepository planQueryRepository;
     private final ProductionResultRepository productionResultRepository;
     private final UserRepository userRepository;
-
+    private final RiskPredictionEventPublisher riskPredictionEventPublisher;
     /*
      * ProductionPlanMaterial은 현재 material 도메인에 위치함.
      * 생산계획 상세 조회 시 해당 계획에 필요한 자재 목록을 조회하기 위해 참조한다.
@@ -270,6 +271,7 @@ public class PlanService {
                 request.getPlanSequence(),
                 request.getPlanStatus()
         );
+        riskPredictionEventPublisher.publishPlanChanged(plan.getOrderId());
 
         return PlanUpdateResponse.from(plan);
     }
@@ -322,6 +324,7 @@ public class PlanService {
                 request.getPlannedStartAt(),
                 request.getPlannedEndAt()
         );
+        riskPredictionEventPublisher.publishPlanChanged(plan.getOrderId());
 
         return PlanUpdateResponse.from(plan);
     }

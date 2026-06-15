@@ -2,7 +2,6 @@ package s_map.server.domain.risk.dto.fastapi;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.JsonNode;
 
 import java.math.BigDecimal;
 
@@ -19,7 +18,7 @@ public record FastApiShapFactorResponse(
         String causeTag,
 
         @JsonProperty("feature_value")
-        JsonNode featureValue,
+        Object featureValue,
 
         @JsonProperty("impact")
         BigDecimal impact,

@@ -31,14 +31,45 @@ public class RiskPredictionCoverageService {
             throw new IllegalArgumentException("limit must be positive.");
         }
 
-        List<Long> targetOrderIds = coverageRepository.findIncompleteOrderIdsMissingPrediction(limit);
+        List<Long> targetOrderIds =
+                coverageRepository.findIncompleteOrderIdsMissingPrediction(limit);
 
         log.info(
-                "Risk prediction backfill target loaded. targetCount={}, limit={}",
+                "Risk prediction missing backfill target loaded. targetCount={}, limit={}",
                 targetOrderIds.size(),
                 limit
         );
 
+        return predictAndSaveForOrderIds(
+                targetOrderIds,
+                "missing-backfill"
+        );
+    }
+
+    public RiskPredictionCoverageResult refreshPredictionsForIncompleteOrders(int limit) {
+        if (limit <= 0) {
+            throw new IllegalArgumentException("limit must be positive.");
+        }
+
+        List<Long> targetOrderIds =
+                coverageRepository.findIncompleteOrderIdsForPredictionRefresh(limit);
+
+        log.info(
+                "Risk prediction refresh target loaded. targetCount={}, limit={}",
+                targetOrderIds.size(),
+                limit
+        );
+
+        return predictAndSaveForOrderIds(
+                targetOrderIds,
+                "refresh"
+        );
+    }
+    
+    private RiskPredictionCoverageResult predictAndSaveForOrderIds(
+            List<Long> targetOrderIds,
+            String jobType
+    ) {
         List<Long> succeededOrderIds = new ArrayList<>();
         List<RiskPredictionBackfillFailure> failures = new ArrayList<>();
 
@@ -50,7 +81,8 @@ public class RiskPredictionCoverageService {
                 succeededOrderIds.add(orderId);
 
                 log.info(
-                        "Risk prediction backfill succeeded. orderId={}, predictionId={}, riskLevel={}, delayProbability={}, requiresAgentAnalysis={}",
+                        "Risk prediction {} succeeded. orderId={}, predictionId={}, riskLevel={}, delayProbability={}, requiresAgentAnalysis={}",
+                        jobType,
                         orderId,
                         result.predictionId(),
                         result.riskLevel(),
@@ -67,11 +99,9 @@ public class RiskPredictionCoverageService {
                         )
                 );
 
-                /*
-                 * 일부 주문 실패가 전체 backfill을 중단하지 않도록 합니다.
-                 */
                 log.error(
-                        "Risk prediction backfill failed. orderId={}",
+                        "Risk prediction {} failed. orderId={}",
+                        jobType,
                         orderId,
                         ex
                 );

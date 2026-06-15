@@ -39,6 +39,28 @@ public class RiskPredictionCoverageRepository {
             ORDER BY co.order_id
             LIMIT :limit
             """;
+            
+    private static final String FIND_INCOMPLETE_ORDER_IDS_FOR_PREDICTION_REFRESH_SQL = """
+        SELECT co.order_id
+        FROM customer_orders co
+        WHERE COALESCE(UPPER(co.order_status::text), '') NOT IN ('COMPLETE', 'COMPLETED', 'CANCELLED')
+          AND EXISTS (
+                SELECT 1
+                FROM delay_prediction_evidence.vw_delay_probability_inference_orders v
+                WHERE v.order_id = co.order_id
+          )
+        ORDER BY co.order_id
+        LIMIT :limit
+        """;
+    
+    private static final String EXISTS_INCOMPLETE_ORDER_SQL = """
+        SELECT EXISTS (
+            SELECT 1
+            FROM customer_orders co
+            WHERE co.order_id = :orderId
+              AND COALESCE(UPPER(co.order_status::text), '') NOT IN ('COMPLETE', 'COMPLETED', 'CANCELLED')
+        )
+        """;
 
     private final NamedParameterJdbcTemplate jdbcTemplate;
 
@@ -60,4 +82,38 @@ public class RiskPredictionCoverageRepository {
                 Long.class
         );
     }
+
+    public List<Long> findIncompleteOrderIdsForPredictionRefresh(int limit) {
+        if (limit <= 0) {
+            throw new IllegalArgumentException("limit must be positive.");
+        }
+
+        MapSqlParameterSource params = new MapSqlParameterSource()
+                .addValue("limit", limit, Types.INTEGER);
+
+        return jdbcTemplate.queryForList(
+                FIND_INCOMPLETE_ORDER_IDS_FOR_PREDICTION_REFRESH_SQL,
+                params,
+                Long.class
+        );
+    }
+
+    public boolean existsIncompleteOrder(Long orderId) {
+        if (orderId == null || orderId <= 0) {
+            throw new IllegalArgumentException("orderId must be positive.");
+        }
+
+        MapSqlParameterSource params = new MapSqlParameterSource()
+                .addValue("orderId", orderId, Types.BIGINT);
+
+        Boolean exists = jdbcTemplate.queryForObject(
+                EXISTS_INCOMPLETE_ORDER_SQL,
+                params,
+                Boolean.class
+        );
+
+        return Boolean.TRUE.equals(exists);
+    }
+
+    
 }

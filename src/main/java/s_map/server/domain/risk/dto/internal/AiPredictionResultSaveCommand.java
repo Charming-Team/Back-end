@@ -1,6 +1,5 @@
 package s_map.server.domain.risk.dto.internal;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import s_map.server.domain.risk.entity.RiskLevel;
 
 import java.math.BigDecimal;
@@ -17,7 +16,7 @@ public record AiPredictionResultSaveCommand(
         String modelName,
         String modelVersion,
         OffsetDateTime predictedAt,
-        JsonNode causeDetail
+        Object causeDetail
 ) {
 
     public AiPredictionResultSaveCommand {

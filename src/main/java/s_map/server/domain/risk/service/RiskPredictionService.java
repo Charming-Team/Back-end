@@ -1,6 +1,5 @@
 package s_map.server.domain.risk.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import s_map.server.domain.risk.dto.fastapi.FastApiDelayProbabilityResponse;
@@ -19,16 +18,13 @@ public class RiskPredictionService {
 
     private final RiskFastApiClient riskFastApiClient;
     private final AiPredictionResultJdbcRepository aiPredictionResultJdbcRepository;
-    private final ObjectMapper objectMapper;
 
     public RiskPredictionService(
             RiskFastApiClient riskFastApiClient,
-            AiPredictionResultJdbcRepository aiPredictionResultJdbcRepository,
-            ObjectMapper objectMapper
+            AiPredictionResultJdbcRepository aiPredictionResultJdbcRepository
     ) {
         this.riskFastApiClient = riskFastApiClient;
         this.aiPredictionResultJdbcRepository = aiPredictionResultJdbcRepository;
-        this.objectMapper = objectMapper;
     }
 
     @Transactional
@@ -48,8 +44,7 @@ public class RiskPredictionService {
         FastApiDelayProbabilityResponse fastApiResponse =
                 riskFastApiClient.predictDelayProbability(orderId, normalizedTopN);
 
-        AiPredictionResultSaveCommand saveCommand =
-                fastApiResponse.toSaveCommand(objectMapper);
+        AiPredictionResultSaveCommand saveCommand = fastApiResponse.toSaveCommand();
 
         Long predictionId = aiPredictionResultJdbcRepository.save(saveCommand);
 
