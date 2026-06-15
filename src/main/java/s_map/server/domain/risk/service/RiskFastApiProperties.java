@@ -34,6 +34,10 @@ public class RiskFastApiProperties {
         return URI.create(joinUrl(baseUrl, risk.getDelayProbabilityPredictPath()));
     }
 
+    public URI delayPredictionPredictUri() {
+        return URI.create(joinUrl(baseUrl, risk.getDelayPredictionPredictPath()));
+    }
+
     public Duration connectTimeout() {
         return Duration.ofMillis(risk.getConnectTimeoutMs());
     }
@@ -61,6 +65,7 @@ public class RiskFastApiProperties {
     public static class Risk {
 
         private String delayProbabilityPredictPath = "/api/v1/delay-probability/predict";
+        private String delayPredictionPredictPath = "/api/v1/delay-prediction/predict";
 
         private int connectTimeoutMs = 3000;
 
@@ -74,6 +79,14 @@ public class RiskFastApiProperties {
 
         public void setDelayProbabilityPredictPath(String delayProbabilityPredictPath) {
             this.delayProbabilityPredictPath = delayProbabilityPredictPath;
+        }
+
+        public String getDelayPredictionPredictPath() {
+            return delayPredictionPredictPath;
+        }
+
+        public void setDelayPredictionPredictPath(String delayPredictionPredictPath) {
+            this.delayPredictionPredictPath = delayPredictionPredictPath;
         }
 
         public int getConnectTimeoutMs() {

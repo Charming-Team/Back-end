@@ -29,6 +29,7 @@ public class AiPredictionResultJdbcRepository {
                 plan_id,
                 line_id,
                 delay_probability,
+                predicted_delay_days,
                 risk_level,
                 model_name,
                 model_version,
@@ -43,6 +44,7 @@ public class AiPredictionResultJdbcRepository {
                 :planId,
                 :lineId,
                 :delayProbability,
+                :predictedDelayDays,
                 CAST(:riskLevel AS risk_level_enum),
                 :modelName,
                 :modelVersion,
@@ -98,6 +100,7 @@ public class AiPredictionResultJdbcRepository {
                 .addValue("planId", command.planId(), Types.BIGINT)
                 .addValue("lineId", command.lineId(), Types.BIGINT)
                 .addValue("delayProbability", normalizeDelayProbability(command.delayProbability()))
+                .addValue("predictedDelayDays", command.predictedDelayDays(), Types.NUMERIC)
                 .addValue("riskLevel", command.riskLevel().name(), Types.VARCHAR)
                 .addValue("modelName", command.modelName(), Types.VARCHAR)
                 .addValue("modelVersion", command.modelVersion(), Types.VARCHAR)

@@ -34,6 +34,7 @@ public class RiskQueryRepository {
                     apr.plan_id,
                     apr.line_id,
                     apr.delay_probability,
+                    apr.predicted_delay_days,
                     apr.risk_level,
                     apr.model_name,
                     apr.model_version,
@@ -108,7 +109,19 @@ public class RiskQueryRepository {
             WITH
             """ + LATEST_PREDICTION_CTE + "," + PROGRESS_AGG_CTE + "," + MATERIAL_SHORTAGE_CTE + """
             SELECT
-                0::numeric AS expected_delay_days,
+                ROUND(
+                    COALESCE(
+                        SUM(
+                            CASE
+                                WHEN lp.risk_level::text <> 'SAFE'
+                                THEN GREATEST(COALESCE(lp.predicted_delay_days, 0), 0)
+                                ELSE 0
+                            END
+                        ),
+                        0
+                    ),
+                    1
+                ) AS expected_delay_days,
                 COALESCE(SUM(CASE WHEN lp.risk_level::text <> 'SAFE' THEN 1 ELSE 0 END), 0)::bigint AS delayed_order_count,
                 COALESCE(SUM(CASE WHEN COALESCE(ms.shortage_quantity, 0) > 0 THEN 1 ELSE 0 END), 0)::bigint AS material_shortage_count,
                 COALESCE(SUM(COALESCE(ms.shortage_quantity, 0)), 0)::bigint AS material_shortage_quantity,
@@ -211,7 +224,7 @@ public class RiskQueryRepository {
                 lp.delay_probability,
                 ROUND(lp.delay_probability * 100, 2) AS delay_probability_percent,
                 lp.predicted_at,
-                NULL::numeric AS expected_delay_days,
+                lp.predicted_delay_days AS expected_delay_days,
                 lp.analysis_summary,
                 lp.recommended_action,
                 lp.cause_detail::text AS cause_detail_json

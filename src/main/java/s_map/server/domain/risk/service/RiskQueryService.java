@@ -169,7 +169,7 @@ public class RiskQueryService {
                 defaultBigDecimal(row.delayProbabilityPercent()),
                 row.predictedAt(),
 
-                null,
+                row.expectedDelayDays(),
                 title,
                 List.of(),
                 summary,

@@ -12,6 +12,7 @@ public record AiPredictionResultSaveCommand(
         Long planId,
         Long lineId,
         BigDecimal delayProbability,
+        BigDecimal predictedDelayDays,
         RiskLevel riskLevel,
         String modelName,
         String modelVersion,

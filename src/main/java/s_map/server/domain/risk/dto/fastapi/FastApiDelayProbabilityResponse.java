@@ -59,7 +59,9 @@ public record FastApiDelayProbabilityResponse(
         FastApiCauseDetailResponse causeDetail
 ) {
 
-    public AiPredictionResultSaveCommand toSaveCommand() {
+    public AiPredictionResultSaveCommand toSaveCommand(
+            BigDecimal predictedDelayDays
+    ) {
         validateRequiredFields();
 
         return new AiPredictionResultSaveCommand(
@@ -68,6 +70,7 @@ public record FastApiDelayProbabilityResponse(
                 planId,
                 lineId,
                 delayProbability,
+                predictedDelayDays,
                 riskLevel,
                 modelName,
                 modelVersion,

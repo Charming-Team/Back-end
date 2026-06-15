@@ -12,6 +12,10 @@ import s_map.server.domain.risk.dto.res.RiskSummaryResponse;
 import s_map.server.domain.risk.service.RiskQueryService;
 import s_map.server.global.common.BaseResponse;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.Operation;
+
+@Tag(name = "Risk", description = "리스크 분석 API")
 @RestController
 @RequestMapping("/api/risks")
 public class RiskController {
@@ -33,6 +37,7 @@ public class RiskController {
      * - criticalOrderCount
      * - overallRiskLevel
      */
+    @Operation(summary = "리스크 요약 조회")
     @GetMapping("/summary")
     public BaseResponse<RiskSummaryResponse> getRiskSummary() {
         return BaseResponse.success(
