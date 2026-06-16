@@ -245,14 +245,21 @@ public class RiskQueryService {
             String riskLevelLabel,
             String progressMessage
     ) {
-        boolean hasAgentAnalysis = hasText(row.analysisSummary())
-                || hasText(row.recommendedAction());
-
-        List<RiskCauseResponse> causes = extractCausesFromCauseDetail(
-                row.causeDetailJson()
+        List<String> agentCauseTypes = parseAgentCauseTypes(
+                row.agentCauseTypesCsv()
         );
 
-        List<String> causeTypes = extractCauseTypes(causes);
+        boolean hasAgentAnalysis = hasText(row.analysisSummary())
+                || hasText(row.recommendedAction())
+                || !agentCauseTypes.isEmpty();
+
+        List<RiskCauseResponse> causes = hasAgentAnalysis
+                ? buildAgentCauseResponses(agentCauseTypes)
+                : extractCausesFromCauseDetail(row.causeDetailJson());
+
+        List<String> causeTypes = hasAgentAnalysis
+                ? agentCauseTypes
+                : List.of();
 
         String title = row.orderNo() + " 주문건은 " + riskLevelLabel + " 단계입니다.";
 
@@ -409,6 +416,48 @@ public class RiskQueryService {
         return List.copyOf(uniqueCauseTypes);
     }
 
+    private List<String> parseAgentCauseTypes(String agentCauseTypesCsv) {
+        if (!hasText(agentCauseTypesCsv)) {
+            return List.of();
+        }
+
+        Set<String> uniqueCauseTypes = new LinkedHashSet<>();
+
+        String[] tokens = agentCauseTypesCsv.split(",");
+
+        for (String token : tokens) {
+            if (hasText(token)) {
+                uniqueCauseTypes.add(token.trim().toUpperCase());
+            }
+        }
+
+        return List.copyOf(uniqueCauseTypes);
+    }
+
+    private List<RiskCauseResponse> buildAgentCauseResponses(List<String> causeTypes) {
+        if (causeTypes == null || causeTypes.isEmpty()) {
+            return List.of();
+        }
+
+        List<RiskCauseResponse> result = new ArrayList<>();
+
+        for (String causeType : causeTypes) {
+            result.add(
+                    new RiskCauseResponse(
+                            causeType,
+                            toCauseTypeLabel(causeType),
+                            null,
+                            null,
+                            null,
+                            null,
+                            null
+                    )
+            );
+        }
+
+        return result;
+    }
+
     private String buildCauseDescription(Map<String, Object> factor) {
         String featureNameKo = toStringValue(factor.get("feature_name_ko"));
         Object featureValue = factor.get("feature_value");
@@ -453,13 +502,16 @@ public class RiskQueryService {
             case "LINE_LOAD" -> "라인 부하";
             case "LONG_DURATION" -> "생산 소요시간";
             case "YIELD_RISK" -> "수율 위험";
-            case "MATERIAL_SHORTAGE" -> "자재 부족";
-            case "MATERIAL_DELAY" -> "자재 입고 지연";
             case "MATERIAL_NOT_READY" -> "자재 준비 미완료";
             case "LINE_CAPACITY" -> "라인 생산능력";
             case "LINE_RISK" -> "라인 위험";
             case "PRODUCT_RISK" -> "제품 위험";
             case "SCHEDULE_PRESSURE" -> "일정 압박";
+            case "MATERIAL_SHORTAGE" -> "자재 부족";
+            case "MATERIAL_DELAY" -> "자재 입고 지연";
+            case "LOW_YIELD" -> "수율 저하";
+            case "MACHINE_ABNORMAL" -> "설비 상태 이상";
+            case "LINE_ABNORMAL" -> "라인 상태 이상";
             default -> causeType;
         };
     }

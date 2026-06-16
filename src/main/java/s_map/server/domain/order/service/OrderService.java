@@ -51,7 +51,7 @@ import java.util.Set;
 @Transactional(readOnly = true)
 public class OrderService {
 
-    private static final DateTimeFormatter ORDER_NO_DATE_FORMATTER = DateTimeFormatter.ofPattern("yyMMdd");
+    private static final DateTimeFormatter ORDER_NO_DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMM");
     private static final ZoneId DEFAULT_PRODUCTION_ZONE = ZoneId.of("Asia/Seoul");
     private static final LocalDate MIN_DUE_DATE_FILTER = LocalDate.of(1, 1, 1);
     private static final LocalDate MAX_DUE_DATE_FILTER = LocalDate.of(9999, 12, 31);
@@ -264,7 +264,7 @@ public class OrderService {
         );
 
         ProductionPlan savedPlan = productionPlanRepository.saveAndFlush(plan);
-        
+
         riskPredictionEventPublisher.publishOrderCreated(savedOrder.getOrderId());
 
         return OrderCreateResponse.from(
@@ -471,7 +471,7 @@ public class OrderService {
     }
 
     private String createOrderNoPrefix(LocalDate date) {
-        return "PO-" + date.format(ORDER_NO_DATE_FORMATTER) + "-";
+        return "ORD-" + date.format(ORDER_NO_DATE_FORMATTER) + "-";
     }
 
     private String formatOrderNo(LocalDate date, int sequence) {

@@ -227,7 +227,12 @@ public class RiskQueryRepository {
                 lp.predicted_delay_days AS expected_delay_days,
                 lp.analysis_summary,
                 lp.recommended_action,
-                lp.cause_detail::text AS cause_detail_json
+                lp.cause_detail::text AS cause_detail_json,
+                (
+                    SELECT COALESCE(STRING_AGG(apc.cause_type::text, ',' ORDER BY apc.cause_type::text), '')
+                    FROM ai_prediction_causes apc
+                    WHERE apc.prediction_id = lp.prediction_id
+                ) AS agent_cause_types_csv
             """ + BASE_FROM_CLAUSE + """
               AND co.order_id = :orderId
             LIMIT 1
@@ -432,7 +437,8 @@ public class RiskQueryRepository {
                     rs.getBigDecimal("expected_delay_days"),
                     rs.getString("analysis_summary"),
                     rs.getString("recommended_action"),
-                    rs.getString("cause_detail_json")
+                    rs.getString("cause_detail_json"),
+                    rs.getString("agent_cause_types_csv")
             );
         }
     }
@@ -486,7 +492,8 @@ public class RiskQueryRepository {
             BigDecimal expectedDelayDays,
             String analysisSummary,
             String recommendedAction,
-            String causeDetailJson
+            String causeDetailJson,
+            String agentCauseTypesCsv
     ) {
     }
 }
