@@ -9,7 +9,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
-import s_map.server.domain.notification.service.NotificationService;
+import s_map.server.domain.notification.service.NotificationEventPublisher;
 import s_map.server.domain.report.dto.fastapi.FastApiBusinessReportGenerateRequest;
 import s_map.server.domain.report.dto.fastapi.FastApiBusinessReportGenerateResponse;
 import s_map.server.domain.report.dto.fastapi.FastApiReportGenerateRequest;
@@ -43,7 +43,7 @@ public class ReportAsyncService {
     private final FastApiReportClient fastApiReportClient;
     private final ObjectMapper objectMapper;
     private final TransactionTemplate transactionTemplate;
-    private final NotificationService notificationService;
+    private final NotificationEventPublisher notificationEventPublisher;
 
     /**
      * 기능: 보고서 생성 Job을 실행하고 FastAPI 응답을 reports 테이블과 report_jobs 상태에 반영한다.
@@ -270,7 +270,7 @@ public class ReportAsyncService {
                     .map(Report::getReportTitle)
                     .orElse("보고서");
 
-            notificationService.createReportGeneratedNotification(
+            notificationEventPublisher.publishReportGenerated(
                     requestedBy,
                     reportId,
                     reportTitle

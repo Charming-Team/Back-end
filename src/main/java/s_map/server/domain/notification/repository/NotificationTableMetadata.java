@@ -30,13 +30,16 @@ public class NotificationTableMetadata {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    public String recipientColumnOrNull() {
+    public String recipientColumn() {
         Set<String> tableColumns = loadColumns();
 
         return RECIPIENT_COLUMN_CANDIDATES.stream()
                 .filter(tableColumns::contains)
                 .findFirst()
-                .orElse(null);
+                .orElseThrow(() -> new IllegalStateException(
+                        "notifications table must have one recipient column among "
+                                + RECIPIENT_COLUMN_CANDIDATES
+                ));
     }
 
     public boolean hasUrlColumn() {

@@ -1,5 +1,6 @@
 package s_map.server.domain.notification.service;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -10,13 +11,13 @@ import s_map.server.domain.notification.dto.req.NotificationCreateRequest;
 import s_map.server.domain.notification.dto.res.NotificationListResponse;
 import s_map.server.domain.notification.dto.res.NotificationMutationResponse;
 import s_map.server.domain.notification.dto.res.NotificationResponse;
+import s_map.server.domain.notification.dto.res.NotificationSseTicketResponse;
 import s_map.server.domain.notification.dto.res.NotificationUnreadCountResponse;
 import s_map.server.domain.notification.entity.NotificationReferenceType;
 import s_map.server.domain.notification.entity.NotificationSeverity;
 import s_map.server.domain.notification.entity.NotificationType;
 import s_map.server.domain.notification.repository.NotificationRepository;
 import s_map.server.domain.notification.repository.NotificationRepository.NotificationRow;
-import s_map.server.domain.order.entity.ProductionPlan;
 import s_map.server.domain.user.entity.Role;
 import s_map.server.domain.user.entity.User;
 import s_map.server.domain.user.entity.UserStatus;
@@ -35,6 +36,7 @@ import java.util.Set;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class NotificationService {
 
     private static final int DEFAULT_SIZE = 20;
@@ -42,17 +44,9 @@ public class NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final NotificationSseService notificationSseService;
+    private final NotificationSseTicketService notificationSseTicketService;
     private final UserRepository userRepository;
 
-    public NotificationService(
-            NotificationRepository notificationRepository,
-            NotificationSseService notificationSseService,
-            UserRepository userRepository
-    ) {
-        this.notificationRepository = notificationRepository;
-        this.notificationSseService = notificationSseService;
-        this.userRepository = userRepository;
-    }
 
     /**
      * 기능: 로그인 사용자의 알림 목록을 최신순 cursor 방식으로 조회한다.
@@ -134,8 +128,13 @@ public class NotificationService {
      * - result / SseEmitter / 알림 이벤트 스트림
      */
     @Transactional(readOnly = true)
-    public SseEmitter subscribe(AuthUser authUser) {
-        Long userId = resolveUserId(authUser);
+    public NotificationSseTicketResponse issueSseTicket(AuthUser authUser) {
+        return notificationSseTicketService.issue(resolveUserId(authUser));
+    }
+
+    @Transactional(readOnly = true)
+    public SseEmitter subscribe(String ticket) {
+        Long userId = notificationSseTicketService.consume(ticket);
         long unreadCount = notificationRepository.countUnread(userId);
 
         return notificationSseService.subscribe(userId, unreadCount);
@@ -330,32 +329,33 @@ public class NotificationService {
      * 기능: 단일 생산계획 변경 알림을 담당자, 생산관리자, 경영진에게 저장한다.
      *
      * Input:
-     * - plan / ProductionPlan / 변경된 생산계획
+     * - planId / Long / 변경된 생산계획 ID
+     * - operatorId / Long / 생산 담당자 사용자 ID
      *
      * Output:
      * - none / void / 대상 수신자별 알림 저장 및 SSE 발행
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void createScheduleAppliedNotification(ProductionPlan plan) {
-        if (plan == null || plan.getPlanId() == null) {
+    public void createScheduleAppliedNotification(Long planId, Long operatorId) {
+        if (planId == null) {
             return;
         }
 
         Set<Long> recipientIds = new LinkedHashSet<>(
                 findActiveUserIdsByRoles(List.of(Role.MANUFACTURING_MANAGER, Role.EXECUTIVE))
         );
-        if (plan.getOperatorId() != null) {
-            recipientIds.add(plan.getOperatorId());
+        if (operatorId != null) {
+            recipientIds.add(operatorId);
         }
 
         notifyRecipients(
                 recipientIds,
                 NotificationType.SCHEDULE_APPLIED,
                 "생산계획 변경",
-                "생산계획 " + plan.getPlanId() + "의 일정 또는 배정 정보가 변경되었습니다.",
+                "생산계획 " + planId + "의 일정 또는 배정 정보가 변경되었습니다.",
                 NotificationSeverity.MEDIUM,
                 NotificationReferenceType.PLAN,
-                plan.getPlanId()
+                planId
         );
     }
 

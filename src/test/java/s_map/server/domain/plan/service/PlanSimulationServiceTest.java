@@ -12,6 +12,7 @@ import s_map.server.domain.order.entity.PlanStatus;
 import s_map.server.domain.order.entity.ProductionPlan;
 import s_map.server.domain.order.repository.CustomerOrderRepository;
 import s_map.server.domain.order.repository.ProductionPlanRepository;
+import s_map.server.domain.notification.service.NotificationEventPublisher;
 import s_map.server.domain.plan.dto.req.SelectedPlanSimulationSaveRequest;
 import s_map.server.domain.plan.repository.PlanSimulationCommandRepository;
 import s_map.server.domain.plan.repository.PlanSimulationRepository;
@@ -59,6 +60,9 @@ class PlanSimulationServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private NotificationEventPublisher notificationEventPublisher;
 
     @InjectMocks
     private PlanSimulationService planSimulationService;

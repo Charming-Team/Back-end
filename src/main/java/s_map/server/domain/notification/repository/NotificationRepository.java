@@ -199,8 +199,7 @@ public class NotificationRepository {
     }
 
     public NotificationRow save(NotificationCreateRequest request) {
-        String recipientColumn = tableMetadata.recipientColumnOrNull();
-        boolean hasRecipientColumn = recipientColumn != null;
+        String recipientColumn = tableMetadata.recipientColumn();
         boolean hasUrlColumn = tableMetadata.hasUrlColumn();
         boolean hasUpdatedAtColumn = tableMetadata.hasUpdatedAtColumn();
 
@@ -229,10 +228,8 @@ public class NotificationRepository {
                 enumValueExpression("reference_type", ":referenceType")
         ));
 
-        if (hasRecipientColumn) {
-            columns.insert(0, recipientColumn + ",\n");
-            values.insert(0, ":recipientUserId,\n");
-        }
+        columns.insert(0, recipientColumn + ",\n");
+        values.insert(0, ":recipientUserId,\n");
 
         if (hasUrlColumn) {
             columns.append(",\nurl");
@@ -283,12 +280,7 @@ public class NotificationRepository {
     }
 
     private String ownerPredicate(String alias) {
-        String recipientColumn = tableMetadata.recipientColumnOrNull();
-        if (recipientColumn == null) {
-            return "";
-        }
-
-        return " AND " + alias + "." + recipientColumn + " = :userId ";
+        return " AND " + alias + "." + tableMetadata.recipientColumn() + " = :userId ";
     }
 
     private String notDeletedPredicate(String alias) {
