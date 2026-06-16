@@ -29,6 +29,7 @@ import s_map.server.domain.user.entity.UserStatus;
 import s_map.server.domain.user.repository.UserRepository;
 import s_map.server.global.error.CustomException;
 import s_map.server.global.error.ErrorCode;
+import s_map.server.domain.risk.service.RiskPredictionEventPublisher;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -69,6 +70,7 @@ public class OrderService {
     private final ProductionPlanRepository productionPlanRepository;
     private final OrderNoSequenceRepository orderNoSequenceRepository;
     private final UserRepository userRepository;
+    private final RiskPredictionEventPublisher riskPredictionEventPublisher;
 
     /**
      * 기능: 주문 목록을 검색 조건과 페이지 조건에 맞춰 조회한다.
@@ -262,6 +264,8 @@ public class OrderService {
         );
 
         ProductionPlan savedPlan = productionPlanRepository.saveAndFlush(plan);
+        
+        riskPredictionEventPublisher.publishOrderCreated(savedOrder.getOrderId());
 
         return OrderCreateResponse.from(
                 savedOrder,
