@@ -75,6 +75,15 @@ public class PlanSimulationController {
                 상세 변경 내역은 schedule_simulation_details에 저장합니다.
                 """
     )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "선택 생산계획 시뮬레이션 저장 성공"),
+            @ApiResponse(responseCode = "400", description = "요청 값 검증 실패 또는 반영 불가능한 선택안"),
+            @ApiResponse(responseCode = "401", description = "인증 필요"),
+            @ApiResponse(responseCode = "403", description = "생산계획 반영 권한 필요"),
+            @ApiResponse(responseCode = "404", description = "생산계획, 주문 또는 시뮬레이션 결과 없음"),
+            @ApiResponse(responseCode = "409", description = "동일 라인 일정 또는 순서 충돌"),
+            @ApiResponse(responseCode = "500", description = "서버 내부 오류")
+    })
     @PostMapping("/selected")
     public BaseResponse<SelectedPlanSimulationSaveResponse> saveSelectedSimulation(
             @AuthenticationPrincipal AuthUser authUser,

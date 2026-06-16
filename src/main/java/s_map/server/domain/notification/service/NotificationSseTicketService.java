@@ -30,6 +30,15 @@ public class NotificationSseTicketService {
         this.ttl = Duration.ofMillis(ticketTtlMillis);
     }
 
+    /**
+     * 기능: EventSource 연결에 사용할 짧은 수명의 1회용 SSE ticket을 발급한다.
+     *
+     * Input:
+     * - userId / Long / ticket을 발급받을 사용자 ID
+     *
+     * Output:
+     * - result / NotificationSseTicketResponse / 발급된 ticket과 만료 시각
+     */
     public NotificationSseTicketResponse issue(Long userId) {
         byte[] randomBytes = new byte[TICKET_BYTE_LENGTH];
         secureRandom.nextBytes(randomBytes);
@@ -43,6 +52,15 @@ public class NotificationSseTicketService {
         return new NotificationSseTicketResponse(ticket, expiresAt);
     }
 
+    /**
+     * 기능: SSE 연결 요청의 1회용 ticket을 검증하고 사용자 ID를 반환한다.
+     *
+     * Input:
+     * - ticket / String / EventSource 연결에 사용할 1회용 ticket
+     *
+     * Output:
+     * - result / Long / ticket을 발급받은 사용자 ID
+     */
     public Long consume(String ticket) {
         if (ticket == null || ticket.isBlank()) {
             throw new CustomException(ErrorCode.UNAUTHORIZED);

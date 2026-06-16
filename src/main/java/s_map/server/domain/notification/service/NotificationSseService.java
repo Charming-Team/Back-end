@@ -30,6 +30,16 @@ public class NotificationSseService {
         this.timeoutMillis = timeoutMillis;
     }
 
+    /**
+     * 기능: 로그인 사용자의 SSE 연결을 등록하고 최초 미읽음 수를 전송한다.
+     *
+     * Input:
+     * - userId / Long / SSE를 구독할 사용자 ID
+     * - unreadCount / long / 연결 직후 전송할 미읽음 알림 수
+     *
+     * Output:
+     * - result / SseEmitter / 등록된 SSE emitter
+     */
     public SseEmitter subscribe(Long userId, long unreadCount) {
         SseEmitter emitter = new SseEmitter(timeoutMillis);
         emittersByUserId.computeIfAbsent(userId, ignored -> new CopyOnWriteArrayList<>()).add(emitter);
@@ -48,6 +58,16 @@ public class NotificationSseService {
         return emitter;
     }
 
+    /**
+     * 기능: 특정 사용자 또는 전체 사용자에게 새 알림 SSE 이벤트를 전송한다.
+     *
+     * Input:
+     * - userId / Long / 수신 사용자 ID, null이면 전체 접속 사용자 대상
+     * - notification / NotificationResponse / 전송할 알림 payload
+     *
+     * Output:
+     * - none / void / SSE 전송 후 반환 값 없음
+     */
     public void publishNotification(Long userId, NotificationResponse notification) {
         if (userId == null) {
             publishBroadcast(notification);
@@ -60,6 +80,16 @@ public class NotificationSseService {
         }
     }
 
+    /**
+     * 기능: 특정 사용자에게 미읽음 알림 수 SSE 이벤트를 전송한다.
+     *
+     * Input:
+     * - userId / Long / 수신 사용자 ID
+     * - unreadCount / long / 최신 미읽음 알림 수
+     *
+     * Output:
+     * - none / void / SSE 전송 후 반환 값 없음
+     */
     public void publishUnreadCount(Long userId, long unreadCount) {
         List<SseEmitter> emitters = emittersByUserId.getOrDefault(userId, List.of());
         NotificationUnreadCountResponse payload = new NotificationUnreadCountResponse(unreadCount);

@@ -41,6 +41,15 @@ public class RiskQueryService {
         this.objectMapper = objectMapper;
     }
 
+    /**
+     * 기능: 리스크 분석 화면 상단 요약 지표를 조회한다.
+     *
+     * Input:
+     * - 없음
+     *
+     * Output:
+     * - result / RiskSummaryResponse / 예상 지연, 지연 주문 수, 자재 부족, 고위험 주문 수, 전체 위험도
+     */
     public RiskSummaryResponse getSummary() {
         RiskQueryRepository.RiskSummaryRow row = riskQueryRepository.findSummary();
 
@@ -54,6 +63,18 @@ public class RiskQueryService {
         );
     }
 
+    /**
+     * 기능: 지연 위험 주문 목록을 위험도, 검색어, 페이지 조건으로 조회한다.
+     *
+     * Input:
+     * - riskLevel / String / SAFE, CAUTION, WARNING, CRITICAL 위험도 필터
+     * - keyword / String / 주문번호, 고객명, 제품명 검색어
+     * - page / int / 조회할 페이지 번호
+     * - size / int / 한 페이지에 조회할 주문 수
+     *
+     * Output:
+     * - result / RiskOrderListResponse / 리스크 주문 목록과 페이지 정보
+     */
     public RiskOrderListResponse getOrders(
             String riskLevel,
             String keyword,
@@ -85,6 +106,15 @@ public class RiskQueryService {
         );
     }
 
+    /**
+     * 기능: 특정 주문의 지연 위험 상세 정보를 조회한다.
+     *
+     * Input:
+     * - orderId / Long / 조회할 주문 ID
+     *
+     * Output:
+     * - result / RiskOrderDetailResponse / 주문별 리스크 상세, 주요 원인, 권고 정보
+     */
     public RiskOrderDetailResponse getOrderDetail(Long orderId) {
         validateOrderId(orderId);
 
