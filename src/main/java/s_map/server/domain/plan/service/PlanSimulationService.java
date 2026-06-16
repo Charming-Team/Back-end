@@ -9,6 +9,7 @@ import s_map.server.domain.order.entity.PlanStatus;
 import s_map.server.domain.order.entity.ProductionPlan;
 import s_map.server.domain.order.repository.CustomerOrderRepository;
 import s_map.server.domain.order.repository.ProductionPlanRepository;
+import s_map.server.domain.notification.service.NotificationService;
 import s_map.server.domain.plan.dto.req.SelectedPlanSimulationSaveRequest;
 import s_map.server.domain.plan.dto.res.PlanSimulationDetailResponse;
 import s_map.server.domain.plan.dto.res.PlanSimulationListResponse;
@@ -52,6 +53,7 @@ public class PlanSimulationService {
     private final ProductionPlanRepository productionPlanRepository;
     private final CustomerOrderRepository customerOrderRepository;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
     /**
      * [기능]
@@ -193,7 +195,24 @@ public class PlanSimulationService {
                 response.getSimulationGroupId(),
                 response.getSavedPlanIds()
         );
+        notifyScheduleAppliedSummarySafely(appliedBy, savedPlanIds);
         return response;
+    }
+
+    private void notifyScheduleAppliedSummarySafely(
+            Long appliedBy,
+            List<Long> savedPlanIds
+    ) {
+        try {
+            notificationService.createScheduleAppliedSummaryNotification(appliedBy, savedPlanIds);
+        } catch (Exception exception) {
+            log.warn(
+                    "[PlanSimulation] 선택안 반영 알림 저장 실패 appliedBy={} savedPlanIds={}",
+                    appliedBy,
+                    savedPlanIds,
+                    exception
+            );
+        }
     }
 
     private void logSelectedSimulationRequest(

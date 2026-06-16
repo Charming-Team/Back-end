@@ -1,6 +1,7 @@
 package s_map.server.domain.plan.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import s_map.server.domain.material.entity.ProductionPlanMaterial;
@@ -14,6 +15,7 @@ import s_map.server.domain.plan.dto.res.PlanUpdateResponse;
 import s_map.server.domain.order.entity.PlanStatus;
 import s_map.server.domain.order.entity.ProductionPlan;
 import s_map.server.domain.order.repository.ProductionPlanRepository;
+import s_map.server.domain.notification.service.NotificationService;
 import s_map.server.domain.plan.repository.PlanQueryRepository;
 import s_map.server.domain.plan.repository.PlanRow;
 import s_map.server.domain.plan.repository.ProductionResultRepository;
@@ -36,6 +38,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 @Transactional(readOnly = true)
 public class PlanService {
 
@@ -46,6 +49,7 @@ public class PlanService {
     private final ProductionResultRepository productionResultRepository;
     private final UserRepository userRepository;
     private final RiskPredictionEventPublisher riskPredictionEventPublisher;
+    private final NotificationService notificationService;
     /*
      * ProductionPlanMaterial은 현재 material 도메인에 위치함.
      * 생산계획 상세 조회 시 해당 계획에 필요한 자재 목록을 조회하기 위해 참조한다.
@@ -272,6 +276,7 @@ public class PlanService {
                 request.getPlanStatus()
         );
         riskPredictionEventPublisher.publishPlanChanged(plan.getOrderId());
+        notifyScheduleAppliedSafely(plan);
 
         return PlanUpdateResponse.from(plan);
     }
@@ -325,8 +330,19 @@ public class PlanService {
                 request.getPlannedEndAt()
         );
         riskPredictionEventPublisher.publishPlanChanged(plan.getOrderId());
+        notifyScheduleAppliedSafely(plan);
 
         return PlanUpdateResponse.from(plan);
+    }
+
+    private void notifyScheduleAppliedSafely(ProductionPlan plan) {
+        try {
+            notificationService.createScheduleAppliedNotification(plan);
+        } catch (Exception exception) {
+            // 알림 저장 실패가 생산계획 변경 트랜잭션을 막지 않도록 로그만 남긴다.
+            Long planId = plan == null ? null : plan.getPlanId();
+            log.warn("[PlanService] 생산계획 변경 알림 저장 실패 planId={}", planId, exception);
+        }
     }
 
     private void validateLineCapability(ProductionPlan plan, Long lineId) {

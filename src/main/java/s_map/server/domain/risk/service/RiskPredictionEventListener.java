@@ -6,6 +6,8 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
+import s_map.server.domain.notification.service.NotificationService;
+import s_map.server.domain.risk.dto.internal.AiPredictionResultSaveResult;
 import s_map.server.domain.risk.repository.RiskPredictionCoverageRepository;
 
 @Component
@@ -15,13 +17,16 @@ public class RiskPredictionEventListener {
 
     private final RiskPredictionService riskPredictionService;
     private final RiskPredictionCoverageRepository coverageRepository;
+    private final NotificationService notificationService;
 
     public RiskPredictionEventListener(
             RiskPredictionService riskPredictionService,
-            RiskPredictionCoverageRepository coverageRepository
+            RiskPredictionCoverageRepository coverageRepository,
+            NotificationService notificationService
     ) {
         this.riskPredictionService = riskPredictionService;
         this.coverageRepository = coverageRepository;
+        this.notificationService = notificationService;
     }
 
     /**
@@ -70,6 +75,7 @@ public class RiskPredictionEventListener {
                     result.delayProbability(),
                     result.requiresAgentAnalysis()
             );
+            notifyDelayRiskSafely(result);
 
         } catch (Exception ex) {
             /*
@@ -81,6 +87,29 @@ public class RiskPredictionEventListener {
                     event.orderId(),
                     event.triggerType(),
                     ex
+            );
+        }
+    }
+
+    private void notifyDelayRiskSafely(AiPredictionResultSaveResult result) {
+        if (result == null || !result.requiresAgentAnalysis()) {
+            return;
+        }
+
+        try {
+            notificationService.createDelayRiskNotification(
+                    result.orderId(),
+                    result.predictionId(),
+                    result.riskLevel().name(),
+                    result.delayProbability()
+            );
+        } catch (Exception exception) {
+            log.warn(
+                    "Delay risk notification failed. predictionId={}, orderId={}, riskLevel={}",
+                    result.predictionId(),
+                    result.orderId(),
+                    result.riskLevel(),
+                    exception
             );
         }
     }

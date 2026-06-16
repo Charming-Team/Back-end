@@ -54,6 +54,7 @@ public enum ErrorCode {
     LINE_NOT_FOUND(HttpStatus.NOT_FOUND, "404-501", "라인 정보를 찾을 수 없습니다."),
     REPORT_NOT_FOUND(HttpStatus.NOT_FOUND, "404-401", "보고서 정보를 찾을 수 없습니다."),
     REPORT_JOB_NOT_FOUND(HttpStatus.NOT_FOUND, "404-402", "보고서 생성 작업 정보를 찾을 수 없습니다."),
+    NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "404-701", "처리할 알림이 없습니다."),
     PLAN_SIMULATION_NOT_FOUND(HttpStatus.NOT_FOUND, "404-601", "시뮬레이션 결과를 찾을 수 없습니다."),
 
     // 405 Method Not Allowed
@@ -80,6 +81,7 @@ public enum ErrorCode {
     MACHINE_OPERATION_STATUS_LOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "500-502", "설비 가동 현황을 불러올 수 없습니다. 잠시 후 다시 조회해주세요."),
     LINE_ORDER_SEARCH_LOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "500-503", "주문 검색 결과를 불러올 수 없습니다. 잠시 후 다시 조회해주세요."),
     LINE_ORDER_DISTRIBUTION_LOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "500-504", "주문별 생산 라인 분배 현황을 불러올 수 없습니다. 잠시 후 다시 조회해주세요."),
+    NOTIFICATION_SAVE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "500-701", "알림을 저장할 수 없습니다. 잠시 후 다시 시도해주세요."),
 
     // Chat FastAPI Gateway
     CHAT_FASTAPI_CONNECTION_FAILED(HttpStatus.BAD_GATEWAY, "CHAT_FASTAPI_001", "챗봇 서버 연결에 실패했습니다."),
