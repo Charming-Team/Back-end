@@ -52,7 +52,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class OrderServiceTest {
 
-    private static final DateTimeFormatter ORDER_NO_DATE_FORMATTER = DateTimeFormatter.ofPattern("yyMMdd");
+    private static final DateTimeFormatter ORDER_NO_DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMM");
     private static final ZoneId DEFAULT_PRODUCTION_ZONE = ZoneId.of("Asia/Seoul");
     private static final LocalDate MIN_DUE_DATE_FILTER = LocalDate.of(1, 1, 1);
     private static final LocalDate MAX_DUE_DATE_FILTER = LocalDate.of(9999, 12, 31);
@@ -119,7 +119,7 @@ class OrderServiceTest {
         ProductionPlan savedPlan = planCaptor.getValue();
 
         assertThat(savedOrder.getOrderNo())
-                .isEqualTo("PO-" + LocalDate.now(DEFAULT_PRODUCTION_ZONE).format(ORDER_NO_DATE_FORMATTER) + "-007");
+                .isEqualTo("ORD-" + LocalDate.now(DEFAULT_PRODUCTION_ZONE).format(ORDER_NO_DATE_FORMATTER) + "-007");
         assertThat(savedOrder.getCustomerName()).isEqualTo("A사");
         assertThat(savedOrder.getOrderQuantity()).isEqualTo(1000);
         assertThat(savedPlan.getOrderId()).isEqualTo(101L);
