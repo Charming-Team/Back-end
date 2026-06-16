@@ -288,7 +288,7 @@ docker run --rm -p 8080:8080 \
 | BOM | `GET /api/materials/boms/**` | BOM 목록 및 제품별 BOM 조회 |
 | BOM | `POST /api/materials/boms` | BOM 등록 |
 | BOM | `PUT /api/materials/boms/{bomId}` | BOM 수정 |
-| 챗봇 | `POST /api/v1/chat/answer` | FastAPI 챗봇 답변 요청 |
+| 챗봇 | `POST /api/chat/answer` | FastAPI 챗봇 답변 요청 |
 | 챗봇 내부 | `POST /internal/chat/evidence` | FastAPI용 RDB Evidence 조회 |
 | 리포트 | `POST /api/reports/generate` | AI 리포트 생성 시작 |
 | 리포트 | `POST /api/reports/business` | 업무 리포트 생성 |
