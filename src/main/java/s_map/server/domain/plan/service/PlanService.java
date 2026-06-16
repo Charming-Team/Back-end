@@ -53,17 +53,16 @@ public class PlanService {
     private final ProductionPlanMaterialRepository productionPlanMaterialRepository;
 
     /**
-     * [기능]
-     * 조건 없이 전체 생산계획 목록을 조회한다.
+     * 기능: 조건 없이 전체 생산계획 목록을 조회한다.
      *
-     * [Input]
+     * Input:
      * - 없음
      *
-     * [Process]
+     * Process:
      * - 조건 조회 메서드에 검색어, 상태, 기간 조건을 null로 전달한다.
      * - 전체 생산계획을 기본 정렬 기준으로 조회한다.
      *
-     * [Output]
+     * Output:
      * - List<PlanListResponse>
      * - 전체 생산계획 목록을 반환한다.
      */
@@ -72,23 +71,22 @@ public class PlanService {
     }
 
     /**
-     * [기능]
-     * 검색어, 상태, 기간 조건으로 생산계획 목록을 조회한다.
+     * 기능: 검색어, 상태, 기간 조건으로 생산계획 목록을 조회한다.
      *
-     * [Input]
+     * Input:
      * - keyword: 계획 ID, 주문 ID, 제품명, 라인명, 라인 코드, 담당자명 검색어
      * - status: 생산계획 상태 코드
      * - startAt: 조회 시작 일시
      * - endAt: 조회 종료 일시
      *
-     * [Process]
+     * Process:
      * - 검색어는 공백 제거 후 빈 문자열이면 null로 처리한다.
      * - 상태 값은 PlanStatus enum 값인지 검증하고 대문자 코드로 정규화한다.
      * - PlanQueryRepository에서 production_plans, products, production_lines, users를 조인 조회한다.
      * - 기간 조건은 plannedEndAt >= startAt, plannedStartAt < endAt 기준으로 겹치는 일정을 조회한다.
      * - 조회 결과를 프론트엔드 응답용 DTO 목록으로 변환한다.
      *
-     * [Output]
+     * Output:
      * - List<PlanListResponse>
      * - 생산계획 ID, 주문 ID, 제품 정보, 라인 정보, 담당자 정보,
      *   계획 시작/종료 시간, 예상 소요 시간, 계획 수량, 계획 순서, 상태, 생성/수정 일시를 반환한다.
@@ -111,19 +109,18 @@ public class PlanService {
     }
 
     /**
-     * [기능]
-     * 특정 생산계획의 상세 정보를 조회한다.
+     * 기능: 특정 생산계획의 상세 정보를 조회한다.
      *
-     * [Input]
+     * Input:
      * - planId: 조회할 생산계획 ID
      *
-     * [Process]
+     * Process:
      * - planId로 production_plans, products, production_lines, users를 조인 조회한다.
      * - 생산계획이 존재하지 않으면 PRODUCTION_PLAN_NOT_FOUND 예외를 발생시킨다.
      * - production_plan_materials 테이블에서 해당 생산계획에 필요한 자재 목록을 조회한다.
      * - 생산계획 기본 정보, 표시용 이름, 자재 소요/예약/부족 정보를 하나의 DTO로 조합한다.
      *
-     * [Output]
+     * Output:
      * - PlanDetailResponse
      * - 생산계획 상세 정보와 계획별 필요 자재 목록을 반환한다.
      */
@@ -159,13 +156,12 @@ public class PlanService {
     }
 
     /**
-     * [기능]
-     * 현재 날짜 기준으로 오늘 일정에 포함되는 생산계획 목록을 조회한다.
+     * 기능: 현재 날짜 기준으로 오늘 일정에 포함되는 생산계획 목록을 조회한다.
      *
-     * [Input]
+     * Input:
      * - 없음
      *
-     * [Process]
+     * Process:
      * - 오늘 날짜의 시작 시각과 종료 시각을 계산한다.
      * - plannedStartAt <= 오늘 종료 시각 AND plannedEndAt >= 오늘 시작 시각 조건으로
      *   오늘 일정에 걸쳐 있는 생산계획을 조회한다.
@@ -173,7 +169,7 @@ public class PlanService {
      * - 생산계획과 생산실적을 planId 기준으로 매칭한다.
      * - 실적이 없는 생산계획은 실제 수량/불량 수량을 0으로 내려준다.
      *
-     * [Output]
+     * Output:
      * - List<CurrentPlanResponse>
      * - 현재 생산계획 정보와 실제 생산 실적 정보를 함께 반환한다.
      */
@@ -221,10 +217,9 @@ public class PlanService {
     }
 
     /**
-     * [기능]
-     * 특정 생산계획 정보를 수정한다.
+     * 기능: 특정 생산계획 정보를 수정한다.
      *
-     * [Input]
+     * Input:
      * - planId: 수정할 생산계획 ID
      * - request: 수정할 생산계획 정보
      *   - lineId: 변경할 생산라인 ID
@@ -235,7 +230,7 @@ public class PlanService {
      *   - planSequence: 라인 내 생산 순서
      *   - planStatus: 생산계획 상태
      *
-     * [Process]
+     * Process:
      * - planId로 생산계획을 조회한다.
      * - 생산계획이 없으면 PRODUCTION_PLAN_NOT_FOUND 예외를 발생시킨다.
      * - 완료 또는 취소 상태의 생산계획이면 수정할 수 없도록 차단한다.
@@ -246,7 +241,7 @@ public class PlanService {
      * - 동일 라인에 겹치는 일정이 있는지 검증한다.
      * - production_plans 테이블에 수정 내용을 반영한다.
      *
-     * [Output]
+     * Output:
      * - PlanUpdateResponse
      * - 실제 반영 여부가 true인 수정 결과를 반환한다.
      */
@@ -277,14 +272,13 @@ public class PlanService {
     }
 
     /**
-     * [기능]
-     * 캘린더 드래그 앤 드롭으로 생산계획 일정을 이동한다.
+     * 기능: 캘린더 드래그 앤 드롭으로 생산계획 일정을 이동한다.
      *
-     * [Input]
+     * Input:
      * - planId: 이동할 생산계획 ID
      * - request: 이동 후 라인 ID와 계획 시작/종료 일시
      *
-     * [Process]
+     * Process:
      * - 생산계획이 없으면 PRODUCTION_PLAN_NOT_FOUND 예외를 발생시킨다.
      * - 완료 또는 취소 상태의 생산계획이면 이동할 수 없도록 차단한다.
      * - 요청 기간이 유효한지 검증한다.
@@ -293,7 +287,7 @@ public class PlanService {
      * - 같은 라인에 일정이 겹치면 PLAN_SCHEDULE_CONFLICT 예외를 발생시킨다.
      * - 일정이 비어 있으면 production_plans의 라인과 계획 시작/종료 일시만 수정한다.
      *
-     * [Output]
+     * Output:
      * - PlanUpdateResponse
      * - 실제 반영 여부가 true인 일정 이동 결과를 반환한다.
      */
@@ -385,18 +379,17 @@ public class PlanService {
     }
 
     /**
-     * [기능]
-     * 수정 가능한 생산계획 상태인지 검증한다.
+     * 기능: 수정 가능한 생산계획 상태인지 검증한다.
      *
-     * [Input]
+     * Input:
      * - plan: 수정 대상 생산계획 Entity
      *
-     * [Process]
+     * Process:
      * - 생산 완료(COMPLETED) 상태인지 확인한다.
      * - 취소(CANCELLED) 상태인지 확인한다.
      * - 완료 또는 취소 상태라면 수정 요청을 차단한다.
      *
-     * [Output]
+     * Output:
      * - 없음
      * - 수정 불가능한 상태이면 BAD_REQUEST 예외를 발생시킨다.
      */
@@ -408,20 +401,19 @@ public class PlanService {
     }
 
     /**
-     * [기능]
-     * 생산계획 수정 요청 값의 유효성을 검증한다.
+     * 기능: 생산계획 수정 요청 값의 유효성을 검증한다.
      *
-     * [Input]
+     * Input:
      * - request: 생산계획 수정 요청 DTO
      *
-     * [Process]
+     * Process:
      * - 필수 값 누락 여부를 확인한다.
      * - 계획 시작 시각이 종료 시각보다 이전인지 확인한다.
      * - 계획 수량이 1 이상인지 확인한다.
      * - 라인 내 순서가 1 이상인지 확인한다.
      * - 계획 상태 값이 존재하는지 확인한다.
      *
-     * [Output]
+     * Output:
      * - 없음
      * - 검증 실패 시 BAD_REQUEST 예외를 발생시킨다.
      */
@@ -449,20 +441,19 @@ public class PlanService {
     }
 
     /**
-     * [기능]
-     * 동일 라인 내 생산계획 일정 충돌 여부를 검증한다.
+     * 기능: 동일 라인 내 생산계획 일정 충돌 여부를 검증한다.
      *
-     * [Input]
+     * Input:
      * - planId: 현재 수정 중인 생산계획 ID
      * - request: 수정 요청 DTO
      *
-     * [Process]
+     * Process:
      * - 같은 lineId를 가진 다른 생산계획 중 시간이 겹치는 일정이 있는지 조회한다.
      * - 현재 수정 중인 planId는 충돌 검증 대상에서 제외한다.
      * - 기존 계획 시작 시간이 수정 종료 시각보다 이전이고,
      *   기존 계획 종료 시간이 수정 시작 시각보다 이후이면 충돌로 판단한다.
      *
-     * [Output]
+     * Output:
      * - 없음
      * - 일정 충돌이 있으면 BAD_REQUEST 예외를 발생시킨다.
      */

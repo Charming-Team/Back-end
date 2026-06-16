@@ -8,6 +8,8 @@ import s_map.server.domain.user.dto.res.AuthMeResponse;
 import s_map.server.domain.user.dto.req.LogoutRequest;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -28,12 +30,25 @@ public class AuthController {
     private final AuthService authService;
 
     @Operation(summary = "로그인")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "로그인 성공"),
+            @ApiResponse(responseCode = "400", description = "요청 값 검증 실패"),
+            @ApiResponse(responseCode = "401", description = "아이디 또는 비밀번호 오류"),
+            @ApiResponse(responseCode = "403", description = "비활성 계정"),
+            @ApiResponse(responseCode = "500", description = "서버 내부 오류")
+    })
     @PostMapping("/login")
     public BaseResponse<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
         return BaseResponse.success(authService.login(request));
     }
 
     @Operation(summary = "내 정보 조회")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "내 정보 조회 성공"),
+            @ApiResponse(responseCode = "401", description = "인증 필요"),
+            @ApiResponse(responseCode = "404", description = "사용자 없음"),
+            @ApiResponse(responseCode = "500", description = "서버 내부 오류")
+    })
     @GetMapping("/me")
     public BaseResponse<AuthMeResponse> getMyInfo(
             @AuthenticationPrincipal AuthUser authUser
@@ -42,6 +57,12 @@ public class AuthController {
     }
 
     @Operation(summary = "로그아웃")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "로그아웃 성공"),
+            @ApiResponse(responseCode = "400", description = "요청 값 검증 실패"),
+            @ApiResponse(responseCode = "401", description = "인증 필요"),
+            @ApiResponse(responseCode = "500", description = "서버 내부 오류")
+    })
     @PostMapping("/logout")
     public BaseResponse<Void> logout(
             @Valid @RequestBody LogoutRequest request,

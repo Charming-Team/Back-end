@@ -26,6 +26,15 @@ public class RiskPredictionCoverageService {
         this.riskPredictionService = riskPredictionService;
     }
 
+    /**
+     * 기능: 예측 결과가 없는 미완료 주문을 찾아 지연 확률 예측 결과를 생성한다.
+     *
+     * Input:
+     * - limit / int / 백필 대상으로 조회할 최대 주문 수
+     *
+     * Output:
+     * - result / RiskPredictionCoverageResult / 대상 수, 성공 수, 실패 수, 성공 주문 ID, 실패 상세
+     */
     public RiskPredictionCoverageResult backfillMissingPredictionsForIncompleteOrders(int limit) {
         if (limit <= 0) {
             throw new IllegalArgumentException("limit must be positive.");
@@ -46,6 +55,15 @@ public class RiskPredictionCoverageService {
         );
     }
 
+    /**
+     * 기능: 미완료 주문의 지연 확률 예측 결과를 최신 DB 기준으로 재생성한다.
+     *
+     * Input:
+     * - limit / int / 재예측 대상으로 조회할 최대 주문 수
+     *
+     * Output:
+     * - result / RiskPredictionCoverageResult / 대상 수, 성공 수, 실패 수, 성공 주문 ID, 실패 상세
+     */
     public RiskPredictionCoverageResult refreshPredictionsForIncompleteOrders(int limit) {
         if (limit <= 0) {
             throw new IllegalArgumentException("limit must be positive.");

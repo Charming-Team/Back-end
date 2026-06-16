@@ -48,15 +48,14 @@ public class PlanAiService {
     private final CustomerOrderRepository customerOrderRepository;
 
     /**
-     * [기능]
-     * FastAPI 생산계획 조정 결과를 생성한다.
+     * 기능: FastAPI 생산계획 조정 결과를 생성한다.
      *
-     * [Input]
+     * Input:
      * - request: 충돌난 생산계획 ID, 이동 목표 라인/시간, 재계획 기간
      * - authorizationHeader: Authorization 헤더
      * - refreshToken: refreshToken 쿠키
      *
-     * [Process]
+     * Process:
      * - planId로 이동 대상 생산계획과 주문 정보를 조회한다.
      * - 이동 목표 시간과 직접 겹치는 동일 라인의 재배치 후보 생산계획을 조회한다.
      * - 이동 대상은 edit_orders.locked_plan으로 고정하고, 직접 충돌 후보 계획은 add_orders로 변환한다.
@@ -64,7 +63,7 @@ public class PlanAiService {
      * - FastAPI 생산계획 조정 API를 호출한다.
      * - 응답 결과는 DB에 저장하지 않고 그대로 반환한다.
      *
-     * [Output]
+     * Output:
      * - FastApiPlanningGenerateResponse
      */
     public FastApiPlanningGenerateResponse generatePlanning(
@@ -82,21 +81,20 @@ public class PlanAiService {
     }
 
     /**
-     * [기능]
-     * 월간 FastAPI 생산계획 분석 결과를 생성한다.
+     * 기능: 월간 FastAPI 생산계획 분석 결과를 생성한다.
      *
-     * [Input]
+     * Input:
      * - request: 월간 재계획 시작/종료 일시
      * - authorizationHeader: Authorization 헤더
      * - refreshToken: refreshToken 쿠키
      *
-     * [Process]
+     * Process:
      * - 요청 기간을 검증한다.
      * - edit_orders/add_orders를 비운 FastAPI 요청을 생성한다.
      * - FastAPI는 요청 기간의 DB 생산계획을 기준으로 월간 재계획 대안을 생성한다.
      * - 응답 결과는 DB에 저장하지 않고 그대로 반환한다.
      *
-     * [Output]
+     * Output:
      * - FastApiPlanningGenerateResponse
      */
     public FastApiPlanningGenerateResponse generateMonthlyPlanning(

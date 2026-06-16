@@ -1,13 +1,17 @@
 package s_map.server.domain.risk.dto.fastapi;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
 
+@Schema(description = "FastAPI 지연 확률 예측 요청")
 public record FastApiDelayProbabilityRequest(
 
         @JsonProperty("orderId")
+        @Schema(description = "예측 대상 주문 ID", example = "431")
         Long orderId,
 
         @JsonProperty("topN")
+        @Schema(description = "응답에 포함할 상위 요인 개수", example = "5")
         Integer topN
 ) {
 

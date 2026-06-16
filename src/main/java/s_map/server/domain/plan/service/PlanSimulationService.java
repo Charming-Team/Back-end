@@ -54,16 +54,26 @@ public class PlanSimulationService {
     private final UserRepository userRepository;
 
     /**
-     * [기능]
-     * 생산계획 시뮬레이션 결과 목록을 조회한다.
+     * 기능: 생산계획 시뮬레이션 결과 목록을 조회한다.
+     *
+     * Input:
+     * - 없음
+     *
+     * Output:
+     * - result / List<PlanSimulationListResponse> / 생산계획 시뮬레이션 목록
      */
     public List<PlanSimulationListResponse> getSimulations() {
         return planSimulationRepository.findAllSimulations();
     }
 
     /**
-     * [기능]
-     * 특정 생산계획 시뮬레이션의 상세 변경 내역을 조회한다.
+     * 기능: 특정 생산계획 시뮬레이션의 상세 변경 내역을 조회한다.
+     *
+     * Input:
+     * - simulationId / Long / 조회할 시뮬레이션 고유 ID
+     *
+     * Output:
+     * - result / List<PlanSimulationDetailResponse> / 시뮬레이션 상세 변경 내역 목록
      */
     public List<PlanSimulationDetailResponse> getSimulationDetails(Long simulationId) {
         if (!planSimulationRepository.existsSimulationById(simulationId)) {
@@ -74,15 +84,21 @@ public class PlanSimulationService {
     }
 
     /**
-     * [기능]
-     * FastAPI 생산계획 조정 결과 중 사용자가 선택한 대안 1개를 DB에 저장한다.
+     * 기능: FastAPI 생산계획 조정 결과 중 사용자가 선택한 대안 1개를 DB에 저장한다.
      *
-     * [Process]
+     * Input:
+     * - request / SelectedPlanSimulationSaveRequest / 선택한 시뮬레이션 대안과 생산계획 목록
+     * - appliedBy / Long / 대안 반영 사용자 ID
+     *
+     * Process:
      * - 요청값을 검증한다.
      * - 요청 plans의 주문, 제품, 생산 라인, 담당자, 일정 충돌 여부를 검증한다.
      * - planId가 있는 요청은 해당 생산계획 row를 수정하고, planId가 없으면 새 계획을 저장한다.
      * - 시뮬레이션 요약을 schedule_simulation_results에 저장한다.
      * - 시뮬레이션 상세 변경 내역을 schedule_simulation_details에 저장한다.
+     *
+     * Output:
+     * - result / SelectedPlanSimulationSaveResponse / 저장된 시뮬레이션 ID, 반영 여부, 저장된 계획/상세 건수
      */
     @Transactional
     public SelectedPlanSimulationSaveResponse saveSelectedSimulation(
