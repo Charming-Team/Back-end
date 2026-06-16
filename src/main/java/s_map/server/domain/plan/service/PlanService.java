@@ -14,6 +14,7 @@ import s_map.server.domain.plan.dto.res.PlanUpdateResponse;
 import s_map.server.domain.order.entity.PlanStatus;
 import s_map.server.domain.order.entity.ProductionPlan;
 import s_map.server.domain.order.repository.ProductionPlanRepository;
+import s_map.server.domain.notification.service.NotificationEventPublisher;
 import s_map.server.domain.plan.repository.PlanQueryRepository;
 import s_map.server.domain.plan.repository.PlanRow;
 import s_map.server.domain.plan.repository.ProductionResultRepository;
@@ -46,6 +47,7 @@ public class PlanService {
     private final ProductionResultRepository productionResultRepository;
     private final UserRepository userRepository;
     private final RiskPredictionEventPublisher riskPredictionEventPublisher;
+    private final NotificationEventPublisher notificationEventPublisher;
     /*
      * ProductionPlanMaterial은 현재 material 도메인에 위치함.
      * 생산계획 상세 조회 시 해당 계획에 필요한 자재 목록을 조회하기 위해 참조한다.
@@ -272,6 +274,7 @@ public class PlanService {
                 request.getPlanStatus()
         );
         riskPredictionEventPublisher.publishPlanChanged(plan.getOrderId());
+        notificationEventPublisher.publishScheduleApplied(plan.getPlanId(), plan.getOperatorId());
 
         return PlanUpdateResponse.from(plan);
     }
@@ -325,6 +328,7 @@ public class PlanService {
                 request.getPlannedEndAt()
         );
         riskPredictionEventPublisher.publishPlanChanged(plan.getOrderId());
+        notificationEventPublisher.publishScheduleApplied(plan.getPlanId(), plan.getOperatorId());
 
         return PlanUpdateResponse.from(plan);
     }

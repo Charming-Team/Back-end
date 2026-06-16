@@ -34,11 +34,30 @@ public class RiskPredictionService {
         this.aiPredictionResultJdbcRepository = aiPredictionResultJdbcRepository;
     }
 
+    /**
+     * 기능: 주문 ID 기준 지연 확률을 기본 원인 개수로 예측하고 결과를 저장한다.
+     *
+     * Input:
+     * - orderId / Long / 지연 위험을 예측할 주문 ID
+     *
+     * Output:
+     * - result / AiPredictionResultSaveResult / 저장된 AI 예측 결과 요약
+     */
     @Transactional
     public AiPredictionResultSaveResult predictAndSaveDelayProbability(Long orderId) {
         return predictAndSaveDelayProbability(orderId, DEFAULT_TOP_N);
     }
 
+    /**
+     * 기능: 주문 ID 기준 지연 확률과 지연 예상일을 예측하고 결과를 저장한다.
+     *
+     * Input:
+     * - orderId / Long / 지연 위험을 예측할 주문 ID
+     * - topN / Integer / FastAPI가 반환할 주요 원인 최대 개수
+     *
+     * Output:
+     * - result / AiPredictionResultSaveResult / 저장된 AI 예측 결과 요약
+     */
     @Transactional
     public AiPredictionResultSaveResult predictAndSaveDelayProbability(
             Long orderId,

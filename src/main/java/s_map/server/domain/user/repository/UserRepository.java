@@ -3,6 +3,8 @@ package s_map.server.domain.user.repository;
 import s_map.server.domain.user.entity.User;
 import s_map.server.domain.user.entity.Role;
 import s_map.server.domain.user.entity.UserStatus;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -25,6 +27,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
     long countByRoleAndStatusNot(Role role, UserStatus status);
 
     Optional<User> findFirstByNameAndStatusAndRoleOrderByIdAsc(String name, UserStatus status, Role role);
+
+    List<User> findByRoleInAndStatus(Collection<Role> roles, UserStatus status);
 
     Page<User> findByStatusNot(UserStatus status, Pageable pageable);
 

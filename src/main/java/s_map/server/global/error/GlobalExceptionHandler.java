@@ -16,6 +16,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @Slf4j
@@ -130,6 +131,18 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(errorCode.getHttpStatus())
                 .body(BaseResponse.fail(errorCode));
+    }
+
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    public void handleAsyncRequestNotUsableException(
+            AsyncRequestNotUsableException exception,
+            HttpServletRequest request
+    ) {
+        log.debug(
+                "[GlobalExceptionHandler] 비동기 요청 클라이언트 연결 종료 path={} message={}",
+                request.getRequestURI(),
+                exception.getMessage()
+        );
     }
 
     @ExceptionHandler(Exception.class)

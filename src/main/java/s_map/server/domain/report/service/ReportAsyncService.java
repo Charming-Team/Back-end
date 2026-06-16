@@ -9,6 +9,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
+import s_map.server.domain.notification.service.NotificationEventPublisher;
 import s_map.server.domain.report.dto.fastapi.FastApiBusinessReportGenerateRequest;
 import s_map.server.domain.report.dto.fastapi.FastApiBusinessReportGenerateResponse;
 import s_map.server.domain.report.dto.fastapi.FastApiReportGenerateRequest;
@@ -42,6 +43,7 @@ public class ReportAsyncService {
     private final FastApiReportClient fastApiReportClient;
     private final ObjectMapper objectMapper;
     private final TransactionTemplate transactionTemplate;
+    private final NotificationEventPublisher notificationEventPublisher;
 
     /**
      * 기능: 보고서 생성 Job을 실행하고 FastAPI 응답을 reports 테이블과 report_jobs 상태에 반영한다.
@@ -105,6 +107,7 @@ public class ReportAsyncService {
             }
 
             Long reportId = saveReportAndMarkSuccess(reportJobId, requestedBy, request, fastApiResponse);
+            notifyReportGeneratedSafely(requestedBy, reportId);
 
             log.info(
                     "[ReportAsyncService] 보고서 생성 완료 reportJobId={} reportId={}",
@@ -177,6 +180,7 @@ public class ReportAsyncService {
                     requestedBy,
                     fastApiResponse
             );
+            notifyReportGeneratedSafely(requestedBy, businessReportId);
 
             log.info(
                     "[ReportAsyncService] 비즈니스 보고서 생성 완료 reportJobId={} sourceReportId={} requestedBy={} businessReportId={}",
@@ -255,6 +259,27 @@ public class ReportAsyncService {
             log.error(
                     "[ReportAsyncService] 보고서 생성 실패 상태 저장 실패 reportJobId={}",
                     reportJobId,
+                    exception
+            );
+        }
+    }
+
+    private void notifyReportGeneratedSafely(Long requestedBy, Long reportId) {
+        try {
+            String reportTitle = reportRepository.findById(reportId)
+                    .map(Report::getReportTitle)
+                    .orElse("보고서");
+
+            notificationEventPublisher.publishReportGenerated(
+                    requestedBy,
+                    reportId,
+                    reportTitle
+            );
+        } catch (Exception exception) {
+            log.warn(
+                    "[ReportAsyncService] 보고서 생성 완료 알림 생성 실패 requestedBy={} reportId={}",
+                    requestedBy,
+                    reportId,
                     exception
             );
         }
