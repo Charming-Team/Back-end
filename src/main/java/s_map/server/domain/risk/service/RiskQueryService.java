@@ -1,6 +1,8 @@
 package s_map.server.domain.risk.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import s_map.server.domain.risk.dto.res.RiskCauseResponse;
@@ -18,12 +20,15 @@ import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
 @Service
 @Transactional(readOnly = true)
 public class RiskQueryService {
+
+    private static final Logger log = LoggerFactory.getLogger(RiskQueryService.class);
 
     private final RiskQueryRepository riskQueryRepository;
     private final ObjectMapper objectMapper;
@@ -55,8 +60,10 @@ public class RiskQueryService {
             int page,
             int size
     ) {
+        String normalizedRiskLevel = normalizeRiskLevel(riskLevel);
+
         List<RiskOrderListItemResponse> items = riskQueryRepository.findOrders(
-                        riskLevel,
+                        normalizedRiskLevel,
                         keyword,
                         page,
                         size
@@ -66,7 +73,7 @@ public class RiskQueryService {
                 .toList();
 
         long totalElements = riskQueryRepository.countOrders(
-                riskLevel,
+                normalizedRiskLevel,
                 keyword
         );
 
@@ -79,10 +86,33 @@ public class RiskQueryService {
     }
 
     public RiskOrderDetailResponse getOrderDetail(Long orderId) {
+        validateOrderId(orderId);
+
         RiskQueryRepository.RiskOrderDetailRow row = riskQueryRepository.findOrderDetail(orderId)
                 .orElseThrow(() -> new CustomException(ErrorCode.ORDER_NOT_FOUND));
 
         return toDetailResponse(row);
+    }
+
+    private static String normalizeRiskLevel(String riskLevel) {
+        if (!hasText(riskLevel)) {
+            return null;
+        }
+
+        String normalized = riskLevel.trim().toUpperCase(Locale.ROOT);
+
+        try {
+            RiskLevel.valueOf(normalized);
+            return normalized;
+        } catch (IllegalArgumentException ex) {
+            throw new CustomException(ErrorCode.BAD_REQUEST, "riskLevel 값이 올바르지 않습니다.");
+        }
+    }
+
+    private static void validateOrderId(Long orderId) {
+        if (orderId == null || orderId <= 0) {
+            throw new CustomException(ErrorCode.BAD_REQUEST, "orderId 값이 올바르지 않습니다.");
+        }
     }
 
     private RiskOrderListItemResponse toListItemResponse(
@@ -309,7 +339,8 @@ public class RiskQueryService {
 
             return result;
 
-        } catch (Exception ignored) {
+        } catch (Exception ex) {
+            log.warn("Risk cause_detail parsing failed. Returning empty causes.", ex);
             return List.of();
         }
     }
