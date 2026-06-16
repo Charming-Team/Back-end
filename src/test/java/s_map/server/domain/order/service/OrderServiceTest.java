@@ -21,6 +21,7 @@ import s_map.server.domain.order.repository.OrderQueryRepository;
 import s_map.server.domain.order.repository.OrderSummaryProjection;
 import s_map.server.domain.order.repository.ProductQueryRepository;
 import s_map.server.domain.order.repository.ProductionPlanRepository;
+import s_map.server.domain.risk.service.RiskPredictionEventPublisher;
 import s_map.server.domain.user.entity.Role;
 import s_map.server.domain.user.entity.UserStatus;
 import s_map.server.domain.user.repository.UserRepository;
@@ -73,6 +74,9 @@ class OrderServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private RiskPredictionEventPublisher riskPredictionEventPublisher;
 
     @InjectMocks
     private OrderService orderService;

@@ -21,7 +21,7 @@ import s_map.server.global.security.AuthUser;
 @Tag(name = "Chat", description = "사용자 챗봇 API")
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/v1/chat")
+@RequestMapping("/api/chat")
 public class ChatController {
 
     private final ChatService chatService;

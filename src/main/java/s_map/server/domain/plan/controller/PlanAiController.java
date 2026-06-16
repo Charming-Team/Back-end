@@ -1,6 +1,8 @@
 package s_map.server.domain.plan.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +37,16 @@ public class PlanAiController {
                     사용자가 특정 시뮬레이션 후보를 선택하면 별도 저장 API에서 DB에 저장합니다.
                     """
     )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "AI 생산계획 조정 결과 생성 성공"),
+            @ApiResponse(responseCode = "400", description = "요청 값 검증 실패 또는 수정 불가능한 생산계획"),
+            @ApiResponse(responseCode = "401", description = "인증 필요"),
+            @ApiResponse(responseCode = "403", description = "생산계획 수정 권한 필요"),
+            @ApiResponse(responseCode = "404", description = "생산계획, 주문 또는 생산 가능 라인 없음"),
+            @ApiResponse(responseCode = "502", description = "FastAPI 호출 또는 응답 처리 실패"),
+            @ApiResponse(responseCode = "503", description = "FastAPI 사용 불가"),
+            @ApiResponse(responseCode = "504", description = "FastAPI 응답 시간 초과")
+    })
     @PostMapping("/generate")
     public BaseResponse<FastApiPlanningGenerateResponse> generatePlanning(
             @RequestHeader(HttpHeaders.AUTHORIZATION) String authorizationHeader,
@@ -60,6 +72,15 @@ public class PlanAiController {
                     AI 응답은 DB에 저장하지 않고 그대로 프론트에 반환합니다.
                     """
     )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "월간 AI 생산계획 분석 성공"),
+            @ApiResponse(responseCode = "400", description = "요청 값 검증 실패 또는 분석 기간 오류"),
+            @ApiResponse(responseCode = "401", description = "인증 필요"),
+            @ApiResponse(responseCode = "403", description = "생산계획 분석 권한 필요"),
+            @ApiResponse(responseCode = "502", description = "FastAPI 호출 또는 응답 처리 실패"),
+            @ApiResponse(responseCode = "503", description = "FastAPI 사용 불가"),
+            @ApiResponse(responseCode = "504", description = "FastAPI 응답 시간 초과")
+    })
     @PostMapping("/monthly-analysis")
     public BaseResponse<FastApiPlanningGenerateResponse> generateMonthlyPlanning(
             @RequestHeader(HttpHeaders.AUTHORIZATION) String authorizationHeader,

@@ -87,6 +87,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(AUTH_PATHS).permitAll()
                         .requestMatchers(INTERNAL_PATHS).permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/notifications/subscribe").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, MATERIAL_MUTATION_PATHS)
                         .hasAnyRole("ADMIN", "EXECUTIVE", "MANUFACTURING_MANAGER")

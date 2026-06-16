@@ -31,6 +31,15 @@ public class ReportStructuredDataService {
 
     private final ReportStructuredDataQueryRepository queryRepository;
 
+    /**
+     * 기능: 저장된 보고서의 구조화 데이터를 조회하거나 현재 DB 기준으로 보완한다.
+     *
+     * Input:
+     * - report / Report / 구조화 데이터를 구성할 보고서 엔티티
+     *
+     * Output:
+     * - result / ReportStructuredData / 보고서 상세 화면과 PDF에 사용할 구조화 데이터
+     */
     public ReportStructuredData resolve(Report report) {
         String markdown = extractMarkdown(report.getReportContent());
         if (hasStructuredData(report)) {
@@ -40,6 +49,15 @@ public class ReportStructuredDataService {
         return createFromCurrentDatabase(report);
     }
 
+    /**
+     * 기능: 보고서 기간과 유형을 기준으로 현재 DB 데이터에서 보고서 구조화 데이터를 생성한다.
+     *
+     * Input:
+     * - report / Report / 보고서 유형과 대상 기간을 포함한 보고서 엔티티
+     *
+     * Output:
+     * - result / ReportStructuredData / 현재 DB 기준 주요 요약, 라인별 성과, 설비 현황, 분석 데이터
+     */
     public ReportStructuredData createFromCurrentDatabase(Report report) {
         DateRange dateRange = DateRange.from(
                 report.getReportType(),

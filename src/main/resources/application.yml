@@ -37,6 +37,10 @@ app:
   report:
     mail:
       from: ${REPORT_MAIL_FROM:no-reply@smap.local}
+  notification:
+    sse:
+      timeout-ms: ${NOTIFICATION_SSE_TIMEOUT_MS:1800000}
+      ticket-ttl-ms: ${NOTIFICATION_SSE_TICKET_TTL_MS:30000}
   jwt:
     access-token-expiration-ms: 300000
     refresh-token-expiration-ms: 86400000
@@ -48,6 +52,15 @@ ai:
     chat-answer-path: /ai/api/v1/chat/answer
     chat-answer-internal-token: ${CHAT_ANSWER_INTERNAL_TOKEN:}
     timeout-seconds: 60
+    risk:
+      delay-probability-predict-path: ${AI_FASTAPI_DELAY_PROBABILITY_PREDICT_PATH:/api/v1/delay-probability/predict}
+      delay-prediction-predict-path: ${AI_FASTAPI_DELAY_PREDICTION_PREDICT_PATH:/api/v1/delay-prediction/predict}
+      connect-timeout-ms: ${AI_FASTAPI_RISK_CONNECT_TIMEOUT_MS:3000}
+      read-timeout-ms: ${AI_FASTAPI_RISK_READ_TIMEOUT_MS:10000}
+      internal-token: ${AI_FASTAPI_RISK_INTERNAL_TOKEN:}
+      startup-backfill-enabled: ${AI_FASTAPI_RISK_STARTUP_BACKFILL_ENABLED:false}
+      startup-backfill-limit: ${AI_FASTAPI_RISK_STARTUP_BACKFILL_LIMIT:1000}
+      startup-backfill-mode: ${AI_FASTAPI_RISK_STARTUP_BACKFILL_MODE:MISSING_ONLY}
 
 ---
 spring:

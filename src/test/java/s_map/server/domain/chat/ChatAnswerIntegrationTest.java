@@ -85,7 +85,7 @@ class ChatAnswerIntegrationTest {
         User user = saveUser(Role.MANUFACTURING_MANAGER, "manager@sk.com");
         String accessToken = loginAndGetAccessToken(user);
 
-        mockMvc.perform(MockMvcRequestBuilders.post("/api/v1/chat/answer")
+        mockMvc.perform(MockMvcRequestBuilders.post("/api/chat/answer")
                         .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
@@ -128,7 +128,7 @@ class ChatAnswerIntegrationTest {
         User user = saveUser(Role.OPERATOR, "operator@sk.com");
         String accessToken = loginAndGetAccessToken(user);
 
-        mockMvc.perform(MockMvcRequestBuilders.post("/api/v1/chat/answer")
+        mockMvc.perform(MockMvcRequestBuilders.post("/api/chat/answer")
                         .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
@@ -153,7 +153,7 @@ class ChatAnswerIntegrationTest {
         user.suspend();
         userRepository.saveAndFlush(user);
 
-        mockMvc.perform(MockMvcRequestBuilders.post("/api/v1/chat/answer")
+        mockMvc.perform(MockMvcRequestBuilders.post("/api/chat/answer")
                         .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
@@ -176,7 +176,7 @@ class ChatAnswerIntegrationTest {
         User user = saveUser(Role.OPERATOR, "blocked-operator@sk.com");
         String accessToken = loginAndGetAccessToken(user);
 
-        mockMvc.perform(MockMvcRequestBuilders.post("/api/v1/chat/answer")
+        mockMvc.perform(MockMvcRequestBuilders.post("/api/chat/answer")
                         .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
@@ -198,7 +198,7 @@ class ChatAnswerIntegrationTest {
         User user = saveUser(Role.MANUFACTURING_MANAGER, "timeout-manager@sk.com");
         String accessToken = loginAndGetAccessToken(user);
 
-        mockMvc.perform(MockMvcRequestBuilders.post("/api/v1/chat/answer")
+        mockMvc.perform(MockMvcRequestBuilders.post("/api/chat/answer")
                         .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
@@ -230,7 +230,7 @@ class ChatAnswerIntegrationTest {
         User user = saveUser(Role.EXECUTIVE, "executive@sk.com");
         String accessToken = loginAndGetAccessToken(user);
 
-        mockMvc.perform(MockMvcRequestBuilders.post("/api/v1/chat/answer")
+        mockMvc.perform(MockMvcRequestBuilders.post("/api/chat/answer")
                         .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
@@ -251,7 +251,7 @@ class ChatAnswerIntegrationTest {
         User user = saveUser(Role.MANUFACTURING_MANAGER, "mismatch-manager@sk.com");
         String accessToken = loginAndGetAccessToken(user);
 
-        mockMvc.perform(MockMvcRequestBuilders.post("/api/v1/chat/answer")
+        mockMvc.perform(MockMvcRequestBuilders.post("/api/chat/answer")
                         .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(

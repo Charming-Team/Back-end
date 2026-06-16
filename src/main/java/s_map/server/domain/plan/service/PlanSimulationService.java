@@ -9,6 +9,7 @@ import s_map.server.domain.order.entity.PlanStatus;
 import s_map.server.domain.order.entity.ProductionPlan;
 import s_map.server.domain.order.repository.CustomerOrderRepository;
 import s_map.server.domain.order.repository.ProductionPlanRepository;
+import s_map.server.domain.notification.service.NotificationEventPublisher;
 import s_map.server.domain.plan.dto.req.SelectedPlanSimulationSaveRequest;
 import s_map.server.domain.plan.dto.res.PlanSimulationDetailResponse;
 import s_map.server.domain.plan.dto.res.PlanSimulationListResponse;
@@ -52,18 +53,29 @@ public class PlanSimulationService {
     private final ProductionPlanRepository productionPlanRepository;
     private final CustomerOrderRepository customerOrderRepository;
     private final UserRepository userRepository;
+    private final NotificationEventPublisher notificationEventPublisher;
 
     /**
-     * [기능]
-     * 생산계획 시뮬레이션 결과 목록을 조회한다.
+     * 기능: 생산계획 시뮬레이션 결과 목록을 조회한다.
+     *
+     * Input:
+     * - 없음
+     *
+     * Output:
+     * - result / List<PlanSimulationListResponse> / 생산계획 시뮬레이션 결과 목록
      */
     public List<PlanSimulationListResponse> getSimulations() {
         return planSimulationRepository.findAllSimulations();
     }
 
     /**
-     * [기능]
-     * 특정 생산계획 시뮬레이션의 상세 변경 내역을 조회한다.
+     * 기능: 특정 생산계획 시뮬레이션의 상세 변경 내역을 조회한다.
+     *
+     * Input:
+     * - simulationId / Long / 조회할 시뮬레이션 ID
+     *
+     * Output:
+     * - result / List<PlanSimulationDetailResponse> / 시뮬레이션 상세 변경 내역
      */
     public List<PlanSimulationDetailResponse> getSimulationDetails(Long simulationId) {
         if (!planSimulationRepository.existsSimulationById(simulationId)) {
@@ -74,8 +86,11 @@ public class PlanSimulationService {
     }
 
     /**
-     * [기능]
-     * FastAPI 생산계획 조정 결과 중 사용자가 선택한 대안 1개를 DB에 저장한다.
+     * 기능: FastAPI 생산계획 조정 결과 중 사용자가 선택한 대안 1개를 DB에 저장한다.
+     *
+     * Input:
+     * - request / SelectedPlanSimulationSaveRequest / 선택 시뮬레이션 저장 요청 값
+     * - appliedBy / Long / 선택안을 반영한 사용자 ID
      *
      * [Process]
      * - 요청값을 검증한다.
@@ -83,6 +98,9 @@ public class PlanSimulationService {
      * - planId가 있는 요청은 해당 생산계획 row를 수정하고, planId가 없으면 새 계획을 저장한다.
      * - 시뮬레이션 요약을 schedule_simulation_results에 저장한다.
      * - 시뮬레이션 상세 변경 내역을 schedule_simulation_details에 저장한다.
+     *
+     * Output:
+     * - result / SelectedPlanSimulationSaveResponse / 저장된 시뮬레이션과 반영된 생산계획 ID 목록
      */
     @Transactional
     public SelectedPlanSimulationSaveResponse saveSelectedSimulation(
@@ -193,6 +211,7 @@ public class PlanSimulationService {
                 response.getSimulationGroupId(),
                 response.getSavedPlanIds()
         );
+        notificationEventPublisher.publishScheduleAppliedSummary(appliedBy, savedPlanIds);
         return response;
     }
 

@@ -192,7 +192,7 @@ class PlanningFastApiClientTest {
     }
 
     @Test
-    @DisplayName("FastAPI 400 응답은 Spring에서도 BAD_REQUEST로 전달한다")
+    @DisplayName("FastAPI 400 응답은 BAD_REQUEST로 처리하되 원문을 노출하지 않는다")
     void generatePlanningPropagatesFastApiClientErrorMessage() {
         FastApiPlanningProperties properties = new FastApiPlanningProperties();
         properties.setBaseUrl("http://internal-fastapi:8000");
@@ -221,7 +221,9 @@ class PlanningFastApiClientTest {
                     org.assertj.core.api.Assertions.assertThat(customException.getErrorCode())
                             .isEqualTo(ErrorCode.BAD_REQUEST);
                     org.assertj.core.api.Assertions.assertThat(customException.getMessage())
-                            .contains("edit_order 398 does not exist in DB planning data");
+                            .isEqualTo("AI 생산계획 요청을 처리할 수 없습니다. 입력값을 확인해주세요.")
+                            .doesNotContain("edit_order 398")
+                            .doesNotContain("DB planning data");
                 });
     }
 
@@ -255,7 +257,7 @@ class PlanningFastApiClientTest {
     }
 
     @Test
-    @DisplayName("FastAPI 5xx 응답은 AI 서버 호출 실패로 처리하되 응답 메시지를 전달한다")
+    @DisplayName("FastAPI 5xx 응답은 AI 서버 호출 실패로 처리하되 원문을 노출하지 않는다")
     void generatePlanningPropagatesFastApiServerErrorMessage() {
         FastApiPlanningProperties properties = new FastApiPlanningProperties();
         properties.setBaseUrl("http://internal-fastapi:8000");
@@ -284,7 +286,8 @@ class PlanningFastApiClientTest {
                     org.assertj.core.api.Assertions.assertThat(customException.getErrorCode())
                             .isEqualTo(ErrorCode.AI_SERVER_CALL_FAILED);
                     org.assertj.core.api.Assertions.assertThat(customException.getMessage())
-                            .contains("optimizer failed to build adjusted plan");
+                            .isEqualTo(ErrorCode.AI_SERVER_CALL_FAILED.getMessage())
+                            .doesNotContain("optimizer failed");
                 });
     }
 

@@ -153,6 +153,9 @@ public class AdminAuthService {
      * 기능: 관리자 대시보드에 필요한 사용자 현황 요약을 조회한다.
      * 전체 사용자와 권한별 분포는 WITHDRAWN 상태를 제외하고, 활성 사용자는 ACTIVE 상태만 집계한다.
      *
+     * Input:
+     * - 없음
+     *
      * Output:
      * - response / AdminDashboardResponse / 관리자 대시보드 사용자 현황
      * - response.totalUsers / long / 전체 사용자 수

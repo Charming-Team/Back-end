@@ -312,10 +312,10 @@ public class ReportService {
         reportMailService.sendReportPdfMail(report, authorName, normalizedRequest, pdf);
 
         log.info(
-                "[ReportService] 보고서 PDF 메일 발송 완료 reportId={}, userId={}, recipients={}, fileName={}, fileSizeBytes={}",
+                "[ReportService] 보고서 PDF 메일 발송 완료 reportId={}, userId={}, recipientCount={}, fileName={}, fileSizeBytes={}",
                 report.getReportId(),
                 user.getId(),
-                recipients,
+                recipients.size(),
                 fileName,
                 content.length
         );
