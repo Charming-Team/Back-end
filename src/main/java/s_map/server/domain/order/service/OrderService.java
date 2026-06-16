@@ -264,7 +264,7 @@ public class OrderService {
         );
 
         ProductionPlan savedPlan = productionPlanRepository.saveAndFlush(plan);
-        
+
         riskPredictionEventPublisher.publishOrderCreated(savedOrder.getOrderId());
 
         return OrderCreateResponse.from(
@@ -471,7 +471,7 @@ public class OrderService {
     }
 
     private String createOrderNoPrefix(LocalDate date) {
-        return "PO-" + date.format(ORDER_NO_DATE_FORMATTER) + "-";
+        return "ORD-" + date.format(ORDER_NO_DATE_FORMATTER) + "-";
     }
 
     private String formatOrderNo(LocalDate date, int sequence) {
