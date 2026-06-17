@@ -2,6 +2,7 @@ package s_map.server.domain.notification.service;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import s_map.server.domain.notification.dto.res.NotificationResponse;
@@ -18,6 +19,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public class NotificationSseService {
 
     private static final String EVENT_CONNECTED = "connected";
+    private static final String EVENT_HEARTBEAT = "heartbeat";
     private static final String EVENT_NOTIFICATION = "notification";
     private static final String EVENT_UNREAD_COUNT = "unread-count";
 
@@ -45,8 +47,14 @@ public class NotificationSseService {
         emittersByUserId.computeIfAbsent(userId, ignored -> new CopyOnWriteArrayList<>()).add(emitter);
 
         emitter.onCompletion(() -> removeEmitter(userId, emitter));
-        emitter.onTimeout(() -> removeEmitter(userId, emitter));
-        emitter.onError(error -> removeEmitter(userId, emitter));
+        emitter.onTimeout(() -> {
+            removeEmitter(userId, emitter);
+            completeSilently(emitter);
+        });
+        emitter.onError(error -> {
+            removeEmitter(userId, emitter);
+            log.debug("Notification SSE emitter closed after error. userId={}", userId);
+        });
 
         sendSafely(
                 userId,
@@ -99,6 +107,24 @@ public class NotificationSseService {
         }
     }
 
+    /**
+     * 기능: SSE 연결 유지를 위해 접속 중인 사용자에게 주기적으로 heartbeat 이벤트를 전송한다.
+     *
+     * Input:
+     * - none / void / 스케줄러가 주기적으로 호출
+     *
+     * Output:
+     * - none / void / heartbeat 전송 후 반환 값 없음
+     */
+    @Scheduled(fixedDelayString = "${app.notification.sse.heartbeat-interval-ms:25000}")
+    public void publishHeartbeat() {
+        emittersByUserId.forEach((userId, emitters) -> {
+            for (SseEmitter emitter : emitters) {
+                sendSafely(userId, emitter, EVENT_HEARTBEAT, "ping");
+            }
+        });
+    }
+
     private void publishBroadcast(NotificationResponse notification) {
         emittersByUserId.forEach((userId, emitters) -> {
             for (SseEmitter emitter : emitters) {
@@ -119,6 +145,7 @@ public class NotificationSseService {
                     .data(payload));
         } catch (IOException | RuntimeException exception) {
             removeEmitter(userId, emitter);
+            completeSilently(emitter);
             log.debug(
                     "Notification SSE emitter removed after send failure. userId={}, eventName={}",
                     userId,
@@ -136,6 +163,14 @@ public class NotificationSseService {
         emitters.remove(emitter);
         if (emitters.isEmpty()) {
             emittersByUserId.remove(userId);
+        }
+    }
+
+    private void completeSilently(SseEmitter emitter) {
+        try {
+            emitter.complete();
+        } catch (RuntimeException ignored) {
+            // 이미 닫힌 SSE 연결은 추가 조치가 필요하지 않습니다.
         }
     }
 }
