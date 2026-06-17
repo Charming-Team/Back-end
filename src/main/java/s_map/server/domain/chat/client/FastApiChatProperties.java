@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 public class FastApiChatProperties {
 
     private String baseUrl = "http://localhost:8000";
-    private String chatAnswerPath = "/ai/api/v1/chat/answer";
+    private String chatAnswerPath = "/api/v1/chat/answer";
     private String chatAnswerInternalToken = "";
     private long timeoutSeconds = 60;
 }

@@ -45,7 +45,7 @@ class PlanningFastApiClientTest {
         FastApiPlanningGenerateRequest request = request();
 
         ReflectionTestUtils.setField(client, "restTemplate", restTemplate);
-        server.expect(requestTo("http://internal-fastapi:8000/ai/api/v1/planning"))
+        server.expect(requestTo("http://internal-fastapi:8000/api/v1/planning"))
                 .andRespond(withSuccess(
                         """
                                 {
@@ -127,7 +127,7 @@ class PlanningFastApiClientTest {
         FastApiPlanningGenerateRequest request = request();
 
         ReflectionTestUtils.setField(client, "restTemplate", restTemplate);
-        server.expect(requestTo("http://internal-fastapi:8000/ai/api/v1/planning"))
+        server.expect(requestTo("http://internal-fastapi:8000/api/v1/planning"))
                 .andRespond(withSuccess(
                         """
                                 {
@@ -203,7 +203,7 @@ class PlanningFastApiClientTest {
 
         ReflectionTestUtils.setField(client, "restTemplate", restTemplate);
         when(restTemplate.postForObject(
-                eq("http://internal-fastapi:8000/ai/api/v1/planning"),
+                eq("http://internal-fastapi:8000/api/v1/planning"),
                 any(HttpEntity.class),
                 eq(String.class)
         )).thenThrow(HttpClientErrorException.create(
@@ -238,7 +238,7 @@ class PlanningFastApiClientTest {
 
         ReflectionTestUtils.setField(client, "restTemplate", restTemplate);
         when(restTemplate.postForObject(
-                eq("http://internal-fastapi:8000/ai/api/v1/planning"),
+                eq("http://internal-fastapi:8000/api/v1/planning"),
                 any(HttpEntity.class),
                 eq(String.class)
         )).thenThrow(new RestClientException("I/O error on POST request for http://internal-fastapi:8000/secret"));
@@ -268,7 +268,7 @@ class PlanningFastApiClientTest {
 
         ReflectionTestUtils.setField(client, "restTemplate", restTemplate);
         when(restTemplate.postForObject(
-                eq("http://internal-fastapi:8000/ai/api/v1/planning"),
+                eq("http://internal-fastapi:8000/api/v1/planning"),
                 any(HttpEntity.class),
                 eq(String.class)
         )).thenThrow(HttpServerErrorException.create(

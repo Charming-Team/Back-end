@@ -15,8 +15,8 @@ class RiskFastApiPropertiesTest {
         properties.setBaseUrl("http://fastapi-service:8000/");
 
         assertThat(properties.delayProbabilityPredictUri().toString())
-                .isEqualTo("http://fastapi-service:8000/ai/api/v1/delay-probability/predict");
+                .isEqualTo("http://fastapi-service:8000/api/v1/delay-probability/predict");
         assertThat(properties.delayPredictionPredictUri().toString())
-                .isEqualTo("http://fastapi-service:8000/ai/api/v1/delay-prediction/predict");
+                .isEqualTo("http://fastapi-service:8000/api/v1/delay-prediction/predict");
     }
 }

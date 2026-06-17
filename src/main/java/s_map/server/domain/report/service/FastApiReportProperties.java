@@ -12,8 +12,8 @@ import org.springframework.stereotype.Component;
 public class FastApiReportProperties {
 
     private String baseUrl = "http://localhost:8000";
-    private String reportGeneratePath = "/ai/api/v1/reports/generate";
-    private String businessReportGeneratePath = "/ai/api/v1/business-reports/generate";
+    private String reportGeneratePath = "/api/v1/reports/generate";
+    private String businessReportGeneratePath = "/api/v1/business-reports/generate";
     private int reportConnectTimeoutMillis = 5_000;
     private int reportReadTimeoutMillis = 300_000;
 }

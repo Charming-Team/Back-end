@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 public class FastApiPlanningProperties {
 
     private String baseUrl = "http://localhost:8000";
-    private String planningGeneratePath = "/ai/api/v1/planning";
+    private String planningGeneratePath = "/api/v1/planning";
     private int planningConnectTimeoutMillis = 5_000;
     private int planningReadTimeoutMillis = 300_000;
 }
