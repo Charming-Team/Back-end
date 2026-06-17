@@ -48,16 +48,18 @@ app:
 
 ai:
   fastapi:
-    base-url: ${FASTAPI_BASE_URL:http://fastapi-service:8000}
-    report-generate-path: ${AI_FASTAPI_REPORT_GENERATE_PATH:/api/v1/reports/generate}
-    business-report-generate-path: ${AI_FASTAPI_BUSINESS_REPORT_GENERATE_PATH:/api/v1/business-reports/generate}
+    base-url: ${FASTAPI_BASE_URL:http://localhost:8000}
+    report-generate-path: ${AI_FASTAPI_REPORT_GENERATE_PATH:/ai/api/v1/reports/generate}
+    business-report-generate-path: ${AI_FASTAPI_BUSINESS_REPORT_GENERATE_PATH:/ai/api/v1/business-reports/generate}
+    report-connect-timeout-millis: ${AI_FASTAPI_REPORT_CONNECT_TIMEOUT_MILLIS:5000}
+    report-read-timeout-millis: ${AI_FASTAPI_REPORT_READ_TIMEOUT_MILLIS:300000}
     planning-generate-path: ${AI_FASTAPI_PLANNING_GENERATE_PATH:/ai/api/v1/planning}
-    chat-answer-path: /ai/api/v1/chat/answer
+    chat-answer-path: ${AI_FASTAPI_CHAT_ANSWER_PATH:/ai/api/v1/chat/answer}
     chat-answer-internal-token: ${CHAT_ANSWER_INTERNAL_TOKEN:}
     timeout-seconds: 60
     risk:
-      delay-probability-predict-path: ${AI_FASTAPI_DELAY_PROBABILITY_PREDICT_PATH:/api/v1/delay-probability/predict}
-      delay-prediction-predict-path: ${AI_FASTAPI_DELAY_PREDICTION_PREDICT_PATH:/api/v1/delay-prediction/predict}
+      delay-probability-predict-path: ${AI_FASTAPI_DELAY_PROBABILITY_PREDICT_PATH:/ai/api/v1/delay-probability/predict}
+      delay-prediction-predict-path: ${AI_FASTAPI_DELAY_PREDICTION_PREDICT_PATH:/ai/api/v1/delay-prediction/predict}
       connect-timeout-ms: ${AI_FASTAPI_RISK_CONNECT_TIMEOUT_MS:3000}
       read-timeout-ms: ${AI_FASTAPI_RISK_READ_TIMEOUT_MS:10000}
       internal-token: ${AI_FASTAPI_RISK_INTERNAL_TOKEN:}

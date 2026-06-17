@@ -63,7 +63,7 @@ public class ReportController {
     public BaseResponse<ReportGenerateStartResponse> generateReport(
             @Parameter(hidden = true)
             @AuthenticationPrincipal AuthUser authUser,
-            @RequestBody ReportGenerateRequest request
+            @Valid @RequestBody ReportGenerateRequest request
     ) {
         return BaseResponse.success(reportService.generateReport(authUser, request));
     }

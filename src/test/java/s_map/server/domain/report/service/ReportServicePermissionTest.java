@@ -1,6 +1,7 @@
 package s_map.server.domain.report.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -9,12 +10,16 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.test.util.ReflectionTestUtils;
+import s_map.server.domain.report.dto.req.BusinessReportGenerateRequest;
 import s_map.server.domain.report.dto.req.ReportMailSendRequest;
 import s_map.server.domain.report.dto.res.ReportMailSendResponse;
 import s_map.server.domain.report.dto.res.ReportListResponse;
 import s_map.server.domain.report.dto.res.ReportPdfDownloadResponse;
 import s_map.server.domain.report.dto.res.ReportStructuredData;
 import s_map.server.domain.report.entity.Report;
+import s_map.server.domain.report.entity.ReportJob;
+import s_map.server.domain.report.entity.ReportJobStatus;
 import s_map.server.domain.report.entity.ReportType;
 import s_map.server.domain.report.repository.ReportJobRepository;
 import s_map.server.domain.report.repository.ReportRepository;
@@ -122,6 +127,36 @@ class ReportServicePermissionTest {
                 .isInstanceOf(CustomException.class)
                 .extracting(exception -> ((CustomException) exception).getErrorCode())
                 .isEqualTo(ErrorCode.REPORT_ACCESS_DENIED);
+    }
+
+    @Test
+    void generateBusinessReportBlocksDuplicateActiveJob() {
+        User manager = user(1L, Role.MANUFACTURING_MANAGER);
+        Report sourceReport = report(10L, ReportType.MONTHLY);
+        ObjectNode requestPayload = new ObjectMapper().createObjectNode();
+        requestPayload.put("jobType", "BUSINESS_REPORT_GENERATE");
+        requestPayload.put("sourceReportId", 10L);
+        ReportJob activeJob = ReportJob.builder()
+                .jobId(99L)
+                .requestedBy(1L)
+                .jobStatus(ReportJobStatus.RUNNING)
+                .requestPayload(requestPayload)
+                .retryCount(0)
+                .build();
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(manager));
+        when(reportRepository.findById(10L)).thenReturn(Optional.of(sourceReport));
+        when(reportJobRepository.findByJobStatusIn(any())).thenReturn(List.of(activeJob));
+
+        assertThatThrownBy(() -> reportService.generateBusinessReport(
+                new AuthUser(1L, "manager@smap.com", Role.MANUFACTURING_MANAGER),
+                businessReportGenerateRequest(10L)
+        ))
+                .isInstanceOf(CustomException.class)
+                .extracting(exception -> ((CustomException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.REPORT_JOB_ALREADY_RUNNING);
+
+        verify(reportJobRepository, never()).save(any());
     }
 
     @Test
@@ -240,5 +275,11 @@ class ReportServicePermissionTest {
                 .targetStartDate(LocalDate.of(2026, 6, 1))
                 .targetEndDate(LocalDate.of(2026, 6, 8))
                 .build();
+    }
+
+    private BusinessReportGenerateRequest businessReportGenerateRequest(Long reportId) {
+        BusinessReportGenerateRequest request = new BusinessReportGenerateRequest();
+        ReflectionTestUtils.setField(request, "reportId", reportId);
+        return request;
     }
 }

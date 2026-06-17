@@ -3,7 +3,9 @@ package s_map.server.domain.report.service;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.client.RestTemplate;
 import s_map.server.domain.report.dto.fastapi.FastApiBusinessReportGenerateRequest;
 import s_map.server.domain.report.dto.fastapi.FastApiBusinessReportGenerateResponse;
@@ -19,6 +21,7 @@ public class FastApiReportClient {
     private final RestTemplate restTemplate;
     private final String reportGenerateUrl;
     private final String businessReportGenerateUrl;
+    private final int reportReadTimeoutMillis;
 
     public FastApiReportClient(FastApiReportProperties properties) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
@@ -28,6 +31,7 @@ public class FastApiReportClient {
         this.restTemplate = new RestTemplate(factory);
         this.reportGenerateUrl = resolveUrl(properties.getBaseUrl(), properties.getReportGeneratePath());
         this.businessReportGenerateUrl = resolveUrl(properties.getBaseUrl(), properties.getBusinessReportGeneratePath());
+        this.reportReadTimeoutMillis = properties.getReportReadTimeoutMillis();
     }
 
     /**
@@ -74,7 +78,7 @@ public class FastApiReportClient {
                     "[FastApiReportClient] FastAPI 보고서 생성 요청 실패 reason=rest_client_exception",
                     exception
             );
-            throw new CustomException(ErrorCode.REPORT_FASTAPI_CALL_FAILED);
+            throw toReportFastApiException("보고서 생성", reportGenerateUrl, exception);
         }
     }
 
@@ -127,8 +131,67 @@ public class FastApiReportClient {
                     "[FastApiReportClient] FastAPI 비즈니스 보고서 생성 요청 실패 reason=rest_client_exception",
                     exception
             );
-            throw new CustomException(ErrorCode.REPORT_FASTAPI_CALL_FAILED);
+            throw toReportFastApiException("비즈니스 보고서 생성", businessReportGenerateUrl, exception);
         }
+    }
+
+    private CustomException toReportFastApiException(
+            String actionName,
+            String url,
+            RestClientException exception
+    ) {
+        if (exception instanceof ResourceAccessException && isTimeoutException(exception)) {
+            return new CustomException(
+                    ErrorCode.REPORT_FASTAPI_TIMEOUT,
+                    actionName + " 서버 응답 시간이 초과되었습니다. timeoutMillis="
+                            + reportReadTimeoutMillis
+                            + " url="
+                            + url,
+                    exception
+            );
+        }
+
+        if (exception instanceof RestClientResponseException responseException) {
+            return new CustomException(
+                    ErrorCode.REPORT_FASTAPI_CALL_FAILED,
+                    actionName
+                            + " 서버 호출에 실패했습니다. status="
+                            + responseException.getStatusCode().value()
+                            + " body="
+                            + truncate(responseException.getResponseBodyAsString()),
+                    exception
+            );
+        }
+
+        return new CustomException(
+                ErrorCode.REPORT_FASTAPI_CALL_FAILED,
+                actionName + " 서버 호출에 실패했습니다. reason=" + truncate(exception.getMessage()),
+                exception
+        );
+    }
+
+    private boolean isTimeoutException(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            String message = current.getMessage();
+            if (current instanceof java.net.SocketTimeoutException
+                    || (message != null && message.toLowerCase(java.util.Locale.ROOT).contains("timed out"))) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    private String truncate(String value) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+
+        String normalizedValue = value.replaceAll("\\s+", " ").trim();
+        return normalizedValue.length() <= 500
+                ? normalizedValue
+                : normalizedValue.substring(0, 500);
     }
 
     private String resolveUrl(String baseUrl, String path) {

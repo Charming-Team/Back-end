@@ -64,8 +64,8 @@ public class RiskFastApiProperties {
 
     public static class Risk {
 
-        private String delayProbabilityPredictPath = "/api/v1/delay-probability/predict";
-        private String delayPredictionPredictPath = "/api/v1/delay-prediction/predict";
+        private String delayProbabilityPredictPath = "/ai/api/v1/delay-probability/predict";
+        private String delayPredictionPredictPath = "/ai/api/v1/delay-prediction/predict";
 
         private int connectTimeoutMs = 3000;
 
