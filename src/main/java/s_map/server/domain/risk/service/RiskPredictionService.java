@@ -83,6 +83,28 @@ public class RiskPredictionService {
         );
     }
 
+    @Transactional
+    public boolean predictAndUpdateDelayDays(
+            Long predictionId,
+            Long orderId
+    ) {
+        Objects.requireNonNull(predictionId, "predictionId must not be null");
+        validateOrderId(orderId);
+
+        BigDecimal predictedDelayDays = predictDelayDaysOrNull(orderId);
+
+        if (predictedDelayDays == null) {
+            return false;
+        }
+
+        int updatedCount = aiPredictionResultJdbcRepository.updatePredictedDelayDays(
+                predictionId,
+                predictedDelayDays
+        );
+
+        return updatedCount == 1;
+    }
+
     private BigDecimal predictDelayDaysOrNull(Long orderId) {
         try {
             FastApiDelayPredictionResponse delayPredictionResponse =

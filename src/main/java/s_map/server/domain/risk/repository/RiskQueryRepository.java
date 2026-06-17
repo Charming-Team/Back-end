@@ -50,12 +50,10 @@ public class RiskQueryRepository {
     private static final String PROGRESS_AGG_CTE = """
             progress_agg AS (
                 SELECT
-                    pp.order_id,
-                    COALESCE(SUM(pr.actual_quantity), 0)::bigint AS completed_quantity
-                FROM production_plans pp
-                LEFT JOIN production_results pr
-                  ON pr.plan_id = pp.plan_id
-                GROUP BY pp.order_id
+                    pr.order_id,
+                    COALESCE(SUM(COALESCE(pr.actual_quantity, 0)), 0)::bigint AS completed_quantity
+                FROM production_results pr
+                GROUP BY pr.order_id
             )
             """;
 
@@ -91,18 +89,23 @@ public class RiskQueryRepository {
             """;
 
     private static final String BASE_FROM_CLAUSE = """
-            FROM latest_prediction lp
-            JOIN customer_orders co
-              ON co.order_id = lp.order_id
+            FROM customer_orders co
             JOIN products p
-              ON p.product_id = co.product_id
+                ON p.product_id = co.product_id
+            LEFT JOIN latest_prediction lp
+                ON lp.order_id = co.order_id
             LEFT JOIN progress_agg pa
-              ON pa.order_id = co.order_id
+                ON pa.order_id = co.order_id
             LEFT JOIN primary_plan pp
-              ON pp.order_id = co.order_id
+                ON pp.order_id = co.order_id
             LEFT JOIN production_lines pl
-              ON pl.line_id = COALESCE(lp.line_id, pp.line_id)
+                    ON pl.line_id = COALESCE(lp.line_id, pp.line_id)
             WHERE COALESCE(UPPER(co.order_status::text), '') NOT IN ('COMPLETE', 'COMPLETED', 'CANCELLED')
+            AND EXISTS (
+                    SELECT 1
+                    FROM delay_prediction_evidence.vw_delay_probability_inference_orders v
+                    WHERE v.order_id = co.order_id
+            )
             """;
 
     private static final String FIND_SUMMARY_SQL = """
@@ -151,18 +154,32 @@ public class RiskQueryRepository {
                 p.product_name,
                 NULL::text AS product_group,
                 co.order_quantity::int AS quantity,
-                LEAST(COALESCE(pa.completed_quantity, 0), co.order_quantity)::int AS completed_quantity,
+                COALESCE(pa.completed_quantity, 0)::int AS completed_quantity,
                 GREATEST(co.order_quantity - COALESCE(pa.completed_quantity, 0), 0)::int AS remaining_quantity,
                 co.due_date,
                 CASE
                     WHEN co.order_quantity > 0
-                    THEN ROUND((LEAST(COALESCE(pa.completed_quantity, 0), co.order_quantity)::numeric / co.order_quantity::numeric) * 100, 1)
+                    THEN ROUND(COALESCE(pa.completed_quantity, 0)::numeric / co.order_quantity::numeric, 4)
                     ELSE 0
                 END AS progress_rate,
+                CASE
+                    WHEN co.order_quantity > 0
+                    THEN ROUND(
+                        ROUND(COALESCE(pa.completed_quantity, 0)::numeric / co.order_quantity::numeric, 4) * 100,
+                        0
+                    )::int
+                    ELSE 0
+                END AS progress_rate_percent,
                 pl.line_name,
-                lp.risk_level::text AS risk_level,
+                CASE
+                    WHEN lp.delay_probability IS NULL THEN NULL
+                    ELSE lp.risk_level::text
+                END AS risk_level,
                 lp.delay_probability,
-                ROUND(lp.delay_probability * 100, 2) AS delay_probability_percent,
+                CASE
+                    WHEN lp.delay_probability IS NULL THEN NULL
+                    ELSE ROUND(lp.delay_probability * 100, 2)
+                END AS delay_probability_percent,
                 lp.predicted_at
             """ + BASE_FROM_CLAUSE + """
               AND (:riskLevel IS NULL OR lp.risk_level::text = :riskLevel)
@@ -211,18 +228,32 @@ public class RiskQueryRepository {
                 p.product_name,
                 NULL::text AS product_group,
                 co.order_quantity::int AS quantity,
-                LEAST(COALESCE(pa.completed_quantity, 0), co.order_quantity)::int AS completed_quantity,
+                COALESCE(pa.completed_quantity, 0)::int AS completed_quantity,
                 GREATEST(co.order_quantity - COALESCE(pa.completed_quantity, 0), 0)::int AS remaining_quantity,
                 co.due_date,
                 CASE
                     WHEN co.order_quantity > 0
-                    THEN ROUND((LEAST(COALESCE(pa.completed_quantity, 0), co.order_quantity)::numeric / co.order_quantity::numeric) * 100, 1)
+                    THEN ROUND(COALESCE(pa.completed_quantity, 0)::numeric / co.order_quantity::numeric, 4)
                     ELSE 0
                 END AS progress_rate,
+                CASE
+                    WHEN co.order_quantity > 0
+                    THEN ROUND(
+                        ROUND(COALESCE(pa.completed_quantity, 0)::numeric / co.order_quantity::numeric, 4) * 100,
+                        0
+                    )::int
+                    ELSE 0
+                END AS progress_rate_percent,
                 pl.line_name,
-                lp.risk_level::text AS risk_level,
+                CASE
+                    WHEN lp.delay_probability IS NULL THEN NULL
+                    ELSE lp.risk_level::text
+                END AS risk_level,
                 lp.delay_probability,
-                ROUND(lp.delay_probability * 100, 2) AS delay_probability_percent,
+                CASE
+                    WHEN lp.delay_probability IS NULL THEN NULL
+                    ELSE ROUND(lp.delay_probability * 100, 2)
+                END AS delay_probability_percent,
                 lp.predicted_at,
                 lp.predicted_delay_days AS expected_delay_days,
                 lp.analysis_summary,
@@ -363,7 +394,7 @@ public class RiskQueryRepository {
 
     private static RiskLevel riskLevelOf(String value) {
         if (value == null || value.isBlank()) {
-            return RiskLevel.SAFE;
+            return null;
         }
 
         return RiskLevel.valueOf(value);
@@ -406,6 +437,7 @@ public class RiskQueryRepository {
                     rs.getInt("remaining_quantity"),
                     getLocalDate(rs, "due_date"),
                     rs.getBigDecimal("progress_rate"),
+                    rs.getObject("progress_rate_percent", Integer.class),
                     rs.getString("line_name"),
                     riskLevelOf(rs.getString("risk_level")),
                     rs.getBigDecimal("delay_probability"),
@@ -429,6 +461,7 @@ public class RiskQueryRepository {
                     rs.getInt("remaining_quantity"),
                     getLocalDate(rs, "due_date"),
                     rs.getBigDecimal("progress_rate"),
+                    rs.getObject("progress_rate_percent", Integer.class),
                     rs.getString("line_name"),
                     riskLevelOf(rs.getString("risk_level")),
                     rs.getBigDecimal("delay_probability"),
@@ -465,6 +498,7 @@ public class RiskQueryRepository {
             Integer remainingQuantity,
             LocalDate dueDate,
             BigDecimal progressRate,
+            Integer progressRatePercent,
             String lineName,
             RiskLevel riskLevel,
             BigDecimal delayProbability,
@@ -484,6 +518,7 @@ public class RiskQueryRepository {
             Integer remainingQuantity,
             LocalDate dueDate,
             BigDecimal progressRate,
+            Integer progressRatePercent,
             String lineName,
             RiskLevel riskLevel,
             BigDecimal delayProbability,

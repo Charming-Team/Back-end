@@ -160,10 +160,11 @@ public class RiskQueryService {
                 defaultInteger(row.remainingQuantity()),
                 row.dueDate(),
                 defaultBigDecimal(row.progressRate()),
+                defaultInteger(row.progressRatePercent()),
                 row.lineName(),
                 row.riskLevel(),
-                defaultBigDecimal(row.delayProbability()),
-                defaultBigDecimal(row.delayProbabilityPercent()),
+                row.delayProbability(),
+                row.delayProbabilityPercent(),
                 row.predictedAt()
         );
     }
@@ -174,17 +175,25 @@ public class RiskQueryService {
         RiskLevel riskLevel = row.riskLevel();
         String riskLevelLabel = toRiskLevelLabel(riskLevel);
 
-        BigDecimal progressRate = defaultBigDecimal(row.progressRate());
+        Integer progressRatePercent = defaultInteger(row.progressRatePercent());
         Integer quantity = defaultInteger(row.quantity());
         Integer completedQuantity = defaultInteger(row.completedQuantity());
         Integer remainingQuantity = defaultInteger(row.remainingQuantity());
 
         String progressMessage = buildProgressMessage(
-                progressRate,
+                progressRatePercent,
                 quantity,
                 completedQuantity,
                 remainingQuantity
         );
+
+        if (riskLevel == null) {
+            return buildPredictionPendingDetailResponse(
+                    row,
+                    riskLevelLabel,
+                    progressMessage
+            );
+        }
 
         if (riskLevel == RiskLevel.SAFE) {
             return buildSafeDetailResponse(
@@ -198,6 +207,46 @@ public class RiskQueryService {
                 row,
                 riskLevelLabel,
                 progressMessage
+        );
+    }
+
+    private RiskOrderDetailResponse buildPredictionPendingDetailResponse(
+            RiskQueryRepository.RiskOrderDetailRow row,
+            String riskLevelLabel,
+            String progressMessage
+    ) {
+        String title = row.orderNo() + " 주문건은 예측 결과 생성 중입니다.";
+        String summary = row.orderNo()
+                + " 주문건은 아직 지연 확률 예측 결과가 생성되지 않았습니다. 잠시 후 다시 확인해주세요.";
+
+        return new RiskOrderDetailResponse(
+                row.orderId(),
+                row.orderNo(),
+                row.customerName(),
+                row.productName(),
+                row.productGroup(),
+                defaultInteger(row.quantity()),
+                defaultInteger(row.completedQuantity()),
+                defaultInteger(row.remainingQuantity()),
+                row.dueDate(),
+                defaultBigDecimal(row.progressRate()),
+                defaultInteger(row.progressRatePercent()),
+                row.lineName(),
+
+                null,
+                riskLevelLabel,
+                null,
+                null,
+                row.predictedAt(),
+
+                row.expectedDelayDays(),
+                title,
+                List.of(),
+                summary,
+                progressMessage,
+                null,
+                List.of(),
+                false
         );
     }
 
@@ -221,12 +270,13 @@ public class RiskQueryService {
                 defaultInteger(row.remainingQuantity()),
                 row.dueDate(),
                 defaultBigDecimal(row.progressRate()),
+                defaultInteger(row.progressRatePercent()),
                 row.lineName(),
 
                 row.riskLevel(),
                 riskLevelLabel,
-                defaultBigDecimal(row.delayProbability()),
-                defaultBigDecimal(row.delayProbabilityPercent()),
+                row.delayProbability(),
+                row.delayProbabilityPercent(),
                 row.predictedAt(),
 
                 row.expectedDelayDays(),
@@ -253,9 +303,8 @@ public class RiskQueryService {
                 || hasText(row.recommendedAction())
                 || !agentCauseTypes.isEmpty();
 
-        List<RiskCauseResponse> causes = hasAgentAnalysis
-                ? buildAgentCauseResponses(agentCauseTypes)
-                : extractCausesFromCauseDetail(row.causeDetailJson());
+        List<RiskCauseResponse> causes = extractCausesFromCauseDetail(
+            row.causeDetailJson());
 
         List<String> causeTypes = hasAgentAnalysis
                 ? agentCauseTypes
@@ -282,12 +331,13 @@ public class RiskQueryService {
                 defaultInteger(row.remainingQuantity()),
                 row.dueDate(),
                 defaultBigDecimal(row.progressRate()),
+                defaultInteger(row.progressRatePercent()),
                 row.lineName(),
 
                 row.riskLevel(),
                 riskLevelLabel,
-                defaultBigDecimal(row.delayProbability()),
-                defaultBigDecimal(row.delayProbabilityPercent()),
+                row.delayProbability(),
+                row.delayProbabilityPercent(),
                 row.predictedAt(),
 
                 row.expectedDelayDays(),
@@ -308,19 +358,19 @@ public class RiskQueryService {
                 + " 주문건은 "
                 + toRiskLevelLabel(row.riskLevel())
                 + " 단계입니다. 현재 지연 확률은 "
-                + formatPercent(defaultBigDecimal(row.delayProbabilityPercent()))
-                + "%입니다. 상세 원인 분석은 아직 생성되지 않았습니다.";
+                + formatPercent(row.delayProbabilityPercent())
+                + "입니다. 상세 원인 분석은 아직 생성되지 않았습니다.";
     }
 
     private String buildProgressMessage(
-            BigDecimal progressRate,
+            Integer progressRatePercent,
             Integer quantity,
             Integer completedQuantity,
             Integer remainingQuantity
     ) {
         return "생산 진행률은 "
-                + formatPercent(progressRate)
-                + "%이며, 총 "
+                + formatPercent(BigDecimal.valueOf(progressRatePercent))
+                + "이며, 총 "
                 + quantity
                 + "개 중 "
                 + completedQuantity
@@ -480,7 +530,7 @@ public class RiskQueryService {
 
     private String toRiskLevelLabel(RiskLevel riskLevel) {
         if (riskLevel == null) {
-            return "알 수 없음";
+            return "예측 전";
         }
 
         return switch (riskLevel) {
@@ -576,17 +626,20 @@ public class RiskQueryService {
         return String.valueOf(value);
     }
 
-    private static String formatPercent(BigDecimal value) {
-        return defaultBigDecimal(value)
-                .setScale(1, RoundingMode.HALF_UP)
-                .stripTrailingZeros()
-                .toPlainString();
-    }
-
     private static String formatDecimal(BigDecimal value) {
         return defaultBigDecimal(value)
                 .setScale(4, RoundingMode.HALF_UP)
                 .stripTrailingZeros()
                 .toPlainString();
     }
+
+    private String formatPercent(BigDecimal value) {
+    if (value == null) {
+        return "예측 전";
+    }
+
+    return value.setScale(1, RoundingMode.HALF_UP)
+            .stripTrailingZeros()
+            .toPlainString() + "%";
+}
 }

@@ -55,7 +55,12 @@ public class AiPredictionResultJdbcRepository {
             )
             RETURNING prediction_id
             """;
-
+    
+    private static final String UPDATE_PREDICTED_DELAY_DAYS_SQL = """
+        UPDATE ai_prediction_results
+        SET predicted_delay_days = :predictedDelayDays
+        WHERE prediction_id = :predictionId
+        """;
     private final NamedParameterJdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
 
@@ -125,6 +130,20 @@ public class AiPredictionResultJdbcRepository {
         }
     }
 
+    public int updatePredictedDelayDays(
+            Long predictionId,
+            BigDecimal predictedDelayDays
+    ) {
+        MapSqlParameterSource params = new MapSqlParameterSource()
+                .addValue("predictionId", predictionId, Types.BIGINT)
+                .addValue("predictedDelayDays", predictedDelayDays, Types.NUMERIC);
+
+        return jdbcTemplate.update(
+                UPDATE_PREDICTED_DELAY_DAYS_SQL,
+                params
+        );
+    }
+    
     public static class AiPredictionResultSaveException extends RuntimeException {
 
         public AiPredictionResultSaveException(String message) {

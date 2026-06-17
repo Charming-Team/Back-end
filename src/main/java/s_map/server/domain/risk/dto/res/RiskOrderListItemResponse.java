@@ -18,6 +18,7 @@ public record RiskOrderListItemResponse(
         Integer remainingQuantity,
         LocalDate dueDate,
         BigDecimal progressRate,
+        Integer progressRatePercent,
         String lineName,
         RiskLevel riskLevel,
         BigDecimal delayProbability,
