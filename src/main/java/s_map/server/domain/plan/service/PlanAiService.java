@@ -12,6 +12,7 @@ import s_map.server.domain.plan.dto.fastapi.FastApiPlanningGenerateRequest;
 import s_map.server.domain.plan.dto.fastapi.FastApiPlanningGenerateResponse;
 import s_map.server.domain.plan.dto.req.PlanAiGenerateRequest;
 import s_map.server.domain.plan.dto.req.PlanAiMonthlyGenerateRequest;
+import s_map.server.domain.plan.dto.res.PlanAiGenerateResponse;
 import s_map.server.global.error.CustomException;
 import s_map.server.global.error.ErrorCode;
 
@@ -65,20 +66,21 @@ public class PlanAiService {
      * - 응답 결과는 DB에 저장하지 않고 그대로 반환한다.
      *
      * [Output]
-     * - FastApiPlanningGenerateResponse
+     * - PlanAiGenerateResponse
      */
-    public FastApiPlanningGenerateResponse generatePlanning(
+    public PlanAiGenerateResponse generatePlanning(
             PlanAiGenerateRequest request,
             String authorizationHeader,
             String refreshToken
     ) {
         FastApiPlanningGenerateRequest fastApiRequest = buildFastApiPlanningRequest(request);
 
-        return planningFastApiClient.generatePlanning(
+        FastApiPlanningGenerateResponse fastApiResponse = planningFastApiClient.generatePlanning(
                 fastApiRequest,
                 authorizationHeader,
                 refreshToken
         );
+        return PlanAiGenerateResponse.from(fastApiResponse);
     }
 
     /**
@@ -97,9 +99,9 @@ public class PlanAiService {
      * - 응답 결과는 DB에 저장하지 않고 그대로 반환한다.
      *
      * [Output]
-     * - FastApiPlanningGenerateResponse
+     * - PlanAiGenerateResponse
      */
-    public FastApiPlanningGenerateResponse generateMonthlyPlanning(
+    public PlanAiGenerateResponse generateMonthlyPlanning(
             PlanAiMonthlyGenerateRequest request,
             String authorizationHeader,
             String refreshToken
@@ -113,11 +115,12 @@ public class PlanAiService {
                 List.of()
         );
 
-        return planningFastApiClient.generatePlanning(
+        FastApiPlanningGenerateResponse fastApiResponse = planningFastApiClient.generatePlanning(
                 fastApiRequest,
                 authorizationHeader,
                 refreshToken
         );
+        return PlanAiGenerateResponse.from(fastApiResponse);
     }
 
     private FastApiPlanningGenerateRequest buildFastApiPlanningRequest(PlanAiGenerateRequest request) {
