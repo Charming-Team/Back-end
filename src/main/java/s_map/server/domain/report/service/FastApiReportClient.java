@@ -16,8 +16,6 @@ import s_map.server.global.error.ErrorCode;
 @Component
 public class FastApiReportClient {
 
-    private static final String BUSINESS_REPORT_GENERATE_PATH = "/ai/api/v1/business-reports/generate";
-
     private final RestTemplate restTemplate;
     private final String reportGenerateUrl;
     private final String businessReportGenerateUrl;
@@ -29,7 +27,7 @@ public class FastApiReportClient {
 
         this.restTemplate = new RestTemplate(factory);
         this.reportGenerateUrl = resolveUrl(properties.getBaseUrl(), properties.getReportGeneratePath());
-        this.businessReportGenerateUrl = resolveUrl(properties.getBaseUrl(), BUSINESS_REPORT_GENERATE_PATH);
+        this.businessReportGenerateUrl = resolveUrl(properties.getBaseUrl(), properties.getBusinessReportGeneratePath());
     }
 
     /**
