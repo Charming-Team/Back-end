@@ -40,18 +40,72 @@ public class RiskPredictionCoverageService {
             throw new IllegalArgumentException("limit must be positive.");
         }
 
-        List<Long> targetOrderIds =
+        List<Long> missingPredictionOrderIds =
                 coverageRepository.findIncompleteOrderIdsMissingPrediction(limit);
 
-        log.info(
-                "Risk prediction missing backfill target loaded. targetCount={}, limit={}",
-                targetOrderIds.size(),
-                limit
+        RiskPredictionCoverageResult missingPredictionResult =
+                predictAndSaveForOrderIds(
+                        missingPredictionOrderIds,
+                        "missing-prediction-backfill"
+                );
+
+        int remainingLimit = Math.max(limit - missingPredictionOrderIds.size(), 0);
+
+        if (remainingLimit == 0) {
+            return missingPredictionResult;
+        }
+
+        List<RiskPredictionCoverageRepository.PredictionMissingDelayDaysRow> missingDelayDayRows =
+                coverageRepository.findLatestPredictionsMissingDelayDays(remainingLimit);
+
+        int delayDaySucceededCount = 0;
+        List<RiskPredictionBackfillFailure> failures = new ArrayList<>(
+                missingPredictionResult.failures()
+        );
+        List<Long> succeededOrderIds = new ArrayList<>(
+                missingPredictionResult.succeededOrderIds()
         );
 
-        return predictAndSaveForOrderIds(
-                targetOrderIds,
-                "missing-backfill"
+        for (RiskPredictionCoverageRepository.PredictionMissingDelayDaysRow row : missingDelayDayRows) {
+            try {
+                boolean updated = riskPredictionService.predictAndUpdateDelayDays(
+                        row.predictionId(),
+                        row.orderId()
+                );
+
+                if (updated) {
+                    delayDaySucceededCount++;
+                    succeededOrderIds.add(row.orderId());
+                }
+
+            } catch (Exception ex) {
+                failures.add(
+                        new RiskPredictionBackfillFailure(
+                                row.orderId(),
+                                ex.getClass().getSimpleName(),
+                                ex.getMessage()
+                        )
+                );
+
+                log.warn(
+                        "Risk prediction delay-days backfill failed. predictionId={}, orderId={}",
+                        row.predictionId(),
+                        row.orderId(),
+                        ex
+                );
+            }
+        }
+
+        int targetCount = missingPredictionOrderIds.size() + missingDelayDayRows.size();
+        int succeededCount = missingPredictionResult.succeededCount() + delayDaySucceededCount;
+        int failedCount = failures.size();
+
+        return new RiskPredictionCoverageResult(
+                targetCount,
+                succeededCount,
+                failedCount,
+                List.copyOf(succeededOrderIds),
+                List.copyOf(failures)
         );
     }
 
