@@ -23,19 +23,28 @@ public class RiskPredictionCoverageRepository {
      * - 현재 프로젝트에서 COMPLETE라고 표현한 경우와 COMPLETED라고 표현한 경우가 섞여 있어 둘 다 제외합니다.
      */
     private static final String FIND_INCOMPLETE_ORDER_IDS_MISSING_PREDICTION_SQL = """
+            WITH latest_prediction AS (
+                SELECT DISTINCT ON (apr.order_id)
+                    apr.prediction_id,
+                    apr.order_id,
+                    apr.delay_probability
+                FROM ai_prediction_results apr
+                ORDER BY apr.order_id, apr.prediction_id DESC
+            )
             SELECT co.order_id
             FROM customer_orders co
+            LEFT JOIN latest_prediction lp
+            ON lp.order_id = co.order_id
             WHERE COALESCE(UPPER(co.order_status::text), '') NOT IN ('COMPLETE', 'COMPLETED', 'CANCELLED')
-              AND EXISTS (
+            AND EXISTS (
                     SELECT 1
                     FROM delay_prediction_evidence.vw_delay_probability_inference_orders v
                     WHERE v.order_id = co.order_id
-              )
-              AND NOT EXISTS (
-                    SELECT 1
-                    FROM ai_prediction_results apr
-                    WHERE apr.order_id = co.order_id
-              )
+            )
+            AND (
+                    lp.prediction_id IS NULL
+                    OR lp.delay_probability IS NULL
+            )
             ORDER BY co.order_id
             LIMIT :limit
             """;
@@ -50,6 +59,34 @@ public class RiskPredictionCoverageRepository {
                 WHERE v.order_id = co.order_id
           )
         ORDER BY co.order_id
+        LIMIT :limit
+        """;
+
+    private static final String FIND_LATEST_PREDICTIONS_MISSING_DELAY_DAYS_SQL = """
+        WITH latest_prediction AS (
+            SELECT DISTINCT ON (apr.order_id)
+                apr.prediction_id,
+                apr.order_id,
+                apr.delay_probability,
+                apr.predicted_delay_days
+            FROM ai_prediction_results apr
+            ORDER BY apr.order_id, apr.prediction_id DESC
+        )
+        SELECT
+            lp.prediction_id,
+            lp.order_id
+        FROM latest_prediction lp
+        JOIN customer_orders co
+          ON co.order_id = lp.order_id
+        WHERE COALESCE(UPPER(co.order_status::text), '') NOT IN ('COMPLETE', 'COMPLETED', 'CANCELLED')
+          AND EXISTS (
+                SELECT 1
+                FROM delay_prediction_evidence.vw_delay_prediction_inference_orders v
+                WHERE v.order_id = co.order_id
+          )
+          AND lp.delay_probability IS NOT NULL
+          AND lp.predicted_delay_days IS NULL
+        ORDER BY lp.order_id
         LIMIT :limit
         """;
     
@@ -68,6 +105,12 @@ public class RiskPredictionCoverageRepository {
         this.jdbcTemplate = jdbcTemplate;
     }
 
+    public record PredictionMissingDelayDaysRow(
+            Long predictionId,
+            Long orderId
+    ) {
+    }
+
     public List<Long> findIncompleteOrderIdsMissingPrediction(int limit) {
         if (limit <= 0) {
             throw new IllegalArgumentException("limit must be positive.");
@@ -80,6 +123,24 @@ public class RiskPredictionCoverageRepository {
                 FIND_INCOMPLETE_ORDER_IDS_MISSING_PREDICTION_SQL,
                 params,
                 Long.class
+        );
+    }
+
+    public List<PredictionMissingDelayDaysRow> findLatestPredictionsMissingDelayDays(int limit) {
+        if (limit <= 0) {
+            throw new IllegalArgumentException("limit must be positive.");
+        }
+
+        MapSqlParameterSource params = new MapSqlParameterSource()
+                .addValue("limit", limit, Types.INTEGER);
+
+        return jdbcTemplate.query(
+                FIND_LATEST_PREDICTIONS_MISSING_DELAY_DAYS_SQL,
+                params,
+                (rs, rowNum) -> new PredictionMissingDelayDaysRow(
+                        rs.getLong("prediction_id"),
+                        rs.getLong("order_id")
+                )
         );
     }
 
