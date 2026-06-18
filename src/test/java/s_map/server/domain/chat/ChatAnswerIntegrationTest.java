@@ -268,7 +268,7 @@ class ChatAnswerIntegrationTest {
     private static HttpServer startFastApiServer() {
         try {
             HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-            server.createContext("/ai/api/v1/chat/answer", exchange -> {
+            server.createContext("/api/v1/chat/answer", exchange -> {
                 String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
                 capturedRequests.add(new CapturedRequest(
                         exchange.getRequestMethod(),

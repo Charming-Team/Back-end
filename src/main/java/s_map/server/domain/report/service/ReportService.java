@@ -26,6 +26,7 @@ import s_map.server.domain.report.dto.res.ReportPdfDownloadResponse;
 import s_map.server.domain.report.dto.res.ReportStructuredData;
 import s_map.server.domain.report.entity.Report;
 import s_map.server.domain.report.entity.ReportJob;
+import s_map.server.domain.report.entity.ReportJobStatus;
 import s_map.server.domain.report.entity.ReportType;
 import s_map.server.domain.report.repository.ReportJobRepository;
 import s_map.server.domain.report.repository.ReportRepository;
@@ -54,6 +55,10 @@ public class ReportService {
     private static final List<ReportType> NORMAL_REPORT_TYPES = List.of(
             ReportType.ON_DEMAND,
             ReportType.MONTHLY
+    );
+    private static final List<ReportJobStatus> ACTIVE_REPORT_JOB_STATUSES = List.of(
+            ReportJobStatus.PENDING,
+            ReportJobStatus.RUNNING
     );
 
     private final ReportRepository reportRepository;
@@ -124,6 +129,7 @@ public class ReportService {
         Report sourceReport = reportRepository.findById(request.getReportId())
                 .orElseThrow(() -> new CustomException(ErrorCode.REPORT_NOT_FOUND));
         validateBusinessReportSource(sourceReport);
+        validateNoActiveBusinessReportJob(sourceReport.getReportId());
 
         ObjectNode requestPayload = objectMapper.createObjectNode();
         requestPayload.put("jobType", "BUSINESS_REPORT_GENERATE");
@@ -444,6 +450,36 @@ public class ReportService {
                     "이미 경영진용 보고서입니다. 원본 수시/월간 보고서에서만 비즈니스 보고서를 생성할 수 있습니다."
             );
         }
+    }
+
+    private void validateNoActiveBusinessReportJob(Long sourceReportId) {
+        reportJobRepository.findByJobStatusIn(ACTIVE_REPORT_JOB_STATUSES)
+                .stream()
+                .filter(reportJob -> isBusinessReportJobForSource(reportJob, sourceReportId))
+                .findFirst()
+                .ifPresent(reportJob -> {
+                    throw new CustomException(
+                            ErrorCode.REPORT_JOB_ALREADY_RUNNING,
+                            "이미 비즈니스 보고서 생성 작업이 진행 중입니다. reportJobId="
+                                    + reportJob.getJobId()
+                    );
+                });
+    }
+
+    private boolean isBusinessReportJobForSource(ReportJob reportJob, Long sourceReportId) {
+        JsonNode requestPayload = reportJob.getRequestPayload();
+        if (requestPayload == null || requestPayload.isNull()) {
+            return false;
+        }
+
+        String jobType = requestPayload.path("jobType").asText("");
+        if (!"BUSINESS_REPORT_GENERATE".equals(jobType)) {
+            return false;
+        }
+
+        JsonNode sourceReportIdNode = requestPayload.path("sourceReportId");
+        return sourceReportIdNode.canConvertToLong()
+                && sourceReportId.equals(sourceReportIdNode.asLong());
     }
 
     private void validateUpdateRequest(ReportUpdateRequest request) {

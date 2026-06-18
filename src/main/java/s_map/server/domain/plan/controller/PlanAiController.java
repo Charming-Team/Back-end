@@ -15,8 +15,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import s_map.server.domain.plan.dto.req.PlanAiGenerateRequest;
 import s_map.server.domain.plan.dto.req.PlanAiMonthlyGenerateRequest;
-import s_map.server.domain.plan.dto.fastapi.FastApiPlanningGenerateResponse;
 import s_map.server.domain.plan.service.PlanAiService;
+import s_map.server.domain.plan.dto.res.PlanAiGenerateResponse;
 import s_map.server.global.common.BaseResponse;
 
 @Tag(name = "Plan AI", description = "생산계획 AI 연동 API")
@@ -48,7 +48,7 @@ public class PlanAiController {
             @ApiResponse(responseCode = "504", description = "FastAPI 응답 시간 초과")
     })
     @PostMapping("/generate")
-    public BaseResponse<FastApiPlanningGenerateResponse> generatePlanning(
+    public BaseResponse<PlanAiGenerateResponse> generatePlanning(
             @RequestHeader(HttpHeaders.AUTHORIZATION) String authorizationHeader,
             @CookieValue(value = "refreshToken", required = false) String refreshToken,
             @Valid @RequestBody PlanAiGenerateRequest request
@@ -82,7 +82,7 @@ public class PlanAiController {
             @ApiResponse(responseCode = "504", description = "FastAPI 응답 시간 초과")
     })
     @PostMapping("/monthly-analysis")
-    public BaseResponse<FastApiPlanningGenerateResponse> generateMonthlyPlanning(
+    public BaseResponse<PlanAiGenerateResponse> generateMonthlyPlanning(
             @RequestHeader(HttpHeaders.AUTHORIZATION) String authorizationHeader,
             @CookieValue(value = "refreshToken", required = false) String refreshToken,
             @Valid @RequestBody PlanAiMonthlyGenerateRequest request

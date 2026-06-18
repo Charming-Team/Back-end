@@ -11,8 +11,8 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "ai.fastapi")
 public class FastApiChatProperties {
 
-    private String baseUrl = "http://fastapi-service:8000";
-    private String chatAnswerPath = "/ai/api/v1/chat/answer";
+    private String baseUrl = "http://localhost:8000";
+    private String chatAnswerPath = "/api/v1/chat/answer";
     private String chatAnswerInternalToken = "";
     private long timeoutSeconds = 60;
 }

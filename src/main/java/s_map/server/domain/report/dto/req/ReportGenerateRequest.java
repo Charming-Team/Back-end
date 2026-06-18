@@ -1,6 +1,8 @@
 package s_map.server.domain.report.dto.req;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import s_map.server.domain.report.entity.ReportType;
 
@@ -15,9 +17,12 @@ public class ReportGenerateRequest {
     private String userRole;
 
     @Schema(description = "생성할 보고서 유형", example = "MONTHLY")
+    @NotNull(message = "reportType은 필수입니다.")
     private ReportType reportType;
 
     @Schema(description = "보고서 대상 기간")
+    @Valid
+    @NotNull(message = "period는 필수입니다.")
     private ReportPeriodRequest period;
 
     @Schema(description = "주요 요약 포함 여부", example = "true")

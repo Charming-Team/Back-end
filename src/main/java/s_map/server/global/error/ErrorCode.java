@@ -68,6 +68,7 @@ public enum ErrorCode {
     CONCURRENT_INVENTORY_UPDATE(HttpStatus.CONFLICT, "409-103", "재고 정보가 동시에 수정되었습니다. 다시 조회 후 시도해주세요."),
     USER_ALREADY_DELETED(HttpStatus.CONFLICT, "409-201", "이미 삭제된 사용자입니다."),
     CONCURRENT_ORDER_CREATION(HttpStatus.CONFLICT, "409-301", "주문 또는 생산계획이 동시에 생성되었습니다. 다시 조회 후 시도해주세요."),
+    REPORT_JOB_ALREADY_RUNNING(HttpStatus.CONFLICT, "409-401", "해당 보고서의 비즈니스 보고서 생성 작업이 이미 진행 중입니다."),
     PLAN_SCHEDULE_CONFLICT(HttpStatus.CONFLICT, "409-601", "해당 라인에 중복된 생산계획이 있습니다. AI 분석이 필요합니다."),
 
     // 500 Internal Server Error
@@ -94,7 +95,8 @@ public enum ErrorCode {
 
     // Report FastAPI Gateway
     REPORT_FASTAPI_CALL_FAILED(HttpStatus.BAD_GATEWAY, "REPORT_FASTAPI_001", "보고서 생성 서버 호출에 실패했습니다."),
-    REPORT_FASTAPI_INVALID_RESPONSE(HttpStatus.BAD_GATEWAY, "REPORT_FASTAPI_002", "보고서 생성 서버 응답을 처리할 수 없습니다.");
+    REPORT_FASTAPI_INVALID_RESPONSE(HttpStatus.BAD_GATEWAY, "REPORT_FASTAPI_002", "보고서 생성 서버 응답을 처리할 수 없습니다."),
+    REPORT_FASTAPI_TIMEOUT(HttpStatus.GATEWAY_TIMEOUT, "REPORT_FASTAPI_003", "보고서 생성 서버 응답 시간이 초과되었습니다.");
 
     private final HttpStatus httpStatus;
     private final String code;
