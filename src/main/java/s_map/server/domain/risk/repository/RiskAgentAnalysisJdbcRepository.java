@@ -19,6 +19,8 @@ public class RiskAgentAnalysisJdbcRepository {
                 analysis_summary = :analysisSummary,
                 recommended_action = :recommendedAction
             WHERE prediction_id = :predictionId
+            AND order_id = :orderId
+            AND risk_level::text <> 'SAFE'
             """;
 
     private static final String DELETE_CAUSES_SQL = """
@@ -46,6 +48,7 @@ public class RiskAgentAnalysisJdbcRepository {
     public void updateAnalysis(RiskAgentAnalysisSaveCommand command) {
         MapSqlParameterSource params = new MapSqlParameterSource()
                 .addValue("predictionId", command.predictionId(), Types.BIGINT)
+                .addValue("orderId", command.orderId(), Types.BIGINT)
                 .addValue("analysisSummary", command.analysisSummary(), Types.VARCHAR)
                 .addValue("recommendedAction", command.recommendedAction(), Types.VARCHAR);
 

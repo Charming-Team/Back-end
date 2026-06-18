@@ -7,6 +7,7 @@ import java.util.Objects;
 
 public record RiskAgentAnalysisSaveCommand(
         Long predictionId,
+        Long orderId,
         String analysisSummary,
         String recommendedAction,
         List<DelayCauseType> causeTypes
@@ -14,6 +15,11 @@ public record RiskAgentAnalysisSaveCommand(
 
     public RiskAgentAnalysisSaveCommand {
         Objects.requireNonNull(predictionId, "predictionId must not be null");
+        Objects.requireNonNull(orderId, "orderId must not be null");
+        
+        if (orderId <= 0) {
+            throw new IllegalArgumentException("orderId must be positive.");
+        }
 
         if (predictionId <= 0) {
             throw new IllegalArgumentException("predictionId must be positive.");

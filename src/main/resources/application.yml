@@ -66,6 +66,9 @@ ai:
       startup-backfill-enabled: ${AI_FASTAPI_RISK_STARTUP_BACKFILL_ENABLED:true}
       startup-backfill-limit: ${AI_FASTAPI_RISK_STARTUP_BACKFILL_LIMIT:1000}
       startup-backfill-mode: ${AI_FASTAPI_RISK_STARTUP_BACKFILL_MODE:MISSING_ONLY}
+      risk-agent-analysis-enabled: ${AI_FASTAPI_RISK_AGENT_ANALYSIS_ENABLED:false}
+      risk-agent-execute-path: ${AI_FASTAPI_RISK_AGENT_EXECUTE_PATH:/api/v1/risk-agent/execute}
+      risk-agent-read-timeout-ms: ${AI_FASTAPI_RISK_AGENT_READ_TIMEOUT_MS:300000}
 
 ---
 spring:

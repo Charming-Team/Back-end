@@ -25,13 +25,16 @@ public class RiskPredictionService {
 
     private final RiskFastApiClient riskFastApiClient;
     private final AiPredictionResultJdbcRepository aiPredictionResultJdbcRepository;
+    private final RiskAgentAnalysisEventPublisher riskAgentAnalysisEventPublisher;
 
     public RiskPredictionService(
             RiskFastApiClient riskFastApiClient,
-            AiPredictionResultJdbcRepository aiPredictionResultJdbcRepository
+            AiPredictionResultJdbcRepository aiPredictionResultJdbcRepository,
+            RiskAgentAnalysisEventPublisher riskAgentAnalysisEventPublisher
     ) {
         this.riskFastApiClient = riskFastApiClient;
         this.aiPredictionResultJdbcRepository = aiPredictionResultJdbcRepository;
+        this.riskAgentAnalysisEventPublisher = riskAgentAnalysisEventPublisher;
     }
 
     /**
@@ -77,10 +80,14 @@ public class RiskPredictionService {
 
         Long predictionId = aiPredictionResultJdbcRepository.save(saveCommand);
 
-        return AiPredictionResultSaveResult.from(
+        AiPredictionResultSaveResult saveResult = AiPredictionResultSaveResult.from(
                 predictionId,
                 saveCommand
         );
+
+        riskAgentAnalysisEventPublisher.publishIfRequired(saveResult);
+
+        return saveResult;
     }
 
     @Transactional
