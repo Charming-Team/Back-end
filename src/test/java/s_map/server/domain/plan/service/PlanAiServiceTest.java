@@ -20,6 +20,7 @@ import s_map.server.domain.plan.dto.req.PlanAiGenerateRequest;
 import s_map.server.domain.plan.dto.req.PlanAiMonthlyGenerateRequest;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -237,6 +238,35 @@ class PlanAiServiceTest {
         assertThat(fastApiRequest.getPlanningEnd()).isEqualTo("2026-07-01 00:00:00.000 +0900");
         assertThat(fastApiRequest.getEditOrders()).isEmpty();
         assertThat(fastApiRequest.getAddOrders()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("월간 AI 분석은 완료 또는 진행 중 계획의 마지막 종료 이후부터 재계획한다")
+    void generateMonthlyPlanningStartsAfterLatestImmutablePlan() {
+        PlanAiMonthlyGenerateRequest request = planAiMonthlyGenerateRequest();
+        Instant latestImmutablePlanEnd = Instant.parse("2026-06-22T01:38:00Z");
+        when(productionPlanRepository.findLatestImmutablePlanEnd(
+                request.getPlanningStart(),
+                request.getPlanningEnd(),
+                List.of("COMPLETED", "IN_PROGRESS")
+        )).thenReturn(Optional.of(latestImmutablePlanEnd));
+        when(planningFastApiClient.generatePlanning(
+                any(FastApiPlanningGenerateRequest.class),
+                eq("Bearer access-token"),
+                eq("refresh-token")
+        )).thenReturn(new FastApiPlanningGenerateResponse());
+
+        planAiService.generateMonthlyPlanning(request, "Bearer access-token", "refresh-token");
+
+        ArgumentCaptor<FastApiPlanningGenerateRequest> captor =
+                ArgumentCaptor.forClass(FastApiPlanningGenerateRequest.class);
+        verify(planningFastApiClient).generatePlanning(
+                captor.capture(),
+                eq("Bearer access-token"),
+                eq("refresh-token")
+        );
+        assertThat(captor.getValue().getPlanningStart())
+                .isEqualTo("2026-06-22 10:38:00.000 +0900");
     }
 
     private PlanAiGenerateRequest planAiGenerateRequest() {
