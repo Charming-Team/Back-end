@@ -3,7 +3,7 @@ package s_map.server.domain.chat.dto.res;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 @Schema(description = "챗봇 보안 검증 결과")
-public record SecurityResultResponse(
+public record ChatSecurityResultResponse(
         @Schema(
                 description = "보안 검증 상태. PASSED가 아니어도 FastAPI HTTP 200이면 Spring은 정상 챗봇 응답으로 내려줍니다.",
                 example = "PASSED",

@@ -132,7 +132,7 @@ public class PlanAiService {
         ProductionPlan targetPlan = productionPlanRepository.findById(request.getPlanId())
                 .orElseThrow(() -> new CustomException(ErrorCode.PRODUCTION_PLAN_NOT_FOUND));
 
-        validateEditablePlan(targetPlan);
+        validateReplanningCandidate(targetPlan);
 
         Long targetLineId = request.getLineId() == null ? targetPlan.getLineId() : request.getLineId();
         validateLineCapability(targetPlan, targetLineId);
@@ -219,10 +219,12 @@ public class PlanAiService {
         return effectivePlanningStart;
     }
 
-    private void validateEditablePlan(ProductionPlan plan) {
-        if (plan.getPlanStatus() == PlanStatus.COMPLETED
-                || plan.getPlanStatus() == PlanStatus.CANCELLED) {
-            throw new CustomException(ErrorCode.BAD_REQUEST);
+    private void validateReplanningCandidate(ProductionPlan plan) {
+        if (!isReplanningCandidate(plan)) {
+            throw new CustomException(
+                    ErrorCode.BAD_REQUEST,
+                    "진행 중, 완료, 취소 상태의 생산계획은 AI 조정 요청 대상이 아닙니다."
+            );
         }
     }
 

@@ -18,6 +18,8 @@ import s_map.server.domain.plan.dto.fastapi.FastApiPlanningGenerateRequest;
 import s_map.server.domain.plan.dto.fastapi.FastApiPlanningGenerateResponse;
 import s_map.server.domain.plan.dto.req.PlanAiGenerateRequest;
 import s_map.server.domain.plan.dto.req.PlanAiMonthlyGenerateRequest;
+import s_map.server.global.error.CustomException;
+import s_map.server.global.error.ErrorCode;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -28,8 +30,10 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -211,6 +215,34 @@ class PlanAiServiceTest {
         assertThat(addOrder.getContractAmount()).isEqualByComparingTo("0");
         assertThat(addOrder.getLatePenaltyAmount()).isEqualByComparingTo("120000");
         assertThat(addOrder.getOrderStatus()).isEqualTo("SCHEDULED");
+    }
+
+    @Test
+    @DisplayName("진행 중 생산계획은 FastAPI 조정 요청 대상에서 제외한다")
+    void generatePlanningRejectsInProgressTargetPlan() {
+        PlanAiGenerateRequest request = planAiGenerateRequest();
+        ProductionPlan targetPlan = productionPlan(
+                100L,
+                421L,
+                10L,
+                PlanStatus.IN_PROGRESS,
+                BigDecimal.valueOf(18),
+                18_700
+        );
+
+        when(productionPlanRepository.findById(100L)).thenReturn(Optional.of(targetPlan));
+
+        assertThatThrownBy(() -> planAiService.generatePlanning(
+                request,
+                "Bearer access-token",
+                "refresh-token"
+        ))
+                .isInstanceOf(CustomException.class)
+                .hasMessage("진행 중, 완료, 취소 상태의 생산계획은 AI 조정 요청 대상이 아닙니다.")
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.BAD_REQUEST);
+
+        verify(planningFastApiClient, never()).generatePlanning(any(), any(), any());
     }
 
     @Test

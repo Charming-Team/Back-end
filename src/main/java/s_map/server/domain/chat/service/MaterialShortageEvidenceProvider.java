@@ -12,8 +12,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import s_map.server.domain.chat.dto.req.EvidenceLookupFilters;
-import s_map.server.domain.chat.dto.req.EvidenceLookupRequest;
-import s_map.server.domain.chat.dto.res.EvidenceItemResponse;
+import s_map.server.domain.chat.dto.req.ChatEvidenceLookupRequest;
+import s_map.server.domain.chat.dto.res.ChatEvidenceItemResponse;
 import s_map.server.domain.material.dto.res.MaterialShortageResponse;
 import s_map.server.domain.material.entity.MaterialInventory;
 import s_map.server.domain.material.repository.MaterialInventoryRepository;
@@ -55,13 +55,13 @@ public class MaterialShortageEvidenceProvider implements EvidenceProvider {
      * 기능: 자재 부족 intent에 사용할 생산계획별 부족 자재 Evidence 목록을 만든다.
      *
      * Input:
-     * - request / EvidenceLookupRequest / 사용자 Role과 조회 필터를 포함한 Evidence 요청
+     * - request / ChatEvidenceLookupRequest / 사용자 Role과 조회 필터를 포함한 Evidence 요청
      *
      * Output:
-     * - result / List<EvidenceItemResponse> / 부족 자재 Evidence 목록
+     * - result / List<ChatEvidenceItemResponse> / 부족 자재 Evidence 목록
      */
     @Override
-    public List<EvidenceItemResponse> getEvidence(EvidenceLookupRequest request) {
+    public List<ChatEvidenceItemResponse> getEvidence(ChatEvidenceLookupRequest request) {
         EvidenceLookupFilters filters = request.filters();
         User user = userRepository.findById(request.user().userId())
                 .orElse(null);
@@ -201,13 +201,13 @@ public class MaterialShortageEvidenceProvider implements EvidenceProvider {
      * - shortage / MaterialShortageResponse / 생산계획별 부족 자재 응답
      *
      * Output:
-     * - result / EvidenceItemResponse / 챗봇 답변 생성에 사용할 근거 항목
+     * - result / ChatEvidenceItemResponse / 챗봇 답변 생성에 사용할 근거 항목
      */
-    private EvidenceItemResponse toMaterialShortageEvidence(
+    private ChatEvidenceItemResponse toMaterialShortageEvidence(
             MaterialShortageResponse shortage,
             MaterialInventory inventory
     ) {
-        return new EvidenceItemResponse(
+        return new ChatEvidenceItemResponse(
                 "MATERIAL",
                 buildMaterialTitle(shortage),
                 buildMaterialSummary(shortage, inventory),

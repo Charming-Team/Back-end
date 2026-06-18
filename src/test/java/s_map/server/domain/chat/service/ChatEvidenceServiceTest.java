@@ -10,22 +10,22 @@ import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import s_map.server.domain.chat.dto.req.EvidenceLookupFilters;
-import s_map.server.domain.chat.dto.req.EvidenceLookupRequest;
+import s_map.server.domain.chat.dto.req.ChatEvidenceLookupRequest;
 import s_map.server.domain.chat.dto.req.EvidenceLookupUser;
-import s_map.server.domain.chat.dto.res.EvidenceItemResponse;
-import s_map.server.domain.chat.dto.res.EvidenceLookupResponse;
+import s_map.server.domain.chat.dto.res.ChatEvidenceItemResponse;
+import s_map.server.domain.chat.dto.res.ChatEvidenceLookupResponse;
 
 class ChatEvidenceServiceTest {
 
     @Test
     @DisplayName("질문 의도는 대소문자와 공백을 정규화한 뒤 Provider로 라우팅한다")
     void lookupRoutesToProviderWithNormalizedIntent() {
-        EvidenceItemResponse evidenceItem = createEvidenceItem();
+        ChatEvidenceItemResponse evidenceItem = createEvidenceItem();
         ChatEvidenceService chatEvidenceService = new ChatEvidenceService(List.of(
                 new StubEvidenceProvider("material_shortage", List.of(evidenceItem))
         ));
 
-        EvidenceLookupResponse response = chatEvidenceService.lookup(createRequest(" MATERIAL_SHORTAGE "));
+        ChatEvidenceLookupResponse response = chatEvidenceService.lookup(createRequest(" MATERIAL_SHORTAGE "));
 
         assertEquals("MATERIAL_SHORTAGE", response.intent());
         assertNotNull(response.basisTime());
@@ -40,15 +40,15 @@ class ChatEvidenceServiceTest {
                 new StubEvidenceProvider("MATERIAL_SHORTAGE", List.of(createEvidenceItem()))
         ));
 
-        EvidenceLookupResponse response = chatEvidenceService.lookup(createRequest("delivery_risk"));
+        ChatEvidenceLookupResponse response = chatEvidenceService.lookup(createRequest("delivery_risk"));
 
         assertEquals("DELIVERY_RISK", response.intent());
         assertNotNull(response.basisTime());
         assertTrue(response.items().isEmpty());
     }
 
-    private EvidenceLookupRequest createRequest(String intent) {
-        return new EvidenceLookupRequest(
+    private ChatEvidenceLookupRequest createRequest(String intent) {
+        return new ChatEvidenceLookupRequest(
                 10L,
                 24L,
                 intent,
@@ -58,8 +58,8 @@ class ChatEvidenceServiceTest {
         );
     }
 
-    private EvidenceItemResponse createEvidenceItem() {
-        return new EvidenceItemResponse(
+    private ChatEvidenceItemResponse createEvidenceItem() {
+        return new ChatEvidenceItemResponse(
                 "MATERIAL",
                 "RM-AL-001 알루미늄 원자재 재고 부족",
                 "생산계획 1001에서 RM-AL-001 알루미늄 원자재 부족 상태입니다.",
@@ -73,11 +73,11 @@ class ChatEvidenceServiceTest {
 
     private record StubEvidenceProvider(
             String intent,
-            List<EvidenceItemResponse> items
+            List<ChatEvidenceItemResponse> items
     ) implements EvidenceProvider {
 
         @Override
-        public List<EvidenceItemResponse> getEvidence(EvidenceLookupRequest request) {
+        public List<ChatEvidenceItemResponse> getEvidence(ChatEvidenceLookupRequest request) {
             return items;
         }
     }

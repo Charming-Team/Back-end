@@ -19,8 +19,8 @@ import jakarta.validation.Valid;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import s_map.server.domain.plan.dto.req.SelectedPlanSimulationSaveRequest;
-import s_map.server.domain.plan.dto.res.SelectedPlanSimulationSaveResponse;
+import s_map.server.domain.plan.dto.req.PlanSimulationSelectedSaveRequest;
+import s_map.server.domain.plan.dto.res.PlanSimulationSelectedSaveResponse;
 import s_map.server.global.security.AuthUser;
 
 import java.util.List;
@@ -85,9 +85,9 @@ public class PlanSimulationController {
             @ApiResponse(responseCode = "500", description = "서버 내부 오류")
     })
     @PostMapping("/selected")
-    public BaseResponse<SelectedPlanSimulationSaveResponse> saveSelectedSimulation(
+    public BaseResponse<PlanSimulationSelectedSaveResponse> saveSelectedSimulation(
             @AuthenticationPrincipal AuthUser authUser,
-            @Valid @RequestBody SelectedPlanSimulationSaveRequest request
+            @Valid @RequestBody PlanSimulationSelectedSaveRequest request
     ) {
         return BaseResponse.success(
                 planSimulationService.saveSelectedSimulation(

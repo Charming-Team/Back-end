@@ -12,7 +12,7 @@ import java.time.OffsetDateTime;
 @Schema(description = "오늘 생산계획 조회 응답")
 @Getter
 @Builder
-public class CurrentPlanResponse {
+public class PlanCurrentResponse {
 
     @Schema(description = "생산계획 ID", example = "1")
     private Long planId;
@@ -53,11 +53,11 @@ public class CurrentPlanResponse {
     @Schema(description = "수율. 실적이 없으면 null입니다.", example = "0.9938", nullable = true)
     private BigDecimal yieldRate;
 
-    public static CurrentPlanResponse of(
+    public static PlanCurrentResponse of(
             ProductionPlan plan,
             ProductionResultRow result
     ) {
-        return CurrentPlanResponse.builder()
+        return PlanCurrentResponse.builder()
                 .planId(plan.getPlanId())
                 .orderId(plan.getOrderId())
                 .productId(plan.getProductId())

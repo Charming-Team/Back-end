@@ -17,7 +17,7 @@ import java.util.List;
 
 @Schema(description = "사용자 선택 생산계획 시뮬레이션 저장 요청")
 @Getter
-public class SelectedPlanSimulationSaveRequest {
+public class PlanSimulationSelectedSaveRequest {
 
     @Schema(description = "시뮬레이션 그룹 ID. 전달하지 않으면 서버에서 생성합니다.", example = "SIM-GRP-20260609-001")
     private String simulationGroupId;

@@ -11,7 +11,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
-import s_map.server.domain.report.dto.req.BusinessReportGenerateRequest;
+import s_map.server.domain.report.dto.req.ReportBusinessGenerateRequest;
 import s_map.server.domain.report.dto.req.ReportMailSendRequest;
 import s_map.server.domain.report.dto.res.ReportMailSendResponse;
 import s_map.server.domain.report.dto.res.ReportListResponse;
@@ -277,8 +277,8 @@ class ReportServicePermissionTest {
                 .build();
     }
 
-    private BusinessReportGenerateRequest businessReportGenerateRequest(Long reportId) {
-        BusinessReportGenerateRequest request = new BusinessReportGenerateRequest();
+    private ReportBusinessGenerateRequest businessReportGenerateRequest(Long reportId) {
+        ReportBusinessGenerateRequest request = new ReportBusinessGenerateRequest();
         ReflectionTestUtils.setField(request, "reportId", reportId);
         return request;
     }

@@ -1,8 +1,8 @@
 package s_map.server.domain.chat.service;
 
 import java.util.List;
-import s_map.server.domain.chat.dto.req.EvidenceLookupRequest;
-import s_map.server.domain.chat.dto.res.EvidenceItemResponse;
+import s_map.server.domain.chat.dto.req.ChatEvidenceLookupRequest;
+import s_map.server.domain.chat.dto.res.ChatEvidenceItemResponse;
 
 public interface EvidenceProvider {
 
@@ -18,10 +18,10 @@ public interface EvidenceProvider {
      * 기능: 요청 사용자와 필터 기준에 맞는 RDB Evidence 목록을 조회한다.
      *
      * Input:
-     * - request / EvidenceLookupRequest / 사용자, 질문, 필터를 포함한 Evidence 요청
+     * - request / ChatEvidenceLookupRequest / 사용자, 질문, 필터를 포함한 Evidence 요청
      *
      * Output:
-     * - result / List<EvidenceItemResponse> / 답변 생성에 사용할 근거 목록
+     * - result / List<ChatEvidenceItemResponse> / 답변 생성에 사용할 근거 목록
      */
-    List<EvidenceItemResponse> getEvidence(EvidenceLookupRequest request);
+    List<ChatEvidenceItemResponse> getEvidence(ChatEvidenceLookupRequest request);
 }

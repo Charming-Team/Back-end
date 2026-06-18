@@ -6,7 +6,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 @Schema(description = "챗봇 RDB Evidence 조회 요청")
-public record EvidenceLookupRequest(
+public record ChatEvidenceLookupRequest(
         @Schema(description = "챗봇 대화 세션 ID", example = "10")
         @NotNull
         Long sessionId,

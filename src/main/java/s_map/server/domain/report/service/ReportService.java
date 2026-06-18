@@ -13,7 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
-import s_map.server.domain.report.dto.req.BusinessReportGenerateRequest;
+import s_map.server.domain.report.dto.req.ReportBusinessGenerateRequest;
 import s_map.server.domain.report.dto.req.ReportGenerateRequest;
 import s_map.server.domain.report.dto.req.ReportMailSendRequest;
 import s_map.server.domain.report.dto.req.ReportUpdateRequest;
@@ -113,7 +113,7 @@ public class ReportService {
      *
      * Input:
      * - authUser / AuthUser / JWT에서 추출한 로그인 사용자 ID, 이메일, Role
-     * - request / BusinessReportGenerateRequest / 원본 보고서 ID
+     * - request / ReportBusinessGenerateRequest / 원본 보고서 ID
      *
      * Output:
      * - result / ReportGenerateStartResponse / 접수된 비즈니스 보고서 생성 Job ID와 초기 상태
@@ -121,7 +121,7 @@ public class ReportService {
     @Transactional
     public ReportGenerateStartResponse generateBusinessReport(
             AuthUser authUser,
-            BusinessReportGenerateRequest request
+            ReportBusinessGenerateRequest request
     ) {
         User user = getAuthorizedReportWriter(authUser);
         validateBusinessReportGenerateRequest(request);
@@ -432,7 +432,7 @@ public class ReportService {
         }
     }
 
-    private void validateBusinessReportGenerateRequest(BusinessReportGenerateRequest request) {
+    private void validateBusinessReportGenerateRequest(ReportBusinessGenerateRequest request) {
         if (request == null) {
             throw new CustomException(ErrorCode.INVALID_REPORT_REQUEST, "비즈니스 보고서 생성 요청은 필수입니다.");
         }

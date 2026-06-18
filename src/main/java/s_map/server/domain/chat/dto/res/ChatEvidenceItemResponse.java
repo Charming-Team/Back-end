@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Map;
 
 @Schema(description = "챗봇 답변 생성 근거 항목")
-public record EvidenceItemResponse(
+public record ChatEvidenceItemResponse(
         @Schema(description = "근거 유형. 예: MATERIAL, PLAN, ORDER, REPORT", example = "MATERIAL")
         String type,
 
