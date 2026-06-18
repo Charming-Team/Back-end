@@ -101,6 +101,7 @@ public class SecurityConfig {
                         .hasAnyRole(PLAN_WRITE_ROLES)
                         .requestMatchers(HttpMethod.PATCH, "/api/plans/**")
                         .hasAnyRole(PLAN_WRITE_ROLES)
+                        .requestMatchers("/internal/risk-agent/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)

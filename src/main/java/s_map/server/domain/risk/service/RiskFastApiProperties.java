@@ -35,7 +35,25 @@ public class RiskFastApiProperties {
     }
 
     public URI delayPredictionPredictUri() {
-        return URI.create(joinUrl(baseUrl, risk.getDelayPredictionPredictPath()));
+            return URI.create(joinUrl(baseUrl, risk.getDelayPredictionPredictPath()));
+        }
+        public URI riskAgentExecuteUri() {
+        return URI.create(
+                joinUrl(
+                        baseUrl,
+                        risk.getRiskAgentExecutePath()
+                )
+        );
+    }
+
+    public Duration riskAgentReadTimeout() {
+        return Duration.ofMillis(
+                risk.getRiskAgentReadTimeoutMs()
+        );
+    }
+
+    public boolean riskAgentAnalysisEnabled() {
+        return risk.isRiskAgentAnalysisEnabled();
     }
 
     public Duration connectTimeout() {
@@ -72,6 +90,13 @@ public class RiskFastApiProperties {
         private int readTimeoutMs = 10000;
 
         private String internalToken = "";
+
+        private boolean riskAgentAnalysisEnabled = false;
+
+        private String riskAgentExecutePath =
+                "/api/v1/risk-agent/execute";
+
+        private int riskAgentReadTimeoutMs = 300000;
 
         public String getDelayProbabilityPredictPath() {
             return delayProbabilityPredictPath;
@@ -111,6 +136,39 @@ public class RiskFastApiProperties {
 
         public void setInternalToken(String internalToken) {
             this.internalToken = internalToken;
+        }
+
+        public boolean isRiskAgentAnalysisEnabled() {
+            return riskAgentAnalysisEnabled;
+        }
+
+        public void setRiskAgentAnalysisEnabled(
+                boolean riskAgentAnalysisEnabled
+        ) {
+            this.riskAgentAnalysisEnabled =
+                    riskAgentAnalysisEnabled;
+        }
+
+        public String getRiskAgentExecutePath() {
+            return riskAgentExecutePath;
+        }
+
+        public void setRiskAgentExecutePath(
+                String riskAgentExecutePath
+        ) {
+            this.riskAgentExecutePath =
+                    riskAgentExecutePath;
+        }
+
+        public int getRiskAgentReadTimeoutMs() {
+            return riskAgentReadTimeoutMs;
+        }
+
+        public void setRiskAgentReadTimeoutMs(
+                int riskAgentReadTimeoutMs
+        ) {
+            this.riskAgentReadTimeoutMs =
+                    riskAgentReadTimeoutMs;
         }
     }
 }
