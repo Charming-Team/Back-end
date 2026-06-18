@@ -38,6 +38,8 @@ public class PlanAiService {
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS Z");
     private static final List<PlanStatus> NON_REPLANNING_STATUSES =
             List.of(PlanStatus.COMPLETED, PlanStatus.CANCELLED, PlanStatus.IN_PROGRESS);
+    private static final List<String> IMMUTABLE_MONTHLY_STATUS_NAMES =
+            List.of(PlanStatus.COMPLETED.name(), PlanStatus.IN_PROGRESS.name());
     private static final List<String> NON_REPLANNING_STATUS_NAMES = NON_REPLANNING_STATUSES
             .stream()
             .map(Enum::name)
@@ -105,9 +107,10 @@ public class PlanAiService {
             String refreshToken
     ) {
         validateMonthlyRequest(request);
+        OffsetDateTime effectivePlanningStart = resolveMonthlyPlanningStart(request);
 
         FastApiPlanningGenerateRequest fastApiRequest = FastApiPlanningGenerateRequest.of(
-                formatDateTime(request.getPlanningStart()),
+                formatDateTime(effectivePlanningStart),
                 formatDateTime(request.getPlanningEnd()),
                 List.of(),
                 List.of()
@@ -192,6 +195,25 @@ public class PlanAiService {
         if (!request.getPlanningStart().isBefore(request.getPlanningEnd())) {
             throw new CustomException(ErrorCode.BAD_REQUEST);
         }
+    }
+
+    private OffsetDateTime resolveMonthlyPlanningStart(PlanAiMonthlyGenerateRequest request) {
+        OffsetDateTime effectivePlanningStart = productionPlanRepository.findLatestImmutablePlanEnd(
+                        request.getPlanningStart(),
+                        request.getPlanningEnd(),
+                        IMMUTABLE_MONTHLY_STATUS_NAMES
+                )
+                .map(end -> end.atZone(DEFAULT_PRODUCTION_ZONE).toOffsetDateTime())
+                .filter(end -> end.isAfter(request.getPlanningStart()))
+                .orElse(request.getPlanningStart());
+
+        if (!effectivePlanningStart.isBefore(request.getPlanningEnd())) {
+            throw new CustomException(
+                    ErrorCode.BAD_REQUEST,
+                    "완료 또는 진행 중인 생산계획 이후에 재계획할 수 있는 시간이 없습니다."
+            );
+        }
+        return effectivePlanningStart;
     }
 
     private void validateEditablePlan(ProductionPlan plan) {
