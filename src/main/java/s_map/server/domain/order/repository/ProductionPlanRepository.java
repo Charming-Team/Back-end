@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import s_map.server.domain.order.entity.ProductionPlan;
 
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -16,6 +17,22 @@ public interface ProductionPlanRepository extends JpaRepository<ProductionPlan, 
     List<ProductionPlan> findByPlannedStartAtLessThanAndPlannedEndAtGreaterThanOrderByPlannedStartAtAsc(
             OffsetDateTime endExclusive,
             OffsetDateTime startInclusive
+    );
+
+    @Query(
+            value = """
+                    SELECT MAX(pp.planned_end_at)
+                    FROM production_plans pp
+                    WHERE CAST(pp.plan_status AS varchar) IN (:immutableStatuses)
+                      AND pp.planned_end_at > :planningStart
+                      AND pp.planned_start_at < :planningEnd
+                    """,
+            nativeQuery = true
+    )
+    Optional<Instant> findLatestImmutablePlanEnd(
+            @Param("planningStart") OffsetDateTime planningStart,
+            @Param("planningEnd") OffsetDateTime planningEnd,
+            @Param("immutableStatuses") List<String> immutableStatuses
     );
 
     boolean existsByLineIdAndPlanIdNotAndPlannedStartAtLessThanAndPlannedEndAtGreaterThan(
