@@ -10,10 +10,10 @@ import s_map.server.domain.order.entity.ProductionPlan;
 import s_map.server.domain.order.repository.CustomerOrderRepository;
 import s_map.server.domain.order.repository.ProductionPlanRepository;
 import s_map.server.domain.notification.service.NotificationEventPublisher;
-import s_map.server.domain.plan.dto.req.SelectedPlanSimulationSaveRequest;
+import s_map.server.domain.plan.dto.req.PlanSimulationSelectedSaveRequest;
 import s_map.server.domain.plan.dto.res.PlanSimulationDetailResponse;
 import s_map.server.domain.plan.dto.res.PlanSimulationListResponse;
-import s_map.server.domain.plan.dto.res.SelectedPlanSimulationSaveResponse;
+import s_map.server.domain.plan.dto.res.PlanSimulationSelectedSaveResponse;
 import s_map.server.domain.plan.repository.PlanSimulationCommandRepository;
 import s_map.server.domain.plan.repository.PlanSimulationRepository;
 import s_map.server.domain.user.entity.Role;
@@ -89,7 +89,7 @@ public class PlanSimulationService {
      * 기능: FastAPI 생산계획 조정 결과 중 사용자가 선택한 대안 1개를 DB에 저장한다.
      *
      * Input:
-     * - request / SelectedPlanSimulationSaveRequest / 선택 시뮬레이션 저장 요청 값
+     * - request / PlanSimulationSelectedSaveRequest / 선택 시뮬레이션 저장 요청 값
      * - appliedBy / Long / 선택안을 반영한 사용자 ID
      *
      * [Process]
@@ -100,11 +100,11 @@ public class PlanSimulationService {
      * - 시뮬레이션 상세 변경 내역을 schedule_simulation_details에 저장한다.
      *
      * Output:
-     * - result / SelectedPlanSimulationSaveResponse / 저장된 시뮬레이션과 반영된 생산계획 ID 목록
+     * - result / PlanSimulationSelectedSaveResponse / 저장된 시뮬레이션과 반영된 생산계획 ID 목록
      */
     @Transactional
-    public SelectedPlanSimulationSaveResponse saveSelectedSimulation(
-            SelectedPlanSimulationSaveRequest request,
+    public PlanSimulationSelectedSaveResponse saveSelectedSimulation(
+            PlanSimulationSelectedSaveRequest request,
             Long appliedBy
     ) {
         validateBaseRequest(request);
@@ -139,7 +139,7 @@ public class PlanSimulationService {
         );
 
         if (baselineSelection) {
-            return SelectedPlanSimulationSaveResponse.builder()
+            return PlanSimulationSelectedSaveResponse.builder()
                     .simulationId(simulationId)
                     .simulationGroupId(simulationGroupId)
                     .savedPlanCount(0)
@@ -172,7 +172,7 @@ public class PlanSimulationService {
         );
         releasePlanSequencesTemporarily(plansByPlanId.values());
 
-        for (SelectedPlanSimulationSaveRequest.SelectedPlan selectedPlan : request.getPlans()) {
+        for (PlanSimulationSelectedSaveRequest.SelectedPlan selectedPlan : request.getPlans()) {
             ProductionPlan existingPlan = resolveExistingPlan(selectedPlan, plansByPlanId);
             log.info(
                     "[PlanSimulation] 선택 계획 반영 simulationId={} requested={} mode={}",
@@ -195,7 +195,7 @@ public class PlanSimulationService {
             );
         }
 
-        SelectedPlanSimulationSaveResponse response = SelectedPlanSimulationSaveResponse.builder()
+        PlanSimulationSelectedSaveResponse response = PlanSimulationSelectedSaveResponse.builder()
                 .simulationId(simulationId)
                 .simulationGroupId(simulationGroupId)
                 .savedPlanCount(savedPlanIds.size())
@@ -216,7 +216,7 @@ public class PlanSimulationService {
     }
 
     private void logSelectedSimulationRequest(
-            SelectedPlanSimulationSaveRequest request,
+            PlanSimulationSelectedSaveRequest request,
             Long appliedBy
     ) {
         log.info(
@@ -239,23 +239,23 @@ public class PlanSimulationService {
         }
     }
 
-    private List<Long> requestedPlanIds(SelectedPlanSimulationSaveRequest request) {
+    private List<Long> requestedPlanIds(PlanSimulationSelectedSaveRequest request) {
         return request.getPlans().stream()
-                .map(SelectedPlanSimulationSaveRequest.SelectedPlan::resolvePlanId)
+                .map(PlanSimulationSelectedSaveRequest.SelectedPlan::resolvePlanId)
                 .filter(java.util.Objects::nonNull)
                 .distinct()
                 .toList();
     }
 
-    private List<Long> requestedOrderIds(SelectedPlanSimulationSaveRequest request) {
+    private List<Long> requestedOrderIds(PlanSimulationSelectedSaveRequest request) {
         return request.getPlans().stream()
-                .map(SelectedPlanSimulationSaveRequest.SelectedPlan::getOrderId)
+                .map(PlanSimulationSelectedSaveRequest.SelectedPlan::getOrderId)
                 .filter(java.util.Objects::nonNull)
                 .distinct()
                 .toList();
     }
 
-    private String selectedPlanLogRow(SelectedPlanSimulationSaveRequest.SelectedPlan plan) {
+    private String selectedPlanLogRow(PlanSimulationSelectedSaveRequest.SelectedPlan plan) {
         return "planId=%s orderId=%s productId=%s lineId=%s sequence=%s start=%s end=%s status=%s"
                 .formatted(
                         plan.resolvePlanId(),
@@ -269,18 +269,18 @@ public class PlanSimulationService {
                 );
     }
 
-    private void validateBaseRequest(SelectedPlanSimulationSaveRequest request) {
+    private void validateBaseRequest(PlanSimulationSelectedSaveRequest request) {
         if (request == null || request.getPlans() == null) {
             throw new CustomException(ErrorCode.BAD_REQUEST);
         }
     }
 
-    private void validateSaveRequest(SelectedPlanSimulationSaveRequest request) {
+    private void validateSaveRequest(PlanSimulationSelectedSaveRequest request) {
         if (request.getPlans().isEmpty()) {
             throw new CustomException(ErrorCode.BAD_REQUEST);
         }
 
-        for (SelectedPlanSimulationSaveRequest.SelectedPlan plan : request.getPlans()) {
+        for (PlanSimulationSelectedSaveRequest.SelectedPlan plan : request.getPlans()) {
             if (plan.getPlannedStartAt() == null
                     || plan.getPlannedEndAt() == null
                     || !plan.getPlannedStartAt().isBefore(plan.getPlannedEndAt())) {
@@ -311,10 +311,10 @@ public class PlanSimulationService {
         }
     }
 
-    private Map<Long, CustomerOrder> loadOrdersById(SelectedPlanSimulationSaveRequest request) {
+    private Map<Long, CustomerOrder> loadOrdersById(PlanSimulationSelectedSaveRequest request) {
         List<Long> orderIds = request.getPlans()
                 .stream()
-                .map(SelectedPlanSimulationSaveRequest.SelectedPlan::getOrderId)
+                .map(PlanSimulationSelectedSaveRequest.SelectedPlan::getOrderId)
                 .distinct()
                 .toList();
 
@@ -329,10 +329,10 @@ public class PlanSimulationService {
         return ordersById;
     }
 
-    private Map<Long, ProductionPlan> loadEditablePlansByPlanId(SelectedPlanSimulationSaveRequest request) {
+    private Map<Long, ProductionPlan> loadEditablePlansByPlanId(PlanSimulationSelectedSaveRequest request) {
         List<Long> planIds = request.getPlans()
                 .stream()
-                .map(SelectedPlanSimulationSaveRequest.SelectedPlan::resolvePlanId)
+                .map(PlanSimulationSelectedSaveRequest.SelectedPlan::resolvePlanId)
                 .filter(java.util.Objects::nonNull)
                 .toList();
 
@@ -363,7 +363,7 @@ public class PlanSimulationService {
     }
 
     private void validateSelectedPlans(
-            SelectedPlanSimulationSaveRequest request,
+            PlanSimulationSelectedSaveRequest request,
             Map<Long, CustomerOrder> ordersById,
             Map<Long, ProductionPlan> plansByPlanId
     ) {
@@ -371,7 +371,7 @@ public class PlanSimulationService {
         validateDuplicateLineSequences(request.getPlans());
         validateScheduleOverlapsInRequest(request.getPlans());
 
-        for (SelectedPlanSimulationSaveRequest.SelectedPlan plan : request.getPlans()) {
+        for (PlanSimulationSelectedSaveRequest.SelectedPlan plan : request.getPlans()) {
             CustomerOrder order = ordersById.get(plan.getOrderId());
             ProductionPlan existingPlan = resolveExistingPlan(plan, plansByPlanId);
 
@@ -401,29 +401,29 @@ public class PlanSimulationService {
     }
 
     private ProductionPlan resolveExistingPlan(
-            SelectedPlanSimulationSaveRequest.SelectedPlan plan,
+            PlanSimulationSelectedSaveRequest.SelectedPlan plan,
             Map<Long, ProductionPlan> plansByPlanId
     ) {
         Long planId = plan.resolvePlanId();
         return planId == null ? null : plansByPlanId.get(planId);
     }
 
-    private void validateDuplicateLineSequences(List<SelectedPlanSimulationSaveRequest.SelectedPlan> plans) {
+    private void validateDuplicateLineSequences(List<PlanSimulationSelectedSaveRequest.SelectedPlan> plans) {
         Set<LineSequenceKey> keys = new HashSet<>();
 
-        for (SelectedPlanSimulationSaveRequest.SelectedPlan plan : plans) {
+        for (PlanSimulationSelectedSaveRequest.SelectedPlan plan : plans) {
             if (!keys.add(new LineSequenceKey(plan.getLineId(), plan.getPlanSequence()))) {
                 throw new CustomException(ErrorCode.BAD_REQUEST);
             }
         }
     }
 
-    private void validateScheduleOverlapsInRequest(List<SelectedPlanSimulationSaveRequest.SelectedPlan> plans) {
+    private void validateScheduleOverlapsInRequest(List<PlanSimulationSelectedSaveRequest.SelectedPlan> plans) {
         for (int left = 0; left < plans.size(); left++) {
-            SelectedPlanSimulationSaveRequest.SelectedPlan leftPlan = plans.get(left);
+            PlanSimulationSelectedSaveRequest.SelectedPlan leftPlan = plans.get(left);
 
             for (int right = left + 1; right < plans.size(); right++) {
-                SelectedPlanSimulationSaveRequest.SelectedPlan rightPlan = plans.get(right);
+                PlanSimulationSelectedSaveRequest.SelectedPlan rightPlan = plans.get(right);
 
                 if (leftPlan.getLineId().equals(rightPlan.getLineId())
                         && leftPlan.getPlannedStartAt().isBefore(rightPlan.getPlannedEndAt())
@@ -434,7 +434,7 @@ public class PlanSimulationService {
         }
     }
 
-    private void validateLineCapability(SelectedPlanSimulationSaveRequest.SelectedPlan plan) {
+    private void validateLineCapability(PlanSimulationSelectedSaveRequest.SelectedPlan plan) {
         boolean existsActiveLineCapability = productionPlanRepository.existsActiveLineCapability(
                 plan.getLineId(),
                 plan.getProductId()
@@ -445,7 +445,7 @@ public class PlanSimulationService {
         }
     }
 
-    private void validateOperator(SelectedPlanSimulationSaveRequest.SelectedPlan plan) {
+    private void validateOperator(PlanSimulationSelectedSaveRequest.SelectedPlan plan) {
         if (plan.getOperatorId() == null) {
             return;
         }
@@ -462,7 +462,7 @@ public class PlanSimulationService {
     }
 
     private void validateLineSequence(
-            SelectedPlanSimulationSaveRequest.SelectedPlan plan,
+            PlanSimulationSelectedSaveRequest.SelectedPlan plan,
             List<Long> excludedPlanIds
     ) {
         boolean existsLineSequence = productionPlanRepository.existsLineSequenceOutsidePlans(
@@ -477,7 +477,7 @@ public class PlanSimulationService {
     }
 
     private void validateScheduleConflict(
-            SelectedPlanSimulationSaveRequest.SelectedPlan plan,
+            PlanSimulationSelectedSaveRequest.SelectedPlan plan,
             List<Long> excludedPlanIds
     ) {
         boolean existsScheduleConflict = productionPlanRepository.existsScheduleConflictOutsidePlans(
@@ -516,7 +516,7 @@ public class PlanSimulationService {
     }
 
     private ProductionPlan applySelectedPlan(
-            SelectedPlanSimulationSaveRequest.SelectedPlan selectedPlan,
+            PlanSimulationSelectedSaveRequest.SelectedPlan selectedPlan,
             ProductionPlan existingPlan
     ) {
         if (existingPlan == null) {

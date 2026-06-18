@@ -31,9 +31,9 @@ public record ChatAnswerResponse(
         List<ChatSourceResponse> sources,
 
         @Schema(description = "권한 차단, 질문 차단 등 챗봇 보안 검증 결과")
-        SecurityResultResponse securityResult,
+        ChatSecurityResultResponse securityResult,
 
         @Schema(description = "RDB, Qdrant, LLM 사용 여부와 근거 개수 등 처리 메타데이터")
-        ModelResultResponse modelResult
+        ChatModelResultResponse modelResult
 ) {
 }

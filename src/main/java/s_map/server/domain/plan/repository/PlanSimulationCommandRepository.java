@@ -6,7 +6,7 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
-import s_map.server.domain.plan.dto.req.SelectedPlanSimulationSaveRequest;
+import s_map.server.domain.plan.dto.req.PlanSimulationSelectedSaveRequest;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -19,7 +19,7 @@ public class PlanSimulationCommandRepository {
     private final NamedParameterJdbcTemplate jdbcTemplate;
 
     public Long saveSimulationResult(
-            SelectedPlanSimulationSaveRequest request,
+            PlanSimulationSelectedSaveRequest request,
             String simulationGroupId,
             String simulationType,
             Long appliedBy,
@@ -110,7 +110,7 @@ public class PlanSimulationCommandRepository {
     public void saveSimulationDetail(
             Long simulationId,
             Long savedPlanId,
-            SelectedPlanSimulationSaveRequest.SelectedPlan plan,
+            PlanSimulationSelectedSaveRequest.SelectedPlan plan,
             OffsetDateTime createdAt
     ) {
         String sql = """

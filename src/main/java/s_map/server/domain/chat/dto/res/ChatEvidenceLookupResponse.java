@@ -5,7 +5,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 
 @Schema(description = "챗봇 RDB Evidence 조회 응답")
-public record EvidenceLookupResponse(
+public record ChatEvidenceLookupResponse(
         @Schema(description = "조회된 Evidence의 질문 의도", example = "MATERIAL_SHORTAGE")
         String intent,
 
@@ -13,6 +13,6 @@ public record EvidenceLookupResponse(
         OffsetDateTime basisTime,
 
         @Schema(description = "답변 생성에 사용할 Evidence 목록")
-        List<EvidenceItemResponse> items
+        List<ChatEvidenceItemResponse> items
 ) {
 }

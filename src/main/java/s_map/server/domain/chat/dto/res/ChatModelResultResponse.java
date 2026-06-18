@@ -3,7 +3,7 @@ package s_map.server.domain.chat.dto.res;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 @Schema(description = "챗봇 모델 처리 결과")
-public record ModelResultResponse(
+public record ChatModelResultResponse(
         @Schema(description = "Qdrant 문서 검색 사용 여부", example = "true")
         Boolean usedVectorSearch,
 
@@ -17,7 +17,7 @@ public record ModelResultResponse(
         Boolean llmCacheHit,
 
         @Schema(description = "LLM 토큰 사용량. LLM 생성이 생략되면 null일 수 있습니다.", nullable = true)
-        LlmUsageResponse llmUsage,
+        ChatLlmUsageResponse llmUsage,
 
         @Schema(description = "RDB 근거 개수", example = "3")
         Integer rdbEvidenceCount,

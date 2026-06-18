@@ -8,7 +8,7 @@ import lombok.Getter;
 
 @Getter
 @Schema(description = "비즈니스 보고서 생성 요청")
-public class BusinessReportGenerateRequest {
+public class ReportBusinessGenerateRequest {
 
     @Schema(description = "비즈니스 보고서 생성 기준이 되는 원본 보고서 ID", example = "7")
     @NotNull(message = "원본 보고서 ID는 필수입니다.")

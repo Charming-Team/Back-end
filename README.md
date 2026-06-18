@@ -156,7 +156,7 @@ JWT_SECRET=<jwt-secret>
 | `JWT_SECRET` | JWT 서명 키 | 없음 |
 | `APP_CORS_ALLOWED_ORIGINS` | prod CORS 허용 Origin 목록 | 없음 |
 | `FASTAPI_BASE_URL` | FastAPI 서버 Base URL | `http://fastapi-service:8000` |
-| `AI_FASTAPI_PLANNING_GENERATE_PATH` | FastAPI 생산계획 생성 경로 | `/ai/api/v1/planning` |
+| `AI_FASTAPI_PLANNING_GENERATE_PATH` | FastAPI 생산계획 생성 경로 | `/api/v1/planning` |
 | `CHAT_EVIDENCE_INTERNAL_TOKEN` | FastAPI가 Spring Evidence API를 호출할 때 사용하는 내부 토큰 | 없음 |
 | `CHAT_ANSWER_INTERNAL_TOKEN` | Spring이 FastAPI 챗봇 응답 API를 호출할 때 사용하는 내부 토큰 | 없음 |
 | `SPRING_MAIL_HOST` | SMTP 서버 호스트 | 없음 |

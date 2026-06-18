@@ -13,7 +13,7 @@ import s_map.server.domain.order.entity.ProductionPlan;
 import s_map.server.domain.order.repository.CustomerOrderRepository;
 import s_map.server.domain.order.repository.ProductionPlanRepository;
 import s_map.server.domain.notification.service.NotificationEventPublisher;
-import s_map.server.domain.plan.dto.req.SelectedPlanSimulationSaveRequest;
+import s_map.server.domain.plan.dto.req.PlanSimulationSelectedSaveRequest;
 import s_map.server.domain.plan.repository.PlanSimulationCommandRepository;
 import s_map.server.domain.plan.repository.PlanSimulationRepository;
 import s_map.server.domain.user.entity.Role;
@@ -71,8 +71,8 @@ class PlanSimulationServiceTest {
     @DisplayName("선택 대안 저장 시 기존 주문의 생산계획은 신규 생성하지 않고 갱신한다")
     void saveSelectedSimulationUpdatesExistingPlan() {
         OffsetDateTime startAt = OffsetDateTime.of(2026, 6, 10, 9, 0, 0, 0, ZoneOffset.ofHours(9));
-        SelectedPlanSimulationSaveRequest request = selectedSimulationSaveRequest(startAt);
-        SelectedPlanSimulationSaveRequest.SelectedPlan selectedPlan = request.getPlans().getFirst();
+        PlanSimulationSelectedSaveRequest request = selectedSimulationSaveRequest(startAt);
+        PlanSimulationSelectedSaveRequest.SelectedPlan selectedPlan = request.getPlans().getFirst();
         CustomerOrder order = customerOrder(100L, 10L);
         ProductionPlan existingPlan = productionPlan(200L, 100L, 10L);
 
@@ -126,7 +126,7 @@ class PlanSimulationServiceTest {
     void saveSelectedSimulationUpdatesMultiplePlansForSameOrderByPlanId() {
         OffsetDateTime firstStartAt = OffsetDateTime.of(2026, 6, 10, 9, 0, 0, 0, ZoneOffset.ofHours(9));
         OffsetDateTime secondStartAt = OffsetDateTime.of(2026, 6, 11, 9, 0, 0, 0, ZoneOffset.ofHours(9));
-        SelectedPlanSimulationSaveRequest request = selectedSimulationSaveRequest(List.of(
+        PlanSimulationSelectedSaveRequest request = selectedSimulationSaveRequest(List.of(
                 selectedPlan(firstStartAt, 200L, 2L, 5),
                 selectedPlan(secondStartAt, 201L, 3L, 6)
         ));
@@ -184,7 +184,7 @@ class PlanSimulationServiceTest {
     @DisplayName("planId가 없는 선택 계획은 신규 생산계획으로 저장한다")
     void saveSelectedSimulationCreatesNewPlanWithoutPlanId() {
         OffsetDateTime startAt = OffsetDateTime.of(2026, 6, 10, 9, 0, 0, 0, ZoneOffset.ofHours(9));
-        SelectedPlanSimulationSaveRequest request = selectedSimulationSaveRequest(
+        PlanSimulationSelectedSaveRequest request = selectedSimulationSaveRequest(
                 List.of(selectedPlan(startAt, null, 2L, 5))
         );
         CustomerOrder order = customerOrder(100L, 10L);
@@ -230,15 +230,15 @@ class PlanSimulationServiceTest {
     void saveSelectedSimulationRejectsSecondLevelOverlapInSelectedPlans() {
         OffsetDateTime firstStartAt = OffsetDateTime.of(2026, 6, 10, 9, 0, 0, 0, ZoneOffset.ofHours(9));
         OffsetDateTime firstEndAt = firstStartAt.plusHours(1).plusSeconds(31);
-        SelectedPlanSimulationSaveRequest.SelectedPlan firstPlan = selectedPlan(firstStartAt, null, 2L, 5);
+        PlanSimulationSelectedSaveRequest.SelectedPlan firstPlan = selectedPlan(firstStartAt, null, 2L, 5);
         ReflectionTestUtils.setField(firstPlan, "plannedEndAt", firstEndAt);
-        SelectedPlanSimulationSaveRequest.SelectedPlan overlappingPlan = selectedPlan(
+        PlanSimulationSelectedSaveRequest.SelectedPlan overlappingPlan = selectedPlan(
                 firstStartAt.plusHours(1),
                 null,
                 2L,
                 6
         );
-        SelectedPlanSimulationSaveRequest request = selectedSimulationSaveRequest(List.of(
+        PlanSimulationSelectedSaveRequest request = selectedSimulationSaveRequest(List.of(
                 firstPlan,
                 overlappingPlan
         ));
@@ -271,7 +271,7 @@ class PlanSimulationServiceTest {
     @Test
     @DisplayName("기존안을 선택하면 생산계획을 수정하지 않는다")
     void saveSelectedSimulationDoesNotApplyBaselineSelection() {
-        SelectedPlanSimulationSaveRequest request = baselineSelectionRequest();
+        PlanSimulationSelectedSaveRequest request = baselineSelectionRequest();
 
         when(planSimulationCommandRepository.saveSimulationResult(
                 eq(request),
@@ -296,14 +296,14 @@ class PlanSimulationServiceTest {
         verify(productionPlanRepository, never()).flush();
     }
 
-    private SelectedPlanSimulationSaveRequest selectedSimulationSaveRequest(OffsetDateTime startAt) {
+    private PlanSimulationSelectedSaveRequest selectedSimulationSaveRequest(OffsetDateTime startAt) {
         return selectedSimulationSaveRequest(List.of(selectedPlan(startAt, 200L, 2L, 5)));
     }
 
-    private SelectedPlanSimulationSaveRequest selectedSimulationSaveRequest(
-            List<SelectedPlanSimulationSaveRequest.SelectedPlan> plans
+    private PlanSimulationSelectedSaveRequest selectedSimulationSaveRequest(
+            List<PlanSimulationSelectedSaveRequest.SelectedPlan> plans
     ) {
-        SelectedPlanSimulationSaveRequest request = new SelectedPlanSimulationSaveRequest();
+        PlanSimulationSelectedSaveRequest request = new PlanSimulationSelectedSaveRequest();
         ReflectionTestUtils.setField(request, "simulationName", "납기 최적화 대안");
         ReflectionTestUtils.setField(request, "planVariantCode", "DUE_DATE_OPTIMAL");
         ReflectionTestUtils.setField(request, "beforeTotalDelayHr", BigDecimal.valueOf(12));
@@ -312,8 +312,8 @@ class PlanSimulationServiceTest {
         return request;
     }
 
-    private SelectedPlanSimulationSaveRequest baselineSelectionRequest() {
-        SelectedPlanSimulationSaveRequest request = new SelectedPlanSimulationSaveRequest();
+    private PlanSimulationSelectedSaveRequest baselineSelectionRequest() {
+        PlanSimulationSelectedSaveRequest request = new PlanSimulationSelectedSaveRequest();
         ReflectionTestUtils.setField(request, "simulationName", "현재 계획 유지");
         ReflectionTestUtils.setField(request, "planVariantCode", "CURRENT_PLAN_BASELINE");
         ReflectionTestUtils.setField(request, "beforeTotalDelayHr", BigDecimal.valueOf(12));
@@ -326,17 +326,17 @@ class PlanSimulationServiceTest {
         return request;
     }
 
-    private SelectedPlanSimulationSaveRequest.SelectedPlan selectedPlan(OffsetDateTime startAt) {
+    private PlanSimulationSelectedSaveRequest.SelectedPlan selectedPlan(OffsetDateTime startAt) {
         return selectedPlan(startAt, 200L, 2L, 5);
     }
 
-    private SelectedPlanSimulationSaveRequest.SelectedPlan selectedPlan(
+    private PlanSimulationSelectedSaveRequest.SelectedPlan selectedPlan(
             OffsetDateTime startAt,
             Long planId,
             Long lineId,
             Integer planSequence
     ) {
-        SelectedPlanSimulationSaveRequest.SelectedPlan plan = new SelectedPlanSimulationSaveRequest.SelectedPlan();
+        PlanSimulationSelectedSaveRequest.SelectedPlan plan = new PlanSimulationSelectedSaveRequest.SelectedPlan();
         ReflectionTestUtils.setField(plan, "planId", planId);
         ReflectionTestUtils.setField(plan, "orderId", 100L);
         ReflectionTestUtils.setField(plan, "productId", 10L);

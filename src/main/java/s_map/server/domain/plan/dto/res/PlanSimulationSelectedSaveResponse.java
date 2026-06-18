@@ -10,7 +10,7 @@ import java.util.List;
 @Schema(description = "사용자 선택 생산계획 시뮬레이션 저장 응답")
 @Getter
 @Builder
-public class SelectedPlanSimulationSaveResponse {
+public class PlanSimulationSelectedSaveResponse {
 
     @Schema(description = "저장된 시뮬레이션 결과 ID", example = "1")
     private Long simulationId;

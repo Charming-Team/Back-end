@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import s_map.server.domain.plan.dto.req.PlanScheduleUpdateRequest;
 import s_map.server.domain.plan.dto.req.PlanUpdateRequest;
 import s_map.server.domain.plan.dto.res.PlanUpdateResponse;
-import s_map.server.domain.plan.dto.res.CurrentPlanResponse;
+import s_map.server.domain.plan.dto.res.PlanCurrentResponse;
 import s_map.server.domain.plan.dto.res.PlanDetailResponse;
 import s_map.server.domain.plan.dto.res.PlanListResponse;
 import s_map.server.domain.plan.service.PlanService;
@@ -110,7 +110,7 @@ public class PlanController {
             @ApiResponse(responseCode = "500", description = "서버 내부 오류")
     })
     @GetMapping("/current")
-    public BaseResponse<List<CurrentPlanResponse>> getCurrentPlans() {
+    public BaseResponse<List<PlanCurrentResponse>> getCurrentPlans() {
         return BaseResponse.success(planService.getCurrentPlans());
     }
 

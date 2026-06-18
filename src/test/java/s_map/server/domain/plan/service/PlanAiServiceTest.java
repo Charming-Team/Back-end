@@ -18,8 +18,11 @@ import s_map.server.domain.plan.dto.fastapi.FastApiPlanningGenerateRequest;
 import s_map.server.domain.plan.dto.fastapi.FastApiPlanningGenerateResponse;
 import s_map.server.domain.plan.dto.req.PlanAiGenerateRequest;
 import s_map.server.domain.plan.dto.req.PlanAiMonthlyGenerateRequest;
+import s_map.server.global.error.CustomException;
+import s_map.server.global.error.ErrorCode;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -27,8 +30,10 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -213,6 +218,34 @@ class PlanAiServiceTest {
     }
 
     @Test
+    @DisplayName("진행 중 생산계획은 FastAPI 조정 요청 대상에서 제외한다")
+    void generatePlanningRejectsInProgressTargetPlan() {
+        PlanAiGenerateRequest request = planAiGenerateRequest();
+        ProductionPlan targetPlan = productionPlan(
+                100L,
+                421L,
+                10L,
+                PlanStatus.IN_PROGRESS,
+                BigDecimal.valueOf(18),
+                18_700
+        );
+
+        when(productionPlanRepository.findById(100L)).thenReturn(Optional.of(targetPlan));
+
+        assertThatThrownBy(() -> planAiService.generatePlanning(
+                request,
+                "Bearer access-token",
+                "refresh-token"
+        ))
+                .isInstanceOf(CustomException.class)
+                .hasMessage("진행 중, 완료, 취소 상태의 생산계획은 AI 조정 요청 대상이 아닙니다.")
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.BAD_REQUEST);
+
+        verify(planningFastApiClient, never()).generatePlanning(any(), any(), any());
+    }
+
+    @Test
     @DisplayName("월간 AI 분석 요청은 기간만 전달하고 edit/add 주문은 비워서 FastAPI 요청을 조립한다")
     void generateMonthlyPlanningBuildsFastApiRequestWithEmptyEditAndAddOrders() {
         PlanAiMonthlyGenerateRequest request = planAiMonthlyGenerateRequest();
@@ -237,6 +270,35 @@ class PlanAiServiceTest {
         assertThat(fastApiRequest.getPlanningEnd()).isEqualTo("2026-07-01 00:00:00.000 +0900");
         assertThat(fastApiRequest.getEditOrders()).isEmpty();
         assertThat(fastApiRequest.getAddOrders()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("월간 AI 분석은 완료 또는 진행 중 계획의 마지막 종료 이후부터 재계획한다")
+    void generateMonthlyPlanningStartsAfterLatestImmutablePlan() {
+        PlanAiMonthlyGenerateRequest request = planAiMonthlyGenerateRequest();
+        Instant latestImmutablePlanEnd = Instant.parse("2026-06-22T01:38:00Z");
+        when(productionPlanRepository.findLatestImmutablePlanEnd(
+                request.getPlanningStart(),
+                request.getPlanningEnd(),
+                List.of("COMPLETED", "IN_PROGRESS")
+        )).thenReturn(Optional.of(latestImmutablePlanEnd));
+        when(planningFastApiClient.generatePlanning(
+                any(FastApiPlanningGenerateRequest.class),
+                eq("Bearer access-token"),
+                eq("refresh-token")
+        )).thenReturn(new FastApiPlanningGenerateResponse());
+
+        planAiService.generateMonthlyPlanning(request, "Bearer access-token", "refresh-token");
+
+        ArgumentCaptor<FastApiPlanningGenerateRequest> captor =
+                ArgumentCaptor.forClass(FastApiPlanningGenerateRequest.class);
+        verify(planningFastApiClient).generatePlanning(
+                captor.capture(),
+                eq("Bearer access-token"),
+                eq("refresh-token")
+        );
+        assertThat(captor.getValue().getPlanningStart())
+                .isEqualTo("2026-06-22 10:38:00.000 +0900");
     }
 
     private PlanAiGenerateRequest planAiGenerateRequest() {

@@ -1,12 +1,12 @@
 package s_map.server.domain.user.service;
 
 import s_map.server.domain.token.service.RefreshTokenService;
-import s_map.server.domain.user.dto.req.LoginRequest;
-import s_map.server.domain.user.dto.res.LoginResponse;
+import s_map.server.domain.user.dto.req.AuthLoginRequest;
+import s_map.server.domain.user.dto.res.AuthLoginResponse;
 import s_map.server.domain.user.entity.User;
 import s_map.server.domain.user.repository.UserRepository;
 import s_map.server.domain.user.dto.res.AuthMeResponse;
-import s_map.server.domain.user.dto.req.LogoutRequest;
+import s_map.server.domain.user.dto.req.AuthLogoutRequest;
 
 import s_map.server.global.error.CustomException;
 import s_map.server.global.error.ErrorCode;
@@ -32,12 +32,12 @@ public class AuthService {
      * 기능: 이메일과 비밀번호로 사용자를 인증하고 Access Token, Refresh Token을 발급한다.
      *
      * Input:
-     * - request / LoginRequest / 로그인 요청 값
+     * - request / AuthLoginRequest / 로그인 요청 값
      * - request.email / String / 로그인 이메일
      * - request.password / String / 로그인 비밀번호
      *
      * Output:
-     * - response / LoginResponse / 로그인 응답 값
+     * - response / AuthLoginResponse / 로그인 응답 값
      * - response.id / Long / 사용자 ID
      * - response.name / String / 사용자 이름
      * - response.email / String / 사용자 이메일
@@ -49,7 +49,7 @@ public class AuthService {
      * - response.refreshTokenExpiresIn / long / Refresh Token 만료 시간(ms)
      */
     @Transactional(noRollbackFor = CustomException.class)
-    public LoginResponse login(LoginRequest request) {
+    public AuthLoginResponse login(AuthLoginRequest request) {
         String email = request.email().trim().toLowerCase(Locale.ROOT);
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> {
@@ -86,7 +86,7 @@ public class AuthService {
                 user.getRole()
         );
 
-        return new LoginResponse(
+        return new AuthLoginResponse(
                 user.getId(),
                 user.getName(),
                 user.getEmail(),
@@ -131,7 +131,7 @@ public class AuthService {
      * 기능: 현재 로그인한 사용자의 Refresh Token인지 검증한 뒤 폐기하여 로그아웃 처리한다.
      *
      * Input:
-     * - request / LogoutRequest / 로그아웃 요청 값
+     * - request / AuthLogoutRequest / 로그아웃 요청 값
      * - request.refreshToken / String / 폐기할 Refresh Token 원문
      * - email / String / 현재 로그인한 사용자 이메일
      *
@@ -139,7 +139,7 @@ public class AuthService {
      * - result / void / 반환값 없음, Refresh Token 폐기만 수행
      */
     @Transactional
-    public void logout(LogoutRequest request, String email) {
+    public void logout(AuthLogoutRequest request, String email) {
         refreshTokenService.revokeOwnedTokenForLogout(request.getRefreshToken(), email);
 
         log.info("[AuthService] 로그아웃 성공 email={}", email);

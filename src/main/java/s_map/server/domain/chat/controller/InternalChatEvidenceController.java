@@ -12,8 +12,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import s_map.server.domain.chat.dto.req.EvidenceLookupRequest;
-import s_map.server.domain.chat.dto.res.EvidenceLookupResponse;
+import s_map.server.domain.chat.dto.req.ChatEvidenceLookupRequest;
+import s_map.server.domain.chat.dto.res.ChatEvidenceLookupResponse;
 import s_map.server.domain.chat.service.ChatEvidenceService;
 import s_map.server.global.common.BaseResponse;
 import s_map.server.global.security.InternalApiTokenValidator;
@@ -40,11 +40,11 @@ public class InternalChatEvidenceController {
             @ApiResponse(responseCode = "500", description = "서버 내부 오류")
     })
     @PostMapping("/evidence")
-    public BaseResponse<EvidenceLookupResponse> lookupEvidence(
+    public BaseResponse<ChatEvidenceLookupResponse> lookupEvidence(
             @Parameter(description = "FastAPI 내부 호출 토큰", required = true)
             @RequestHeader(value = INTERNAL_TOKEN_HEADER, required = false) String internalToken,
             @Parameter(description = "챗봇 Evidence 조회 요청")
-            @Valid @RequestBody EvidenceLookupRequest request
+            @Valid @RequestBody ChatEvidenceLookupRequest request
     ) {
         internalApiTokenValidator.validateEvidenceToken(internalToken);
         return BaseResponse.success(chatEvidenceService.lookup(request));

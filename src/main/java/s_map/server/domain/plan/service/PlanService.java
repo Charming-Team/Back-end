@@ -7,7 +7,7 @@ import s_map.server.domain.material.entity.ProductionPlanMaterial;
 import s_map.server.domain.material.repository.ProductionPlanMaterialRepository;
 import s_map.server.domain.plan.dto.req.PlanScheduleUpdateRequest;
 import s_map.server.domain.plan.dto.req.PlanUpdateRequest;
-import s_map.server.domain.plan.dto.res.CurrentPlanResponse;
+import s_map.server.domain.plan.dto.res.PlanCurrentResponse;
 import s_map.server.domain.plan.dto.res.PlanDetailResponse;
 import s_map.server.domain.plan.dto.res.PlanListResponse;
 import s_map.server.domain.plan.dto.res.PlanUpdateResponse;
@@ -176,10 +176,10 @@ public class PlanService {
      * - 실적이 없는 생산계획은 실제 수량/불량 수량을 0으로 내려준다.
      *
      * [Output]
-     * - List<CurrentPlanResponse>
+     * - List<PlanCurrentResponse>
      * - 현재 생산계획 정보와 실제 생산 실적 정보를 함께 반환한다.
      */
-    public List<CurrentPlanResponse> getCurrentPlans() {
+    public List<PlanCurrentResponse> getCurrentPlans() {
         LocalDate today = LocalDate.now(DEFAULT_PRODUCTION_ZONE);
         OffsetDateTime startOfDay = today.atStartOfDay(DEFAULT_PRODUCTION_ZONE).toOffsetDateTime();
         OffsetDateTime endExclusive = today.plusDays(1).atStartOfDay(DEFAULT_PRODUCTION_ZONE).toOffsetDateTime();
@@ -209,7 +209,7 @@ public class PlanService {
                         ));
 
         return plans.stream()
-                .map(plan -> CurrentPlanResponse.of(
+                .map(plan -> PlanCurrentResponse.of(
                         plan,
                         resultMap.get(plan.getPlanId())
                 ))

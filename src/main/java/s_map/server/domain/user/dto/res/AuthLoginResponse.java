@@ -4,7 +4,7 @@ import s_map.server.domain.user.entity.Role;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 @Schema(description = "로그인 응답")
-public record LoginResponse(
+public record AuthLoginResponse(
         @Schema(description = "사용자 ID", example = "1")
         Long id,
 

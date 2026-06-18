@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import s_map.server.domain.report.dto.req.BusinessReportGenerateRequest;
+import s_map.server.domain.report.dto.req.ReportBusinessGenerateRequest;
 import s_map.server.domain.report.dto.req.ReportGenerateRequest;
 import s_map.server.domain.report.dto.req.ReportMailSendRequest;
 import s_map.server.domain.report.dto.req.ReportUpdateRequest;
@@ -84,7 +84,7 @@ public class ReportController {
     public BaseResponse<ReportGenerateStartResponse> generateBusinessReport(
             @Parameter(hidden = true)
             @AuthenticationPrincipal AuthUser authUser,
-            @Valid @RequestBody BusinessReportGenerateRequest request
+            @Valid @RequestBody ReportBusinessGenerateRequest request
     ) {
         return BaseResponse.success(reportService.generateBusinessReport(authUser, request));
     }

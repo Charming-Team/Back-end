@@ -6,7 +6,7 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @NoArgsConstructor
-public class LogoutRequest {
+public class AuthLogoutRequest {
 
     @NotBlank(message = "Refresh Token은 필수입니다.")
     private String refreshToken;

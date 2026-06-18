@@ -1,11 +1,11 @@
 package s_map.server.domain.user.controller;
 
-import s_map.server.domain.user.dto.req.LoginRequest;
-import s_map.server.domain.user.dto.res.LoginResponse;
+import s_map.server.domain.user.dto.req.AuthLoginRequest;
+import s_map.server.domain.user.dto.res.AuthLoginResponse;
 import s_map.server.domain.user.service.AuthService;
 import s_map.server.global.common.BaseResponse;
 import s_map.server.domain.user.dto.res.AuthMeResponse;
-import s_map.server.domain.user.dto.req.LogoutRequest;
+import s_map.server.domain.user.dto.req.AuthLogoutRequest;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -38,7 +38,7 @@ public class AuthController {
             @ApiResponse(responseCode = "500", description = "서버 내부 오류")
     })
     @PostMapping("/login")
-    public BaseResponse<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
+    public BaseResponse<AuthLoginResponse> login(@Valid @RequestBody AuthLoginRequest request) {
         return BaseResponse.success(authService.login(request));
     }
 
@@ -65,7 +65,7 @@ public class AuthController {
     })
     @PostMapping("/logout")
     public BaseResponse<Void> logout(
-            @Valid @RequestBody LogoutRequest request,
+            @Valid @RequestBody AuthLogoutRequest request,
             @Parameter(hidden = true)
             @AuthenticationPrincipal AuthUser authUser
     ) {
