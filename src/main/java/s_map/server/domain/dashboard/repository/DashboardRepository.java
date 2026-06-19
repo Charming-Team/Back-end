@@ -39,56 +39,46 @@ public class DashboardRepository {
 
     public long countMonthlyDelayRiskOrders(OffsetDateTime startAt, OffsetDateTime endExclusive) {
         String sql = """
-                WITH target_orders AS (
-                    SELECT DISTINCT co.order_id
-                    FROM customer_orders co
-                    JOIN production_plans pp ON pp.order_id = co.order_id
-                    WHERE pp.planned_start_at < :endExclusive
-                      AND pp.planned_end_at >= :startAt
-                      AND pp.plan_status <> 'CANCELLED'
-                      AND co.order_status NOT IN ('COMPLETED', 'CANCELLED')
-                ),
-                latest_predictions AS (
+                WITH latest_predictions AS (
                     SELECT DISTINCT ON (apr.order_id)
                         apr.order_id,
                         apr.risk_level
                     FROM ai_prediction_results apr
-                    JOIN target_orders target ON target.order_id = apr.order_id
-                    ORDER BY apr.order_id, apr.predicted_at DESC
+                    ORDER BY apr.order_id, apr.prediction_id DESC
                 )
                 SELECT COUNT(*)
-                FROM latest_predictions
-                WHERE risk_level IN ('WARNING', 'CRITICAL')
+                FROM latest_predictions lp
+                JOIN customer_orders co
+                  ON co.order_id = lp.order_id
+                WHERE COALESCE(UPPER(co.order_status::text), '') NOT IN ('COMPLETE', 'COMPLETED', 'CANCELLED')
+                  AND EXISTS (
+                        SELECT 1
+                        FROM delay_prediction_evidence.vw_delay_probability_inference_orders v
+                        WHERE v.order_id = co.order_id
+                  )
+                  AND lp.risk_level::text <> 'SAFE'
                 """;
 
-        return queryForLong(sql, params(startAt, endExclusive));
+        return queryForLong(sql, new MapSqlParameterSource());
     }
 
     public long countMonthlyMaterialTargets(OffsetDateTime startAt, OffsetDateTime endExclusive) {
         String sql = """
-                SELECT COUNT(DISTINCT ppm.material_id)
-                FROM production_plan_materials ppm
-                JOIN production_plans pp ON pp.plan_id = ppm.plan_id
-                WHERE pp.planned_start_at < :endExclusive
-                  AND pp.planned_end_at >= :startAt
-                  AND pp.plan_status <> 'CANCELLED'
+                SELECT COUNT(*)
+                FROM material_inventories
                 """;
 
-        return queryForLong(sql, params(startAt, endExclusive));
+        return queryForLong(sql, new MapSqlParameterSource());
     }
 
     public long countMonthlyMaterialShortages(OffsetDateTime startAt, OffsetDateTime endExclusive) {
         String sql = """
-                SELECT COUNT(DISTINCT ppm.material_id)
-                FROM production_plan_materials ppm
-                JOIN production_plans pp ON pp.plan_id = ppm.plan_id
-                WHERE pp.planned_start_at < :endExclusive
-                  AND pp.planned_end_at >= :startAt
-                  AND pp.plan_status <> 'CANCELLED'
-                  AND ppm.material_plan_status IN ('SHORTAGE', 'PARTIAL_RESERVED')
+                SELECT COUNT(*)
+                FROM material_inventories mi
+                WHERE mi.inventory_status::text = 'SHORTAGE'
                 """;
 
-        return queryForLong(sql, params(startAt, endExclusive));
+        return queryForLong(sql, new MapSqlParameterSource());
     }
 
     public long countMonthlyDueTargetOrders(OffsetDateTime startAt, OffsetDateTime endExclusive) {

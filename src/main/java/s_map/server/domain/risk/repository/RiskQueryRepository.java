@@ -75,16 +75,18 @@ public class RiskQueryRepository {
     private static final String MATERIAL_SHORTAGE_CTE = """
             material_shortage AS (
                 SELECT
-                    pp.order_id,
-                    COUNT(DISTINCT CASE
-                        WHEN COALESCE(ppm.shortage_quantity, 0) > 0
-                        THEN ppm.material_id
-                    END)::bigint AS shortage_material_count,
-                    COALESCE(SUM(GREATEST(COALESCE(ppm.shortage_quantity, 0), 0)), 0)::bigint AS shortage_quantity
-                FROM production_plans pp
-                LEFT JOIN production_plan_materials ppm
-                  ON ppm.plan_id = pp.plan_id
-                GROUP BY pp.order_id
+                    COUNT(*)::bigint AS shortage_material_count,
+                    COALESCE(
+                        SUM(
+                            GREATEST(
+                                COALESCE(mi.safety_stock_quantity, 0) - COALESCE(mi.available_quantity, 0),
+                                0
+                            )
+                        ),
+                        0
+                    )::bigint AS shortage_quantity
+                FROM material_inventories mi
+                WHERE mi.inventory_status::text = 'SHORTAGE'
             )
             """;
 
@@ -126,8 +128,8 @@ public class RiskQueryRepository {
                     1
                 ) AS expected_delay_days,
                 COALESCE(SUM(CASE WHEN lp.risk_level::text <> 'SAFE' THEN 1 ELSE 0 END), 0)::bigint AS delayed_order_count,
-                COALESCE(SUM(CASE WHEN COALESCE(ms.shortage_quantity, 0) > 0 THEN 1 ELSE 0 END), 0)::bigint AS material_shortage_count,
-                COALESCE(SUM(COALESCE(ms.shortage_quantity, 0)), 0)::bigint AS material_shortage_quantity,
+                COALESCE((SELECT shortage_material_count FROM material_shortage), 0)::bigint AS material_shortage_count,
+                COALESCE((SELECT shortage_quantity FROM material_shortage), 0)::bigint AS material_shortage_quantity,
                 COALESCE(SUM(CASE WHEN lp.risk_level::text = 'CRITICAL' THEN 1 ELSE 0 END), 0)::bigint AS critical_order_count,
                 CASE
                     WHEN COALESCE(SUM(CASE WHEN lp.risk_level::text = 'CRITICAL' THEN 1 ELSE 0 END), 0) > 0 THEN 'CRITICAL'
@@ -138,8 +140,6 @@ public class RiskQueryRepository {
             FROM latest_prediction lp
             JOIN customer_orders co
               ON co.order_id = lp.order_id
-            LEFT JOIN material_shortage ms
-              ON ms.order_id = co.order_id
             WHERE COALESCE(UPPER(co.order_status::text), '') NOT IN ('COMPLETE', 'COMPLETED', 'CANCELLED')
             """;
 

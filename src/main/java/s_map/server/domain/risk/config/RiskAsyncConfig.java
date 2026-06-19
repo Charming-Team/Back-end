@@ -9,6 +9,22 @@ import java.util.concurrent.Executor;
 @Configuration
 public class RiskAsyncConfig {
 
+    @Bean(name = "riskPredictionTaskExecutor")
+    public Executor riskPredictionTaskExecutor() {
+        ThreadPoolTaskExecutor executor =
+                new ThreadPoolTaskExecutor();
+
+        executor.setCorePoolSize(2);
+        executor.setMaxPoolSize(4);
+        executor.setQueueCapacity(100);
+        executor.setThreadNamePrefix("risk-prediction-");
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(10);
+        executor.initialize();
+
+        return executor;
+    }
+
     @Bean(name = "riskAgentTaskExecutor")
     public Executor riskAgentTaskExecutor() {
         ThreadPoolTaskExecutor executor =

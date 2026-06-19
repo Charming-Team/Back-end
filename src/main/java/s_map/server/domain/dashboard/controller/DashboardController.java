@@ -32,7 +32,7 @@ public class DashboardController {
 
     @Operation(
             summary = "대시보드 상단 KPI 요약 조회",
-            description = "현재 대시보드 기준 기간의 지연 위험 주문 수, 자재 부족 품목 수, 주문별 달성률, 생산계획 절약 시간을 조회합니다."
+            description = "현재 대시보드 기준 기간의 지연 위험 주문 수, 현재 재고 기준 자재 부족 품목 수, 주문별 달성률, 생산계획 절약 시간을 조회합니다."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "대시보드 KPI 요약 조회 성공"),
@@ -103,7 +103,7 @@ public class DashboardController {
 
     @Operation(
             summary = "리스크 요약 조회",
-            description = "대시보드 기준 기간의 지연 위험 주문, 자재 리스크, 라인 리스크, 위험 레벨별 건수와 최근 위험 주문을 조회합니다."
+            description = "대시보드 기준 기간의 지연 위험 주문, 현재 재고 기준 자재 리스크, 라인 리스크, 위험 레벨별 건수와 최근 위험 주문을 조회합니다."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "리스크 요약 조회 성공"),

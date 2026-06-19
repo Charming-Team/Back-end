@@ -15,16 +15,16 @@ public record DashboardSummaryResponse(
         @Schema(description = "집계 종료일", example = "2026-06-06")
         LocalDate periodEndDate,
 
-        @Schema(description = "지연 위험 주문 수", example = "18")
+        @Schema(description = "최신 AI 예측 결과 기준 지연 위험 주문 수. 완료/취소 주문과 예측 대상이 아닌 주문은 제외합니다.", example = "18")
         long delayRiskOrderCount,
 
-        @Schema(description = "전체 생산 대상 주문 대비 지연 위험 주문 비율", example = "8.0")
+        @Schema(description = "월간 생산 대상 주문 대비 지연 위험 주문 비율", example = "8.0")
         BigDecimal delayRiskOrderRate,
 
-        @Schema(description = "생산계획 기준 자재 부족 품목 수", example = "2")
+        @Schema(description = "현재 재고 기준 SHORTAGE 상태 자재 품목 수", example = "2")
         long materialShortageCount,
 
-        @Schema(description = "전체 생산계획 대상 자재 대비 부족 품목 비율", example = "3.0")
+        @Schema(description = "전체 재고 등록 자재 대비 SHORTAGE 상태 자재 비율", example = "3.0")
         BigDecimal materialShortageRate,
 
         @Schema(description = "월간 납기 대상 주문 중 납기일 내 완료된 주문 비율", example = "98.0")

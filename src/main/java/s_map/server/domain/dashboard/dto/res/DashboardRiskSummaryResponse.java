@@ -15,10 +15,10 @@ public record DashboardRiskSummaryResponse(
         @Schema(description = "리스크 집계 종료일", example = "2026-06-06")
         LocalDate periodEndDate,
 
-        @Schema(description = "지연 위험 주문 수", example = "18")
+        @Schema(description = "최신 AI 예측 결과 기준 지연 위험 주문 수. 완료/취소 주문과 예측 대상이 아닌 주문은 제외합니다.", example = "18")
         long delayRiskOrderCount,
 
-        @Schema(description = "생산계획 기준 자재 리스크 품목 수", example = "2")
+        @Schema(description = "현재 재고 기준 SHORTAGE 상태 자재 리스크 품목 수", example = "2")
         long materialRiskCount,
 
         @Schema(description = "활성 라인 중 최신 상태가 위험 상태인 라인 수", example = "1")
