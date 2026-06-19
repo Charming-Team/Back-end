@@ -1,7 +1,7 @@
 # S-MAP Server
 
 S-MAP Server는 제조 현장의 주문, 생산계획, 자재, 라인 운영 데이터를 관리하고 AI 챗봇/분석 서버와 연동하기 위한 Spring Boot 기반 백엔드입니다.
-현재 서버는 사용자 인증/권한, 대시보드, 주문 등록 및 조회, 생산계획 조회/수정, 자재 및 BOM 관리, 라인 운영 현황, AI 생산계획/리포트 연동 등을 제공합니다.
+현재 서버는 사용자 인증/권한, 대시보드, 주문 등록 및 조회, 생산계획 조회/수정, 자재 및 BOM 관리, 라인 운영 현황, 지연 리스크 분석, 실시간 알림, AI 생산계획/챗봇/리포트 연동 등을 제공합니다.
 
 ## 기술 스택
 
@@ -45,6 +45,24 @@ S-MAP Server는 제조 현장의 주문, 생산계획, 자재, 라인 운영 데
 - 주문 납기 상태 조회
 - 라인 가동률 조회
 - 리스크 요약 및 최근 알림 조회
+
+### 지연 리스크 분석
+
+- 주문/생산계획 변경 이후 FastAPI 지연 확률 예측 비동기 실행
+- 서버 시작 시 미분석 또는 미완료 주문 리스크 예측 백필
+- 리스크 요약, 주문별 리스크 목록, 주문 상세 리스크 조회
+- 위험 등급별 지연 확률, 예상 지연일, 주요 원인, 권고 조치 조회
+- 필요 시 FastAPI Risk Agent를 호출해 원인 분석 및 조치 권고 저장
+- FastAPI Risk Agent가 사용할 내부 Evidence 조회 및 결과 저장 API 제공
+
+### 실시간 알림
+
+- 사용자별 알림 목록 cursor 조회
+- 미읽음 알림 수 조회
+- SSE 기반 실시간 알림 및 미읽음 카운트 전송
+- EventSource 구독용 1회용 짧은 수명 ticket 발급
+- 알림 단건 읽음, 전체 읽음, 전체 삭제
+- 리포트 생성 완료, 일정 반영, 지연 위험 분석 결과 알림 생성
 
 ### 주문 관리
 
@@ -114,9 +132,11 @@ src/main/java/s_map/server
 │   ├── dashboard   # 메인 대시보드 지표 조회
 │   ├── line        # 라인/설비 운영 현황, 주문 배분 조회
 │   ├── material    # 자재, 재고, BOM
+│   ├── notification # 사용자 알림, SSE 구독, 알림 이벤트 처리
 │   ├── order       # 주문, 주문번호, 주문 기반 생산계획 생성
 │   ├── plan        # 생산계획 조회/수정, AI 계획 생성, 시뮬레이션
 │   ├── report      # AI 리포트 생성, 조회, 수정
+│   ├── risk        # 지연 리스크 예측, Risk Agent 연동, 리스크 조회
 │   ├── token       # Refresh Token 저장, 검증, 정리
 │   └── user        # 로그인, 관리자 사용자 관리
 └── global
@@ -157,8 +177,30 @@ JWT_SECRET=<jwt-secret>
 | `APP_CORS_ALLOWED_ORIGINS` | prod CORS 허용 Origin 목록 | 없음 |
 | `FASTAPI_BASE_URL` | FastAPI 서버 Base URL | `http://fastapi-service:8000` |
 | `AI_FASTAPI_PLANNING_GENERATE_PATH` | FastAPI 생산계획 생성 경로 | `/api/v1/planning` |
+| `AI_FASTAPI_PLANNING_CONNECT_TIMEOUT_MILLIS` | FastAPI 생산계획 연결 타임아웃(ms) | `5000` |
+| `AI_FASTAPI_PLANNING_READ_TIMEOUT_MILLIS` | FastAPI 생산계획 응답 타임아웃(ms) | `300000` |
+| `AI_FASTAPI_CHAT_ANSWER_PATH` | FastAPI 챗봇 답변 경로 | `/api/v1/chat/answer` |
+| `AI_FASTAPI_TIMEOUT_SECONDS` | FastAPI 챗봇 요청 타임아웃(초) | `60` |
+| `AI_FASTAPI_REPORT_GENERATE_PATH` | FastAPI 리포트 생성 경로 | `/api/v1/reports/generate` |
+| `AI_FASTAPI_BUSINESS_REPORT_GENERATE_PATH` | FastAPI 업무 리포트 생성 경로 | `/api/v1/business-reports/generate` |
+| `AI_FASTAPI_REPORT_CONNECT_TIMEOUT_MILLIS` | FastAPI 리포트 연결 타임아웃(ms) | `5000` |
+| `AI_FASTAPI_REPORT_READ_TIMEOUT_MILLIS` | FastAPI 리포트 응답 타임아웃(ms) | `300000` |
+| `AI_FASTAPI_DELAY_PROBABILITY_PREDICT_PATH` | FastAPI 지연 확률 예측 경로 | `/api/v1/delay-probability/predict` |
+| `AI_FASTAPI_DELAY_PREDICTION_PREDICT_PATH` | FastAPI 지연일 예측 경로 | `/api/v1/delay-prediction/predict` |
+| `AI_FASTAPI_RISK_CONNECT_TIMEOUT_MS` | FastAPI 리스크 예측 연결 타임아웃(ms) | `3000` |
+| `AI_FASTAPI_RISK_READ_TIMEOUT_MS` | FastAPI 리스크 예측 응답 타임아웃(ms) | `10000` |
+| `AI_FASTAPI_RISK_INTERNAL_TOKEN` | Spring과 FastAPI 리스크/Risk Agent 내부 연동 토큰 | 없음 |
+| `AI_FASTAPI_RISK_STARTUP_BACKFILL_ENABLED` | 서버 시작 시 리스크 예측 백필 실행 여부 | `true` |
+| `AI_FASTAPI_RISK_STARTUP_BACKFILL_LIMIT` | 서버 시작 시 리스크 예측 백필 최대 건수 | `1000` |
+| `AI_FASTAPI_RISK_STARTUP_BACKFILL_MODE` | 리스크 예측 백필 모드(`MISSING_ONLY`, `REFRESH_ALL_INCOMPLETE`) | `MISSING_ONLY` |
+| `AI_FASTAPI_RISK_AGENT_ANALYSIS_ENABLED` | 위험 주문에 대한 Risk Agent 분석 호출 여부 | `false` |
+| `AI_FASTAPI_RISK_AGENT_EXECUTE_PATH` | FastAPI Risk Agent 실행 경로 | `/api/v1/risk-agent/execute` |
+| `AI_FASTAPI_RISK_AGENT_READ_TIMEOUT_MS` | FastAPI Risk Agent 응답 타임아웃(ms) | `300000` |
 | `CHAT_EVIDENCE_INTERNAL_TOKEN` | FastAPI가 Spring Evidence API를 호출할 때 사용하는 내부 토큰 | 없음 |
 | `CHAT_ANSWER_INTERNAL_TOKEN` | Spring이 FastAPI 챗봇 응답 API를 호출할 때 사용하는 내부 토큰 | 없음 |
+| `NOTIFICATION_SSE_TIMEOUT_MS` | SSE 연결 유지 타임아웃(ms) | `1800000` |
+| `NOTIFICATION_SSE_HEARTBEAT_INTERVAL_MS` | SSE heartbeat 전송 주기(ms) | `25000` |
+| `NOTIFICATION_SSE_TICKET_TTL_MS` | SSE 구독 ticket 유효 시간(ms) | `30000` |
 | `SPRING_MAIL_HOST` | SMTP 서버 호스트 | 없음 |
 | `SPRING_MAIL_PORT` | SMTP 서버 포트 | 없음 |
 | `SPRING_MAIL_USERNAME` | SMTP 로그인 계정 | 없음 |
@@ -231,8 +273,11 @@ docker run --rm -p 8080:8080 \
   -e DB_PASSWORD=<db-password> \
   -e JWT_SECRET=<jwt-secret> \
   -e APP_CORS_ALLOWED_ORIGINS=http://localhost:3000 \
+  -e FASTAPI_BASE_URL=http://host.docker.internal:8000 \
   -e CHAT_EVIDENCE_INTERNAL_TOKEN=<internal-token> \
   -e CHAT_ANSWER_INTERNAL_TOKEN=<internal-token> \
+  -e AI_FASTAPI_RISK_INTERNAL_TOKEN=<internal-token> \
+  -e AI_FASTAPI_RISK_AGENT_ANALYSIS_ENABLED=false \
   -e SPRING_MAIL_HOST=smtp.gmail.com \
   -e SPRING_MAIL_PORT=587 \
   -e SPRING_MAIL_USERNAME=<gmail-address> \
@@ -255,6 +300,8 @@ docker run --rm -p 8080:8080 \
 - 주문 생성은 `MANUFACTURING_MANAGER` 권한이 필요합니다.
 - AI 생산계획 생성, 시뮬레이션 저장, 생산계획 수정은 `ADMIN`, `EXECUTIVE`, `MANUFACTURING_MANAGER` 권한이 필요합니다.
 - FastAPI 내부 연동 API인 `/internal/chat/evidence`는 `X-Internal-Token` 헤더로 `CHAT_EVIDENCE_INTERNAL_TOKEN` 값을 전달해야 합니다.
+- FastAPI Risk Agent 내부 연동 API인 `/internal/risk-agent/**`는 `X-Internal-Token` 헤더로 `AI_FASTAPI_RISK_INTERNAL_TOKEN` 값을 전달해야 합니다.
+- SSE 구독은 브라우저 `EventSource` 제약 때문에 `POST /api/notifications/sse-ticket`으로 인증된 1회용 ticket을 먼저 발급받고, `GET /api/notifications/subscribe?ticket=...`로 연결합니다.
 
 ## 주요 API 그룹
 
@@ -290,6 +337,18 @@ docker run --rm -p 8080:8080 \
 | BOM | `PUT /api/materials/boms/{bomId}` | BOM 수정 |
 | 챗봇 | `POST /api/chat/answer` | FastAPI 챗봇 답변 요청 |
 | 챗봇 내부 | `POST /internal/chat/evidence` | FastAPI용 RDB Evidence 조회 |
+| 리스크 | `GET /api/risks/summary` | 리스크 요약 조회 |
+| 리스크 | `GET /api/risks/orders` | 리스크 주문 목록 조회 |
+| 리스크 | `GET /api/risks/orders/{orderId}` | 리스크 주문 상세 조회 |
+| Risk Agent 내부 | `GET /internal/risk-agent/evidence/{predictionId}/{orderId}` | FastAPI Risk Agent용 근거 데이터 조회 |
+| Risk Agent 내부 | `POST /internal/risk-agent/results` | FastAPI Risk Agent 분석 결과 저장 |
+| 알림 | `GET /api/notifications` | 알림 목록 cursor 조회 |
+| 알림 | `GET /api/notifications/unread-count` | 미읽음 알림 수 조회 |
+| 알림 | `POST /api/notifications/sse-ticket` | SSE 구독 ticket 발급 |
+| 알림 | `GET /api/notifications/subscribe` | SSE 실시간 알림 구독 |
+| 알림 | `PATCH /api/notifications/{notificationId}/read` | 알림 단건 읽음 처리 |
+| 알림 | `PATCH /api/notifications/read-all` | 알림 전체 읽음 처리 |
+| 알림 | `DELETE /api/notifications` | 알림 전체 삭제 |
 | 리포트 | `POST /api/reports/generate` | AI 리포트 생성 시작 |
 | 리포트 | `POST /api/reports/business` | 업무 리포트 생성 |
 | 리포트 | `GET /api/reports/jobs/{reportJobId}` | 리포트 생성 작업 조회 |
@@ -298,6 +357,7 @@ docker run --rm -p 8080:8080 \
 | 리포트 | `GET /api/reports/{reportId}/pdf` | 리포트 PDF 다운로드 |
 | 리포트 | `POST /api/reports/{reportId}/mail` | 리포트 메일 발송 |
 | 리포트 | `PATCH /api/reports/{reportId}` | 리포트 수정 |
+| 리포트 | `POST /api/reports/{reportId}/structured-data/backfill` | 리포트 상세 구조화 데이터 보정 |
 
 ## 응답 규격
 
